@@ -32,11 +32,13 @@ jobs:
       - name: Auto approve trusted generated PR
         uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4.0.0
         with:
+          github-token: ${{ secrets.AUTOMATION_PAT || github.token }}
           review-message: "Automated approval for trusted generated PR."
 
       - name: Enable auto-merge when allowed
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
+          github-token: ${{ secrets.AUTOMATION_PAT || github.token }}
           script: |
             const pullRequestId = context.payload.pull_request.node_id;
 

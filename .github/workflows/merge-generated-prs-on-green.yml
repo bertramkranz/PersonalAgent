@@ -36,6 +36,7 @@ jobs:
       - name: Approve and merge trusted generated PR when ready
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
+          github-token: ${{ secrets.AUTOMATION_PAT || github.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -159,15 +160,24 @@ jobs:
               );
 
               if (!alreadyApproved) {
-                await github.rest.pulls.createReview({
-                  owner,
-                  repo,
-                  pull_number: pullNumber,
-                  event: 'APPROVE',
-                  body: 'Automated approval for trusted generated PR after successful checks.',
-                });
+                try {
+                  await github.rest.pulls.createReview({
+                    owner,
+                    repo,
+                    pull_number: pullNumber,
+                    event: 'APPROVE',
+                    body: 'Automated approval for trusted generated PR after successful checks.',
+                  });
 
-                core.info(`Approved PR #${pullNumber}.`);
+                  core.info(`Approved PR #${pullNumber}.`);
+                } catch (error) {
+                  const message = String(error.message || error);
+                  if (error.status === 422 && message.includes('approve your own pull request')) {
+                    core.info(`Approval skipped for PR #${pullNumber}: token identity matches PR author.`);
+                  } else {
+                    throw error;
+                  }
+                }
               }
 
               try {
