@@ -8,7 +8,7 @@ class MessageCaptureNode : BertBotGraphNode {
 
     override fun execute(state: BertBotState): BertBotState {
         if (state.lastUserMessage.isNotBlank()) {
-            state.memorySummary.add("Captured user message: ${state.lastUserMessage}")
+            state.memorySummary.add("Captured user message metadata: length=${state.lastUserMessage.length}")
             state.executionSummary.add("Captured input")
         }
         return state

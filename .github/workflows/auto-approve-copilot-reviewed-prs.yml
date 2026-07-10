@@ -1,0 +1,22 @@
+name: Auto Approve Copilot Reviewed PRs
+
+on:
+  # pull_request_target runs in the context of the base branch,
+  # giving it the necessary permissions to submit approvals.
+  pull_request_target:
+    types: [opened, reopened, synchronized]
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    # Only trigger for your own PRs.
+    if: github.actor == 'bertramkranz'
+
+    steps:
+      - name: Bootstrap Approval
+        uses: hmarr/auto-approve-action@v4
+        with:
+          review-message: "Automated self-approval for single-developer workflow."

@@ -101,6 +101,10 @@ This repository includes GitHub Actions workflows:
 	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.
 	- Re-requests review on new pushes to the pull request branch.
 
+- Secret scan workflow: `.github/workflows/secret-scan.yml`
+	- Triggers on pushes, pull requests into `main` or `master`, and manual dispatch.
+	- Scans commits for leaked secrets and uploads SARIF findings to GitHub code scanning.
+
 ## GitHub Copilot Automation
 
 This repository also includes GitHub Copilot repository instructions in `.github/copilot-instructions.md` and a review-focused skill in `.github/skills/code-review/SKILL.md`.
