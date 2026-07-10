@@ -140,5 +140,5 @@ internal fun buildSystemPrompt(
     - pending tasks: ${renderStateListForSystemContext(state.pendingTasks)}
     - delegation plan: ${renderStateListForSystemContext(state.delegationPlan)}
     - memory: ${renderStateListForSystemContext(state.memorySummary)}
-    - selected sub-agent: "${escapeForSystemContext(state.selectedSubAgent ?: "none")}" 
+    - selected sub-agent: "${escapeForSystemContext(state.selectedSubAgent ?: "none")}"
     """.trimIndent()
