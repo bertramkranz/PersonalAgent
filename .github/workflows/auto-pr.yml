@@ -1,0 +1,62 @@
+name: Auto Create PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+    tags-ignore:
+      - '**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  open-pr:
+    if: ${{ github.actor != 'dependabot[bot]' && startsWith(github.ref, 'refs/heads/') && github.ref_name != github.event.repository.default_branch }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create pull request if one does not exist
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const branchName = context.ref.replace('refs/heads/', '');
+            const baseBranch = context.payload.repository.default_branch;
+
+            const { data: existingPulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${branchName}`,
+              base: baseBranch,
+            });
+
+            if (existingPulls.length > 0) {
+              core.info(`Open pull request already exists: #${existingPulls[0].number}`);
+              return;
+            }
+
+            const { data: pullRequest } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: branchName,
+              base: baseBranch,
+              title: `chore: merge ${branchName} into ${baseBranch}`,
+              body: [
+                'Automated pull request created after a branch push.',
+                '',
+                '## Summary',
+                `- proposes merging the latest changes from \`${branchName}\` into \`${baseBranch}\``,
+                '',
+                '## Verification',
+                '- review the CI results for this pull request',
+              ].join('\n'),
+            });
+
+            core.info(`Created pull request #${pullRequest.number}`);

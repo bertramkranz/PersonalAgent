@@ -1,0 +1,22 @@
+name: Auto Approve Copilot Reviewed PRs
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    if: >-
+      github.event.pull_request.user.login == 'bertramkranz' &&
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == 'copilot-pull-request-reviewer[bot]'
+
+    steps:
+      - name: Auto approve after Copilot approval
+        uses: hmarr/auto-approve-action@f0939ea97e9205ef24d872e76833fa908a770363 # v4.0.0
+        with:
+          review-message: "Automated approval after Copilot review approval."
