@@ -1,0 +1,38 @@
+build:
+  maxIssues: 0
+
+style:
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: true
+  ReturnCount:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  MaxLineLength:
+    active: false
+  NewLineAtEndOfFile:
+    active: false
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+  PrintStackTrace:
+    active: false
+
+naming:
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+
+complexity:
+  LongMethod:
+    active: true
+    threshold: 80
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 25
+    thresholdInClasses: 20
+    thresholdInInterfaces: 20
+    thresholdInObjects: 20
