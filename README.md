@@ -78,7 +78,7 @@ Run the app with:
 This repository includes GitHub Actions workflows:
 
 - CI workflow: `.github/workflows/ci.yml`
-	- Triggers on pushes to all branches, pull requests into `main` or `master`, and manual dispatch.
+	- Triggers on pushes to `main` or `master` (excluding tags), pull requests into `main` or `master`, and manual dispatch.
 	- Validates the Gradle wrapper, runs the full `check` quality gate, and uploads reports as workflow artifacts.
 
 - Dependency review workflow: `.github/workflows/dependency-review.yml`
