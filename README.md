@@ -94,7 +94,7 @@ This repository includes GitHub Actions workflows:
 	- Builds distribution archives and publishes a GitHub Release with artifacts from `build/distributions`.
 
 - Auto PR workflow: `.github/workflows/auto-pr.yml`
-	- Triggers on pushes to non-default branches except `master`.
+	- Triggers on pushes to branches other than the repository default branch (and ignores `main`/`master`).
 	- Opens a pull request into the repository default branch when one is not already open.
 
 - Copilot review workflow: `.github/workflows/copilot-review.yml`
