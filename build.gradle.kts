@@ -20,10 +20,9 @@ repositories {
 
 dependencies {
     // OpenAI Java SDK
-    implementation("com.theokanning.openai-gpt3-java:service:0.18.0")
+    implementation("com.openai:openai-java:4.42.0")
 
-    // HTTP Client dependencies (required by OpenAI SDK)
-    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    // JSON serialization (used by FileBertBotStateStore and BertBotMemory)
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Coroutines (optional, for async operations)

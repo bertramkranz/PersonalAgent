@@ -1,15 +1,14 @@
 package com.personalagent.bertbot.app
 
+import com.openai.client.OpenAIClient
+import com.openai.client.okhttp.OpenAIOkHttpClient
+import com.openai.models.ChatModel
+import com.openai.models.chat.completions.ChatCompletionCreateParams
 import com.personalagent.bertbot.config.KoogAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
-import com.theokanning.openai.completion.chat.ChatCompletionRequest
-import com.theokanning.openai.completion.chat.ChatMessage
-import com.theokanning.openai.service.OpenAiService
 import java.io.File
 import java.time.Duration
-
-private const val MODEL_ID = "gpt-4o-mini"
 
 fun main() {
     val agentConfig = KoogAgentConfig()
@@ -34,7 +33,11 @@ fun main() {
     println("")
 
     try {
-        val service = OpenAiService(apiKey, Duration.ofSeconds(30))
+        val service: OpenAIClient =
+            OpenAIOkHttpClient.builder()
+                .apiKey(apiKey)
+                .timeout(Duration.ofSeconds(30))
+                .build()
         println("Type your message and press Enter. Type 'exit' to quit.")
         println("")
 
@@ -73,20 +76,15 @@ fun main() {
             val state = graph.run(initialState)
             val systemPrompt = buildSystemPrompt(agentConfig, state)
 
-            val chatMessages =
-                listOf(
-                    ChatMessage("system", systemPrompt),
-                    ChatMessage("user", userMessage),
-                )
-
             val completionRequest =
-                ChatCompletionRequest.builder()
-                    .model(MODEL_ID)
-                    .messages(chatMessages)
+                ChatCompletionCreateParams.builder()
+                    .model(ChatModel.GPT_4O_MINI)
+                    .addSystemMessage(systemPrompt)
+                    .addUserMessage(userMessage)
                     .build()
 
-            val completion = service.createChatCompletion(completionRequest)
-            val assistantResponse = completion.choices[0].message.content
+            val completion = service.chat().completions().create(completionRequest)
+            val assistantResponse = completion.choices().firstOrNull()?.message()?.content()?.orElse("") ?: ""
 
             println("Assistant: $assistantResponse")
             println("")
