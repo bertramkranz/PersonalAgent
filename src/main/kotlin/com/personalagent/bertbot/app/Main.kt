@@ -19,8 +19,10 @@ fun main() {
 
     if (apiKey.isNullOrEmpty()) {
         println("❌ Error: OPENAI_API_KEY not found")
-        println("Set OPENAI_API_KEY environment variable or create .env with:")
-        println("OPENAI_API_KEY=your-api-key-here")
+        println("Option 1 – shell environment variable:")
+        println("  export OPENAI_API_KEY=your-api-key-here")
+        println("Option 2 – create a .env file containing:")
+        println("  OPENAI_API_KEY=your-api-key-here")
         return
     }
 
