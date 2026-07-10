@@ -11,9 +11,13 @@ on:
 permissions:
   pull-requests: write
 
+concurrency:
+  group: copilot-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   request-copilot-review:
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
 
     steps:
