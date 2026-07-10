@@ -78,15 +78,15 @@ Run the app with:
 This repository includes GitHub Actions workflows:
 
 - CI workflow: `.github/workflows/ci.yml`
-	- Triggers on pushes to `main` or `master` (excluding tags), pull requests into `main` or `master`, and manual dispatch.
+	- Triggers on pushes to `main` (excluding tags), pull requests into `main`, and manual dispatch.
 	- Validates the Gradle wrapper, runs the full `check` quality gate, and uploads reports as workflow artifacts.
 
 - Dependency review workflow: `.github/workflows/dependency-review.yml`
-	- Triggers on pull requests into `main` or `master`.
+	- Triggers on pull requests into `main`.
 	- Fails the pull request when newly introduced dependencies include vulnerable packages.
 
 - CodeQL workflow: `.github/workflows/codeql.yml`
-	- Triggers on pushes and pull requests for `main` or `master`, on a weekly schedule, and by manual dispatch.
+	- Triggers on pushes and pull requests for `main`, on a weekly schedule, and by manual dispatch.
 	- Scans the Kotlin codebase for security and reliability issues using GitHub code scanning.
 
 - CD workflow: `.github/workflows/cd.yml`
@@ -94,7 +94,7 @@ This repository includes GitHub Actions workflows:
 	- Builds distribution archives and publishes a GitHub Release with artifacts from `build/distributions`.
 
 - Auto PR workflow: `.github/workflows/auto-pr.yml`
-	- Triggers on pushes to branches other than the repository default branch (and ignores `main`/`master`).
+	- Triggers on pushes to branches other than the repository default branch (and ignores `main`).
 	- Opens a pull request into the repository default branch when one is not already open.
 
 - Copilot review workflow: `.github/workflows/copilot-review.yml`
@@ -102,7 +102,7 @@ This repository includes GitHub Actions workflows:
 	- Re-requests review on new pushes to the pull request branch.
 
 - Secret scan workflow: `.github/workflows/secret-scan.yml`
-	- Triggers on pushes, pull requests into `main` or `master`, and manual dispatch.
+	- Triggers on pushes, pull requests into `main`, and manual dispatch.
 	- Scans commits for leaked secrets and uploads SARIF findings to GitHub code scanning.
 
 ## GitHub Copilot Automation
