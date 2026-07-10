@@ -78,8 +78,16 @@ Run the app with:
 This repository includes GitHub Actions workflows:
 
 - CI workflow: `.github/workflows/ci.yml`
-	- Triggers on pushes and pull requests to `main` or `master`.
-	- Runs `detekt`, `ktlintCheck`, and `test`.
+	- Triggers on pushes to all branches, pull requests into `main` or `master`, and manual dispatch.
+	- Validates the Gradle wrapper, runs the full `check` quality gate, and uploads reports as workflow artifacts.
+
+- Dependency review workflow: `.github/workflows/dependency-review.yml`
+	- Triggers on pull requests into `main` or `master`.
+	- Fails the pull request when newly introduced dependencies include vulnerable packages.
+
+- CodeQL workflow: `.github/workflows/codeql.yml`
+	- Triggers on pushes and pull requests for `main` or `master`, on a weekly schedule, and by manual dispatch.
+	- Scans the Kotlin codebase for security and reliability issues using GitHub code scanning.
 
 - CD workflow: `.github/workflows/cd.yml`
 	- Triggers when pushing tags like `v1.0.0`.
