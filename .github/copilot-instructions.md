@@ -1,6 +1,6 @@
 When reviewing or changing code in this repository, prefer small, behavior-preserving changes over broad refactors.
 
-Validate Kotlin, Gradle, or workflow changes with `./gradlew --no-daemon detekt ktlintCheck test` when the environment supports it.
+Validate Kotlin, Gradle, or workflow changes with `./gradlew --no-daemon check` when the environment supports it.
 
 Keep the graph architecture split consistent across `graph.model`, `graph.nodes`, `graph.runtime`, and `graph.store`.
 
