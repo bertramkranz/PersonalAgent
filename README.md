@@ -85,6 +85,26 @@ This repository includes GitHub Actions workflows:
 	- Triggers when pushing tags like `v1.0.0`.
 	- Builds distribution archives and publishes a GitHub Release with artifacts from `build/distributions`.
 
+- Auto PR workflow: `.github/workflows/auto-pr.yml`
+	- Triggers on pushes to non-default branches except `master`.
+	- Opens a pull request into the repository default branch when one is not already open.
+
+- Copilot review workflow: `.github/workflows/copilot-review.yml`
+	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.
+	- Re-requests review on new pushes to the pull request branch.
+
+## GitHub Copilot Automation
+
+This repository also includes GitHub Copilot repository instructions in `.github/copilot-instructions.md` and a review-focused skill in `.github/skills/code-review/SKILL.md`.
+
+To use GitHub-native review and implementation flow in pull requests:
+
+- Enable GitHub Copilot code review for the repository.
+- Enable the GitHub Copilot coding agent or cloud agent for the repository.
+- Use **Fix with Copilot** from Copilot review comments when you want GitHub to implement a suggested improvement.
+
+GitHub Copilot can suggest changes and draft implementations, but auto-applying arbitrary review feedback without an explicit pull request action remains a safety boundary in GitHub.
+
 To trigger a release after publishing:
 
 ```bash
