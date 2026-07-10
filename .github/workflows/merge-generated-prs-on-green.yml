@@ -1,6 +1,12 @@
 name: Merge Generated PRs On Green
 
 on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
   workflow_run:
     workflows:
       - CI
@@ -9,14 +15,21 @@ on:
       - Secret Scan
     types:
       - completed
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
+concurrency:
+  group: merge-generated-prs
+  cancel-in-progress: false
+
 jobs:
   merge-generated-pr:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -24,41 +37,120 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
-            const workflowRun = context.payload.workflow_run;
-            const candidatePullRequests = workflowRun.pull_requests || [];
+            const defaultBranch = context.payload.repository.default_branch;
 
-            if (candidatePullRequests.length === 0) {
-              core.info('No pull requests are associated with this workflow run.');
+            async function resolveCandidatePullNumbers() {
+              if (context.eventName === 'pull_request_target') {
+                return [context.payload.pull_request.number];
+              }
+
+              if (context.eventName === 'workflow_run') {
+                const workflowRun = context.payload.workflow_run;
+                const pullNumbers = new Set((workflowRun.pull_requests || []).map((pr) => pr.number));
+
+                // GitHub can emit workflow_run without linked PR metadata; map by head branch as fallback.
+                if (pullNumbers.size === 0 && workflowRun.head_branch) {
+                  const { data: branchPullRequests } = await github.rest.pulls.list({
+                    owner,
+                    repo,
+                    state: 'open',
+                    head: `${owner}:${workflowRun.head_branch}`,
+                    base: defaultBranch,
+                  });
+
+                  for (const pullRequest of branchPullRequests) {
+                    pullNumbers.add(pullRequest.number);
+                  }
+                }
+
+                return [...pullNumbers];
+              }
+
+              const { data: openPullRequests } = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                base: defaultBranch,
+                per_page: 100,
+              });
+
+              return openPullRequests.map((pr) => pr.number);
+            }
+
+            function isTrustedGeneratedPr(pr) {
+              return (
+                pr.state === 'open' &&
+                !pr.draft &&
+                pr.base.ref === defaultBranch &&
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                trustedAuthors.has(pr.user?.login || '') &&
+                pr.title.startsWith('chore: merge ') &&
+                (pr.body || '').includes('Automated pull request created after a branch push.')
+              );
+            }
+
+            async function rerunActionRequiredChecks(pr) {
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: pr.head.sha,
+                per_page: 100,
+              });
+
+              const rerunRunIds = new Set();
+              for (const checkRun of checks.check_runs) {
+                if (checkRun.conclusion !== 'action_required') {
+                  continue;
+                }
+
+                const detailsUrl = checkRun.details_url || '';
+                const runIdMatch = detailsUrl.match(/\/actions\/runs\/(\d+)/);
+                if (runIdMatch) {
+                  rerunRunIds.add(runIdMatch[1]);
+                }
+              }
+
+              for (const runId of rerunRunIds) {
+                try {
+                  await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun', {
+                    owner,
+                    repo,
+                    run_id: Number(runId),
+                  });
+                  core.info(`Requested rerun for action_required run ${runId} on PR #${pr.number}.`);
+                } catch (error) {
+                  core.info(`Unable to rerun run ${runId} on PR #${pr.number}: ${error.message}`);
+                }
+              }
+            }
+
+            const candidatePullNumbers = await resolveCandidatePullNumbers();
+            if (candidatePullNumbers.length === 0) {
+              core.info('No candidate pull requests found for this event.');
               return;
             }
 
-            for (const candidate of candidatePullRequests) {
-              const pullNumber = candidate.number;
+            for (const pullNumber of candidatePullNumbers) {
 
               const { data: pr } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner,
+                repo,
                 pull_number: pullNumber,
               });
 
-              const isTrustedGeneratedPr =
-                pr.state === 'open' &&
-                !pr.draft &&
-                pr.base.ref === context.payload.repository.default_branch &&
-                pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
-                trustedAuthors.has(pr.user?.login || '') &&
-                pr.title.startsWith('chore: merge ') &&
-                (pr.body || '').includes('Automated pull request created after a branch push.');
-
-              if (!isTrustedGeneratedPr) {
+              if (!isTrustedGeneratedPr(pr)) {
                 core.info(`Skipping PR #${pullNumber}: does not match trusted generated PR guardrails.`);
                 continue;
               }
 
+              await rerunActionRequiredChecks(pr);
+
               const { data: reviews } = await github.rest.pulls.listReviews({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner,
+                repo,
                 pull_number: pullNumber,
               });
 
@@ -68,8 +160,8 @@ jobs:
 
               if (!alreadyApproved) {
                 await github.rest.pulls.createReview({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
+                  owner,
+                  repo,
                   pull_number: pullNumber,
                   event: 'APPROVE',
                   body: 'Automated approval for trusted generated PR after successful checks.',
@@ -80,8 +172,8 @@ jobs:
 
               try {
                 const mergeResponse = await github.rest.pulls.merge({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
+                  owner,
+                  repo,
                   pull_number: pullNumber,
                   merge_method: 'squash',
                 });
