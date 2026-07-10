@@ -1,0 +1,98 @@
+name: Merge Generated PRs On Green
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - CodeQL
+      - Dependency Review
+      - Secret Scan
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge-generated-pr:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Approve and merge trusted generated PR when ready
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
+            const workflowRun = context.payload.workflow_run;
+            const candidatePullRequests = workflowRun.pull_requests || [];
+
+            if (candidatePullRequests.length === 0) {
+              core.info('No pull requests are associated with this workflow run.');
+              return;
+            }
+
+            for (const candidate of candidatePullRequests) {
+              const pullNumber = candidate.number;
+
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              });
+
+              const isTrustedGeneratedPr =
+                pr.state === 'open' &&
+                !pr.draft &&
+                pr.base.ref === context.payload.repository.default_branch &&
+                pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+                trustedAuthors.has(pr.user?.login || '') &&
+                pr.title.startsWith('chore: merge ') &&
+                (pr.body || '').includes('Automated pull request created after a branch push.');
+
+              if (!isTrustedGeneratedPr) {
+                core.info(`Skipping PR #${pullNumber}: does not match trusted generated PR guardrails.`);
+                continue;
+              }
+
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              });
+
+              const alreadyApproved = reviews.some(
+                (review) => review.state === 'APPROVED' && trustedAuthors.has(review.user?.login || '')
+              );
+
+              if (!alreadyApproved) {
+                await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                  event: 'APPROVE',
+                  body: 'Automated approval for trusted generated PR after successful checks.',
+                });
+
+                core.info(`Approved PR #${pullNumber}.`);
+              }
+
+              try {
+                const mergeResponse = await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                  merge_method: 'squash',
+                });
+
+                core.info(`Merged PR #${pullNumber}: ${mergeResponse.data.sha}`);
+              } catch (error) {
+                if ([405, 409, 422].includes(error.status)) {
+                  core.info(`Merge deferred for PR #${pullNumber}: ${error.message}`);
+                  continue;
+                }
+
+                throw error;
+              }
+            }
