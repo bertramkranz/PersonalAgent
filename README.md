@@ -24,7 +24,7 @@ BertBot runs as a graph of named nodes:
 2. Plan the work and identify priorities.
 3. Match the task to a specialized sub-agent when appropriate.
 4. Execute the delegated workflow.
-5. Persist the resulting state to disk.
+5. Persist the resulting execution snapshot to disk.
 
 This structure keeps the orchestration logic easy to visualize and makes it straightforward to add more nodes later.
 
@@ -32,11 +32,14 @@ This structure keeps the orchestration logic easy to visualize and makes it stra
 
 BertBot currently persists local state in these files:
 
-- `bertbot-state.json` - graph execution state and delegation context.
+- `bertbot-state.json` - latest graph execution snapshot and delegation context for inspection/debugging.
 - `bertbot-memory.txt` - episodic memory entries from recent interactions.
 - `bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
+- `bertbot-profile.json` - structured profile facts (for example, remembered user name).
+- `bertbot-trace.jsonl` - structured runtime trace events with trace IDs.
+- `bertbot-interactions.mmd` - Mermaid sequence diagram generated from the latest trace and graph state.
 
-These files are local to the workspace and help BertBot retain context across runs.
+These files are local to the workspace. Memory and profile files retain conversational context across runs, while the state, trace, and Mermaid files capture the latest orchestration run for inspection.
 
 ## Extending BertBot
 
@@ -47,7 +50,7 @@ To add a new capability:
 - Add or update sub-agent definitions in `com.personalagent.bertbot.agents.SubAgentRegistry`.
 - Refine the persona, tools, or skills in `com.personalagent.bertbot.config.BertBotAgentConfig`.
 
-Default sub-agent roles currently include: Coder, Planner, Architect, Analyst, Copywriter, Red Teamer, Philosopher, and Psychologist.
+Default sub-agent roles currently include: Coder Agent, Planner Agent, Architect Agent, Analyst Agent, Copywriter Agent, Red Team Agent, Philosopher Agent, and Psychologist Agent.
 
 ## Configuration
 
@@ -62,6 +65,38 @@ The current configuration variables are:
 - `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. The shipped value is `openai`.
 - `BERTBOT_AI_MODEL` - selects the chat model for the active provider adapter.
 - `BERTBOT_AI_API_KEY` - provider-specific API key for the active adapter.
+
+Webhook server and connector variables:
+
+- `BERTBOT_WEBHOOK_HOST` - bind host for the webhook server. Default: `0.0.0.0`.
+- `BERTBOT_WEBHOOK_PORT` - bind port for the webhook server. Default: `8088`.
+- `BERTBOT_WEBHOOK_TELEGRAM_PATH` - Telegram webhook path. Default: `/webhook/telegram`.
+- `BERTBOT_WEBHOOK_SLACK_PATH` - Slack webhook path. Default: `/webhook/slack`.
+- `BERTBOT_WEBHOOK_WHATSAPP_PATH` - WhatsApp webhook path. Default: `/webhook/whatsapp`.
+- `BERTBOT_WEBHOOK_HEALTH_PATH` - health endpoint path. Default: `/health`.
+- `BERTBOT_WEBHOOK_DRY_RUN` - when true, process payloads without persistence writes.
+- `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES` - when true, enforce provider request verification checks.
+- `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS` - when true, trust `X-Forwarded-For` / `X-Real-IP` as client IP source.
+- `BERTBOT_WEBHOOK_ALLOWED_IPS` - comma-separated allowlist of client IPs and CIDRs.
+- `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` - rate-limit window size in seconds.
+- `BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS` - max accepted requests per client IP per window.
+
+Connector enablement and platform metadata:
+
+- `BERTBOT_TELEGRAM_ENABLED` - enable Telegram adapter wiring. Default: `true` for webhook mode.
+- `BERTBOT_SLACK_ENABLED` - enable Slack adapter wiring. Default: `true` for webhook mode.
+- `BERTBOT_WHATSAPP_ENABLED` - enable WhatsApp adapter wiring. Default: `true` for webhook mode.
+- `BERTBOT_SLACK_WORKSPACE_ID` - optional Slack workspace/team identifier used in normalized source metadata.
+- `BERTBOT_WHATSAPP_BUSINESS_PHONE_ID` - optional WhatsApp Business phone number ID used in normalized source metadata.
+- `BERTBOT_INGESTION_REQUIRE_APPROVAL` - require source approval before accepted message ingestion/chat state updates.
+
+Provider verification variables (used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`):
+
+- `BERTBOT_TELEGRAM_SECRET_TOKEN` - expected `X-Telegram-Bot-Api-Secret-Token` header value.
+- `BERTBOT_SLACK_SIGNING_SECRET` - Slack app signing secret for HMAC verification.
+- `BERTBOT_SLACK_MAX_REQUEST_AGE_SECONDS` - allowable Slack timestamp skew window. Default: `300`.
+- `BERTBOT_WHATSAPP_APP_SECRET` - Meta app secret used to verify `X-Hub-Signature-256`.
+- `BERTBOT_WHATSAPP_VERIFY_TOKEN` - token used for WhatsApp webhook subscription challenge verification.
 
 Example local `.env` entry:
 
@@ -105,24 +140,118 @@ Use this mode when Copilot or another MCP client needs to call BertBot as a tool
 .\gradlew.bat runMcpServer --no-daemon
 ```
 
-The server exposes a single tool, `ask_bertbot`, and should be launched from the repository root so the agent can locate local state files.
+The server exposes two tools and should be launched from the repository root so the agent can locate local state files:
+
+- `ask_bertbot` - pass a prompt to BertBot and get the orchestration response.
+- `bertbot_status` - return runtime backend status for the active MCP session (provider/model/tool surface/timestamp).
+
+For workspace-managed startup in VS Code, this repository uses a stale-process-safe launcher at [scripts/mcp-stdio-launcher.ps1](scripts/mcp-stdio-launcher.ps1). It clears old workspace/task-matching processes before starting the selected Gradle MCP task.
+
+A second launcher variant is available at [scripts/mcp-stdio-launcher-bertbot.ps1](scripts/mcp-stdio-launcher-bertbot.ps1). This wrapper pins the task to `runMcpServer` and is useful as a copy pattern for future backends that should each have their own task-specific wrapper.
+
+Sample workspace MCP config for adding a second backend entry:
+
+```json
+{
+	"servers": {
+		"bertbot-backend": {
+			"type": "stdio",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/mcp-stdio-launcher-bertbot.ps1"
+			],
+			"cwd": "${workspaceFolder}",
+			"envFile": "${workspaceFolder}/.env"
+		},
+		"another-backend": {
+			"type": "stdio",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/mcp-stdio-launcher.ps1",
+				"runAnotherMcpServerTask"
+			],
+			"cwd": "${workspaceFolder}",
+			"envFile": "${workspaceFolder}/.env"
+		}
+	}
+}
+```
+
+The second entry is only a template. It requires a real Gradle task (`runAnotherMcpServerTask`) that starts a valid MCP stdio server.
+
+### Webhook Server Mode
+
+Use this mode when Telegram, Slack, or WhatsApp should POST webhook payloads directly to BertBot:
+
+```bash
+.\gradlew.bat runWebhookServer --no-daemon
+```
+
+Default local endpoints:
+
+- `POST /webhook/telegram`
+- `POST /webhook/slack`
+- `POST /webhook/whatsapp`
+- `GET /health`
+
+WhatsApp verification challenge is supported on `GET /webhook/whatsapp` using the `hub.mode`, `hub.verify_token`, and `hub.challenge` query parameters.
+
+If `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`, inbound requests are verified as follows:
+
+- Telegram: `X-Telegram-Bot-Api-Secret-Token` must match `BERTBOT_TELEGRAM_SECRET_TOKEN`.
+- Slack: `X-Slack-Request-Timestamp` + `X-Slack-Signature` must validate against `BERTBOT_SLACK_SIGNING_SECRET`.
+- WhatsApp: `X-Hub-Signature-256` must validate against `BERTBOT_WHATSAPP_APP_SECRET`.
+
+Additional hardening controls:
+
+- IP allowlisting: set `BERTBOT_WEBHOOK_ALLOWED_IPS` (for example `10.0.0.0/8,192.168.1.10`).
+- Rate limiting: tune `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` and `BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS`.
+- Reverse-proxy header trust: only enable `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS=true` when requests arrive through a trusted proxy that sanitizes forwarded headers.
+
+### Tracing And Graph Visualization
+
+BertBot emits structured tracing for graph execution and delegation lifecycles, including events like node start/completion, edge transitions, delegation requested/started/completed, and skill invocation.
+
+The generated `bertbot-trace.jsonl` file can be tailed or filtered by `traceId` for debugging.
+
+For a quick graphical view of interactions, open `bertbot-interactions.mmd` in VS Code Markdown preview (or Mermaid-compatible viewers). The file is refreshed after each request and renders a time-ordered sequence of delegation and node transitions.
 
 ### Copilot Custom Agent
 
 The repository-local agent is defined in [.github/agents/bertbot.agent.md](.github/agents/bertbot.agent.md) and points at the `bertbot-backend` MCP server.
 
+The MCP server registration is workspace-local in [.vscode/mcp.json](.vscode/mcp.json). This is what lets VS Code discover and start `bertbot-backend`.
+
 To use it in VS Code:
 
 1. Open Copilot Chat in the repository.
 2. Make sure the provider variables are available in the environment or `.env` file.
-3. Start the MCP backend with the `runMcpServer` task or the equivalent Gradle command.
+3. Run `MCP: List Servers` and confirm `bertbot-backend` is enabled/trusted and started.
 4. Select `@BertBot` from the agent picker, or invoke it directly from chat if your Copilot setup exposes custom agents.
+
+If `bertbot-backend` tools do not appear in chat:
+
+1. Run `MCP: Open Workspace Folder MCP Configuration` and verify `.vscode/mcp.json` is loaded for this workspace.
+2. Run `MCP: Reset Cached Tools`, then `MCP: List Servers` and restart `bertbot-backend`.
+3. Run `MCP: Reset Trust` if server trust was previously denied.
+4. Reload the VS Code window after MCP configuration changes.
+
+Quick self-check: call `bertbot-backend/bertbot_status` from chat tools. If the call succeeds, your chat session is actively routed through the workspace MCP backend.
 
 ### Scenario Summary
 
 - Use `run` for human-in-the-loop interactive work.
 - Use `runHeadless` for one-shot scripted requests.
-- Use `runMcpServer` when Copilot should broker requests through MCP.
+- Use `runMcpServer` for manual MCP backend startup outside VS Code server management, or rely on `.vscode/mcp.json` for workspace-managed startup.
+- Use `runWebhookServer` for direct Telegram/Slack/WhatsApp webhook ingress with optional provider signature verification.
 - Use the repo-local agent manifest when you want Copilot to route work to BertBot automatically.
 - Use `BERTBOT_AI_PROVIDER` and `BERTBOT_AI_MODEL` when you want to change the LLM adapter settings without changing code.
 
@@ -198,7 +327,7 @@ This repository includes GitHub Actions workflows:
 
 This repository also includes GitHub Copilot repository instructions in `.github/copilot-instructions.md` and a review-focused skill in `.github/skills/code-review/SKILL.md`.
 
-The repository-local Copilot custom agent lives at `.github/agents/bertbot.agent.md` and launches the local MCP backend via the `bertbot-backend` server.
+The repository-local Copilot custom agent lives at `.github/agents/bertbot.agent.md` and uses the `bertbot-backend` MCP tool surface. The server itself is configured in `.vscode/mcp.json`.
 
 To use GitHub-native review and implementation flow in pull requests:
 

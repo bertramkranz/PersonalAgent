@@ -3,6 +3,7 @@ package com.personalagent.bertbot.memory
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.Instant
@@ -11,6 +12,31 @@ import java.time.format.DateTimeFormatter
 data class MemoryEntry(
     val text: String,
     val createdAt: String = Instant.now().atZone(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT),
+    val sourceMetadata: MemorySourceMetadata? = null,
+    val attachmentReferences: List<MemoryAttachmentReference>? = emptyList(),
+)
+
+data class MemorySourceMetadata(
+    val platform: String,
+    val sourceKind: String,
+    val sourceId: String,
+    val workspaceId: String? = null,
+    val senderId: String? = null,
+    val senderDisplayName: String? = null,
+    val threadId: String? = null,
+    val messageId: String? = null,
+)
+
+data class MemoryAttachmentReference(
+    val attachmentId: String,
+    val kind: String,
+    val fileName: String? = null,
+    val mimeType: String? = null,
+    val externalUrl: String? = null,
+    val fileReference: String? = null,
+    val sizeBytes: Long? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 )
 
 class BertBotMemory(
@@ -43,7 +69,7 @@ class BertBotMemory(
             }
 
         if (parsedEntries != null) {
-            entries.addAll(parsedEntries)
+            entries.addAll(parsedEntries.map { it.normalized() })
             return entries.toList()
         }
 
@@ -73,7 +99,7 @@ class BertBotMemory(
             return
         }
 
-        entries.add(entry.copy(text = entry.text.trim()))
+        entries.add(entry.normalized())
         persist()
     }
 
@@ -81,7 +107,7 @@ class BertBotMemory(
 
     fun replaceAll(newEntries: List<MemoryEntry>) {
         entries.clear()
-        entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.copy(text = entry.text.trim()) })
+        entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
         persist()
     }
 
@@ -99,6 +125,12 @@ class BertBotMemory(
         writeTextAtomically(storageFile, gson.toJson(entries))
     }
 }
+
+private fun MemoryEntry.normalized(): MemoryEntry =
+    copy(
+        text = text.trim(),
+        attachmentReferences = attachmentReferences.orEmpty().filter { it.attachmentId.isNotBlank() },
+    )
 
 private fun looksLikeStructuredJson(content: String): Boolean =
     content.startsWith("[") || content.startsWith("{")
@@ -119,5 +151,10 @@ private fun writeTextAtomically(
     target.parentFile?.mkdirs()
     val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
     tempFile.writeText(content)
-    Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    try {
+        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    } catch (_: AtomicMoveNotSupportedException) {
+        println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
+        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
 }

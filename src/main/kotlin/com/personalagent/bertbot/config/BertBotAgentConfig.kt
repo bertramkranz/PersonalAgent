@@ -20,12 +20,60 @@ data class SubAgentConfigDefinition(
     val enabled: Boolean = true,
 )
 
+data class ConnectorConfig(
+    val enabled: Boolean = false,
+    val approvalScope: String = "chat",
+    val dryRunDefault: Boolean = true,
+)
+
+data class TelegramIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(),
+    val approvedChatIds: Set<String> = emptySet(),
+)
+
+data class SlackIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(approvalScope = "channel"),
+    val workspaceId: String? = null,
+    val approvedChannelIds: Set<String> = emptySet(),
+    val approvedDirectMessageIds: Set<String> = emptySet(),
+)
+
+data class WhatsAppIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(approvalScope = "conversation"),
+    val businessPhoneNumberId: String? = null,
+    val approvedConversationIds: Set<String> = emptySet(),
+)
+
+data class IngestionPolicyConfig(
+    val enabled: Boolean = false,
+    val storeImageReferencesOnly: Boolean = true,
+    val requireApproval: Boolean = true,
+)
+
+data class IngestionConfig(
+    val policy: IngestionPolicyConfig = IngestionPolicyConfig(),
+    val telegram: TelegramIntegrationConfig = TelegramIntegrationConfig(),
+    val slack: SlackIntegrationConfig = SlackIntegrationConfig(),
+    val whatsapp: WhatsAppIntegrationConfig = WhatsAppIntegrationConfig(),
+)
+
 data class BertBotAgentConfig(
     val name: String = "BertBot",
     val maxSemanticContextEntries: Int = 5,
     val maxEpisodicContextEntries: Int = 10,
     val memorySummarizationThreshold: Int = 15,
     val memorySummarizationBatchSize: Int = 10,
+    val ingestion: IngestionConfig = IngestionConfig(),
+    val nonActionableMessages: Set<String> =
+        setOf(
+            "hi",
+            "hello",
+            "hey",
+            "thanks",
+            "thank you",
+            "ok",
+            "okay",
+        ),
     val systemPrompt: String =
         """
         You are BertBot, my premium personal assistant and chief orchestration agent.
@@ -52,6 +100,11 @@ data class BertBotAgentConfig(
         *   **Mode 3: The Async Update:** When sub-agents are running long background tasks, provide low-noise updates: [Status], [Action Taken], [Next Milestone].
 
         If a task clearly fits a specialized sub-agent, use your agent tools to delegate it. If you are deeply uncertain about the underlying intent, ask a crisp, clarifying question rather than executing blindly.
+
+        ## 4. TOOLING HONESTY
+        - Never claim concrete tool availability unless that tool access is explicitly available in your current runtime.
+        - If direct execution tools are unavailable, still provide the best possible reasoning answer without inventing actions you did not perform.
+        - Do not list generic platform tools or chat-environment capabilities unless the user explicitly asks for a capability summary.
         """.trimIndent(),
     val tools: List<ToolDefinition> =
         listOf(
@@ -119,49 +172,49 @@ data class BertBotAgentConfig(
         listOf(
             SubAgentConfigDefinition(
                 id = "coder",
-                name = "Coder",
+                name = "Coder Agent",
                 description = "Handles implementation, debugging, and refactoring tasks",
                 skills = setOf("implementation", "coding", "kotlin", "debugging", "refactoring"),
             ),
             SubAgentConfigDefinition(
                 id = "planner",
-                name = "Planner",
+                name = "Planner Agent",
                 description = "Handles prioritization, scheduling, and task organization",
                 skills = setOf("planning", "prioritization", "scheduling", "organization", "workflow"),
             ),
             SubAgentConfigDefinition(
                 id = "architect",
-                name = "Architect",
+                name = "Architect Agent",
                 description = "Reviews plans and system designs for structural soundness",
                 skills = setOf("architecture", "design", "system", "structure", "dependencies"),
             ),
             SubAgentConfigDefinition(
                 id = "analyst",
-                name = "Analyst",
+                name = "Analyst Agent",
                 description = "Performs analysis, triage, and evidence-driven recommendations",
                 skills = setOf("analysis", "triage", "metrics", "evaluation", "summary"),
             ),
             SubAgentConfigDefinition(
                 id = "copywriter",
-                name = "Copywriter",
+                name = "Copywriter Agent",
                 description = "Produces polished user-facing messaging and rewritten drafts",
                 skills = setOf("copy", "writing", "rewrite", "message", "tone"),
             ),
             SubAgentConfigDefinition(
                 id = "red_teamer",
-                name = "Red Teamer",
+                name = "Red Team Agent",
                 description = "Stress-tests outputs, hunts edge cases, and surfaces hidden risks",
                 skills = setOf("adversarial", "edge", "risk", "failure", "security"),
             ),
             SubAgentConfigDefinition(
                 id = "philosopher",
-                name = "Philosopher",
+                name = "Philosopher Agent",
                 description = "Explores meaning, ethics, values, and first-principles reasoning",
                 skills = setOf("philosophy", "ethics", "meaning", "values", "first principles"),
             ),
             SubAgentConfigDefinition(
                 id = "psychologist",
-                name = "Psychologist",
+                name = "Psychologist Agent",
                 description = "Supports behavior insight, emotional framing, and communication dynamics",
                 skills = setOf("psychology", "behavior", "emotion", "mindset", "communication"),
             ),
@@ -195,6 +248,15 @@ data class BertBotAgentConfig(
         require(memorySummarizationBatchSize <= memorySummarizationThreshold) {
             "memorySummarizationBatchSize must be less than or equal to memorySummarizationThreshold"
         }
+        require(nonActionableMessages.none { it.isBlank() }) {
+            "nonActionableMessages must not contain blank values"
+        }
+        require(ingestion.policy.storeImageReferencesOnly) {
+            "ingestion.policy.storeImageReferencesOnly must remain true in the current media policy phase"
+        }
+        requireConnectorScope("telegram", ingestion.telegram.connector.approvalScope, setOf("chat", "conversation"))
+        requireConnectorScope("slack", ingestion.slack.connector.approvalScope, setOf("channel", "chat", "conversation"))
+        requireConnectorScope("whatsapp", ingestion.whatsapp.connector.approvalScope, setOf("conversation", "chat"))
     }
 
     fun enabledTools(): List<ToolDefinition> = tools.filter { it.enabled }
@@ -208,5 +270,15 @@ data class BertBotAgentConfig(
         const val MAX_EPISODIC_CONTEXT_ENTRIES: Int = 500
         const val MAX_MEMORY_SUMMARIZATION_THRESHOLD: Int = 1_000
         const val MAX_MEMORY_SUMMARIZATION_BATCH_SIZE: Int = 500
+    }
+}
+
+private fun requireConnectorScope(
+    connectorName: String,
+    scope: String,
+    supportedScopes: Set<String>,
+) {
+    require(scope in supportedScopes) {
+        "$connectorName approvalScope must be one of ${supportedScopes.joinToString()}"
     }
 }

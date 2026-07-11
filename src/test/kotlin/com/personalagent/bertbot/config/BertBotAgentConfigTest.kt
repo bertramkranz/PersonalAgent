@@ -13,6 +13,9 @@ class BertBotAgentConfigTest {
         assertEquals(10, config.maxEpisodicContextEntries)
         assertEquals(15, config.memorySummarizationThreshold)
         assertEquals(10, config.memorySummarizationBatchSize)
+        assertEquals(false, config.ingestion.policy.enabled)
+        assertEquals(true, config.ingestion.policy.storeImageReferencesOnly)
+        assertEquals(setOf("hi", "hello", "hey", "thanks", "thank you", "ok", "okay"), config.nonActionableMessages)
     }
 
     @Test
@@ -23,12 +26,14 @@ class BertBotAgentConfigTest {
                 maxEpisodicContextEntries = 6,
                 memorySummarizationThreshold = 12,
                 memorySummarizationBatchSize = 8,
+                nonActionableMessages = setOf("yo", "sup"),
             )
 
         assertEquals(3, config.maxSemanticContextEntries)
         assertEquals(6, config.maxEpisodicContextEntries)
         assertEquals(12, config.memorySummarizationThreshold)
         assertEquals(8, config.memorySummarizationBatchSize)
+        assertEquals(setOf("yo", "sup"), config.nonActionableMessages)
     }
 
     @Test
@@ -44,6 +49,13 @@ class BertBotAgentConfigTest {
         }
         assertFailsWith<IllegalArgumentException> {
             BertBotAgentConfig(memorySummarizationBatchSize = 0)
+        }
+    }
+
+    @Test
+    fun `non actionable message list must not contain blanks`() {
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(nonActionableMessages = setOf("hello", " "))
         }
     }
 
@@ -70,6 +82,21 @@ class BertBotAgentConfigTest {
         assertFailsWith<IllegalArgumentException> {
             BertBotAgentConfig(
                 memorySummarizationBatchSize = BertBotAgentConfig.MAX_MEMORY_SUMMARIZATION_BATCH_SIZE + 1,
+            )
+        }
+    }
+
+    @Test
+    fun `ingestion connector approval scope must be supported`() {
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                ingestion =
+                    IngestionConfig(
+                        telegram =
+                            TelegramIntegrationConfig(
+                                connector = ConnectorConfig(approvalScope = "workspace"),
+                            ),
+                    ),
             )
         }
     }

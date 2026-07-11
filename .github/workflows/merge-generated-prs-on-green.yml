@@ -1,6 +1,14 @@
 name: Merge Generated PRs On Green
 
 on:
+  pull_request:
+    branches: ["main"]
+    types:
+      - opened
+      - labeled
+      - reopened
+      - synchronize
+      - ready_for_review
   pull_request_target:
     types:
       - opened
@@ -47,6 +55,12 @@ jobs:
             const defaultBranch = context.payload.repository.default_branch;
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
             const autoMergeLabel = 'auto-merge';
+            const ignoredStatusContexts = new Set(['merge-generated-pr', 'open-pr']);
+            const ignoredCheckNames = new Set(['merge-generated-pr', 'open-pr']);
+
+            function isAcceptedCheckConclusion(conclusion) {
+              return acceptedCheckConclusions.has(conclusion || '');
+            }
 
             function isSameRepoEligiblePr(pr) {
               return (
@@ -58,7 +72,7 @@ jobs:
             }
 
             async function resolveCandidatePullNumbers() {
-              if (context.eventName === 'pull_request_target') {
+              if (['pull_request', 'pull_request_target'].includes(context.eventName)) {
                 return [context.payload.pull_request.number];
               }
 
@@ -118,7 +132,7 @@ jobs:
             }
 
             async function listAllCheckRunsForRef(ref) {
-              return github.paginate(
+              const checkRuns = await github.paginate(
                 github.rest.checks.listForRef,
                 {
                   owner,
@@ -126,7 +140,22 @@ jobs:
                   ref,
                   per_page: 100,
                 },
-                (response) => response.data.check_runs
+                (response) => response.data.check_runs || []
+              );
+
+              return checkRuns.filter(Boolean);
+            }
+
+            async function listRelevantCommitStatusesForRef(ref) {
+              const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+                owner,
+                repo,
+                ref,
+                per_page: 100,
+              });
+
+              return statuses.filter(
+                (status) => status && !ignoredStatusContexts.has(status.context || '')
               );
             }
 
@@ -134,7 +163,7 @@ jobs:
               const rerunRunIds = new Set();
               const checks = await listAllCheckRunsForRef(pr.head.sha);
               for (const checkRun of checks) {
-                if (checkRun.conclusion !== 'action_required') {
+                if (checkRun?.conclusion !== 'action_required') {
                   continue;
                 }
 
@@ -168,8 +197,10 @@ jobs:
                 per_page: 100,
               });
 
-              for (const run of runs.workflow_runs) {
-                if (run.conclusion !== 'action_required') {
+              const workflowRuns = Array.isArray(runs?.workflow_runs) ? runs.workflow_runs.filter(Boolean) : [];
+
+              for (const run of workflowRuns) {
+                if (run?.conclusion !== 'action_required') {
                   continue;
                 }
 
@@ -187,15 +218,14 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
-              const { data: combinedStatus } = await github.rest.repos.getCombinedStatusForRef({
-                owner,
-                repo,
-                ref: pr.head.sha,
-              });
+              const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
+              const blockingStatuses = statuses.filter((status) => status.state !== 'success');
 
-              if (combinedStatus.state !== 'success') {
+              if (blockingStatuses.length > 0) {
                 core.info(
-                  `PR #${pr.number} checks not green yet (combined status: ${combinedStatus.state}). Deferring merge.`
+                  `PR #${pr.number} has blocking statuses: ${blockingStatuses
+                    .map((status) => `${status.context}:${status.state}`)
+                    .join(', ')}`
                 );
                 return false;
               }
@@ -203,8 +233,9 @@ jobs:
               const checks = await listAllCheckRunsForRef(pr.head.sha);
               const blockingChecks = checks.filter(
                 (checkRun) =>
-                  checkRun.status !== 'completed' ||
-                  !acceptedCheckConclusions.has(checkRun.conclusion || '')
+                  !ignoredCheckNames.has(checkRun?.name || '') &&
+                  (checkRun?.status !== 'completed' ||
+                    !isAcceptedCheckConclusion(checkRun?.conclusion))
               );
 
               if (blockingChecks.length > 0) {

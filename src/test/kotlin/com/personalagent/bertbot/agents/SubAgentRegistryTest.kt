@@ -37,10 +37,10 @@ class SubAgentRegistryTest {
         val philosopherMatches = registry.describeMatches("Reflect on meaning and values from first principles")
         val psychologistMatches = registry.describeMatches("Help with behavior patterns and emotional communication")
 
-        assertTrue(copyMatches.contains("Copywriter"))
-        assertTrue(redTeamMatches.contains("Red Teamer"))
-        assertTrue(philosopherMatches.contains("Philosopher"))
-        assertTrue(psychologistMatches.contains("Psychologist"))
+        assertTrue(copyMatches.contains("Copywriter Agent"))
+        assertTrue(redTeamMatches.contains("Red Team Agent"))
+        assertTrue(philosopherMatches.contains("Philosopher Agent"))
+        assertTrue(psychologistMatches.contains("Psychologist Agent"))
     }
 
     @Test
