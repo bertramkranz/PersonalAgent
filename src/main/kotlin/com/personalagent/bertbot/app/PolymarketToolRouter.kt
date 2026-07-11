@@ -316,13 +316,6 @@ internal class PolymarketToolRouter(
     ): Map<String, String?> = fieldNames.associateWith { fieldName -> arguments.queryValue(fieldName) }
 }
 
-private fun JsonObject.stringValue(name: String): String? =
-    get(name)
-        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
-        ?.asString
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
 private fun JsonObject.queryValue(name: String): String? {
     val element = get(name) ?: return null
     if (!element.isJsonPrimitive) {
@@ -337,6 +330,3 @@ private fun JsonObject.queryValue(name: String): String? {
         else -> null
     }
 }
-
-private fun JsonObject.objectValue(name: String): JsonObject? =
-    get(name)?.takeIf { it.isJsonObject }?.asJsonObject

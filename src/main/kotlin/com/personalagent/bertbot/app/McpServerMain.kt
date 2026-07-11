@@ -916,16 +916,6 @@ private data class JsonRpcRequest(
     val params: JsonObject,
 )
 
-private fun JsonObject.stringValue(name: String): String? =
-    get(name)
-        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
-        ?.asString
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun JsonObject.objectValue(name: String): JsonObject? =
-    get(name)?.takeIf { it.isJsonObject }?.asJsonObject
-
 private fun JsonObject.intValue(name: String): Int? {
     val element = get(name) ?: return null
     if (!element.isJsonPrimitive || !element.asJsonPrimitive.isNumber) {
