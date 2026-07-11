@@ -1,91 +1,92 @@
+```mermaid
 flowchart TD
-    subgraph Clients[Clients]
-        CLI[Interactive CLI\nMain.kt]
-        Headless[Headless Prompt\nHeadlessMain.kt]
-        MCP[MCP Stdio Server\nMcpServerMain.kt]
-        Webhook[Webhook HTTP Server\nWebhookMain.kt]
+    subgraph Interfaces
+        CLI[Interactive CLI]
+        Headless[Headless Prompt]
+        MCP[MCP Server]
+        Webhook[Webhook Server]
     end
 
-    subgraph App[Application Layer]
+    subgraph RuntimeComposition
         RuntimeFactory[BertBotRuntimeFactory]
-        Runtime[BertBotRuntime]
+        RuntimeCore[BertBotRuntime]
         GraphFactory[BertBotGraphFactory]
-        Connectors[BertBotConnectorRuntimeFactory]
-        Dispatcher[ExternalChatPayloadDispatcher]
+        ConnectorFactory[BertBotConnectorRuntimeFactory]
+        PayloadDispatcher[ExternalChatPayloadDispatcher]
     end
 
-    subgraph Graph[Graph Orchestration]
+    subgraph GraphExecution
         Runner[BertBotGraphRunner]
-        Capture[MessageCaptureNode]
-        Planner[PlannerNode]
-        Delegate[DelegationNode]
-        Execute[ExecutorNode]
-        State[(BertBotState)]
-        StateStore[(FileBertBotStateStore\nbertbot-state.json)]
-        Trace[(TraceLogger\nbertbot-trace.jsonl)]
-        Interaction[(InteractionGraphWriter\nbertbot-interactions.mmd)]
+        Capture[Capture Node]
+        Planner[Planner Node]
+        Delegate[Delegation Node]
+        Execute[Executor Node]
+        State[(State Snapshot)]
+        StateFile[(bertbot-state.json)]
+        TraceFile[(bertbot-trace.jsonl)]
+        DiagramFile[(bertbot-interactions.mmd)]
     end
 
-    subgraph Intelligence[Intelligence + Configuration]
+    subgraph PlanningAndLLM
         Config[BertBotAgentConfig]
         Registry[SubAgentRegistry]
-        LLM[LlmGateway / OpenAiLlmGateway]
         Skill[SelfCorrectingSkill]
+        LLM[LlmGateway / OpenAiLlmGateway]
     end
 
-    subgraph Memory[Memory + Profile]
-        Episodic[(EpisodicMemory\nbertbot-memory.txt)]
-        Semantic[(SemanticMemory\nbertbot-semantic-memory.txt)]
-        Profile[(UserProfileStore\nbertbot-profile.json)]
+    subgraph Memory
+        Episodic[(bertbot-memory.txt)]
+        Semantic[(bertbot-semantic-memory.txt)]
+        Profile[(bertbot-profile.json)]
         Summarizer[MemorySummarizationWorker]
     end
 
-    subgraph Ingestion[Ingestion + Connector Bridges]
-        Control[IngestionService\n(IngestionControlPlane)]
+    subgraph ExternalIngestion
+        Control[IngestionControlPlane]
         Consent[(FileConsentStore)]
         SourceState[(FileSourceStateStore)]
-        Telegram[TelegramConnectorAdapter]
-        Slack[SlackConnectorAdapter]
-        WhatsApp[WhatsAppConnectorAdapter]
+        Telegram[Telegram Adapter]
+        Slack[Slack Adapter]
+        WhatsApp[WhatsApp Adapter]
     end
 
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
-    Webhook --> Dispatcher
-    Dispatcher --> Connectors
-    Connectors --> Runtime
+    Webhook --> PayloadDispatcher
+    PayloadDispatcher --> ConnectorFactory
+    ConnectorFactory --> RuntimeCore
 
+    RuntimeFactory --> RuntimeCore
     RuntimeFactory --> GraphFactory
-    RuntimeFactory --> LLM
     RuntimeFactory --> Skill
+    RuntimeFactory --> LLM
     RuntimeFactory --> Control
-    RuntimeFactory --> Connectors
-    RuntimeFactory --> Runtime
+    RuntimeFactory --> Config
 
+    RuntimeCore --> Runner
     GraphFactory --> Runner
     Runner --> Capture --> Planner --> Delegate --> Execute
     Execute --> State
-    Runner --> StateStore
-    Runner --> Trace
-    Runtime --> Interaction
-    Runtime --> Runner
+    Runner --> StateFile
+    Runner --> TraceFile
+    RuntimeCore --> DiagramFile
 
     Planner --> Registry
     Delegate --> Registry
-    Runtime --> Skill
     Skill --> LLM
-    Runtime --> Config
+    RuntimeCore --> Skill
 
-    Runtime --> Episodic
-    Runtime --> Semantic
-    Runtime --> Profile
-    Runtime --> Summarizer
+    RuntimeCore --> Episodic
+    RuntimeCore --> Semantic
+    RuntimeCore --> Profile
+    RuntimeCore --> Summarizer
     Summarizer --> LLM
 
-    Control --> Consent
-    Control --> SourceState
-    Control --> Episodic
     Telegram --> Control
     Slack --> Control
     WhatsApp --> Control
+    Control --> Consent
+    Control --> SourceState
+    Control --> Episodic
+```
