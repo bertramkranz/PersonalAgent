@@ -42,6 +42,7 @@ jobs:
             const repo = context.repo.repo;
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
+            const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
 
             async function resolveCandidatePullNumbers() {
               if (context.eventName === 'pull_request_target') {
@@ -50,6 +51,11 @@ jobs:
 
               if (context.eventName === 'workflow_run') {
                 const workflowRun = context.payload.workflow_run;
+                if (!['success', 'action_required'].includes(workflowRun.conclusion || '')) {
+                  core.info(`Skipping workflow_run with conclusion '${workflowRun.conclusion}'.`);
+                  return [];
+                }
+
                 const pullNumbers = new Set((workflowRun.pull_requests || []).map((pr) => pr.number));
 
                 // GitHub can emit workflow_run without linked PR metadata; map by head branch as fallback.
@@ -155,6 +161,45 @@ jobs:
               }
             }
 
+            async function checksAreGreen(pr) {
+              const { data: combinedStatus } = await github.rest.repos.getCombinedStatusForRef({
+                owner,
+                repo,
+                ref: pr.head.sha,
+              });
+
+              if (combinedStatus.state !== 'success') {
+                core.info(
+                  `PR #${pr.number} checks not green yet (combined status: ${combinedStatus.state}). Deferring merge.`
+                );
+                return false;
+              }
+
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: pr.head.sha,
+                per_page: 100,
+              });
+
+              const blockingChecks = checks.check_runs.filter(
+                (checkRun) =>
+                  checkRun.status !== 'completed' ||
+                  !acceptedCheckConclusions.has(checkRun.conclusion || '')
+              );
+
+              if (blockingChecks.length > 0) {
+                core.info(
+                  `PR #${pr.number} has blocking checks: ${blockingChecks
+                    .map((checkRun) => `${checkRun.name}:${checkRun.status}/${checkRun.conclusion}`)
+                    .join(', ')}`
+                );
+                return false;
+              }
+
+              return true;
+            }
+
             const candidatePullNumbers = await resolveCandidatePullNumbers();
             if (candidatePullNumbers.length === 0) {
               core.info('No candidate pull requests found for this event.');
@@ -176,6 +221,10 @@ jobs:
 
               await rerunActionRequiredChecks(pr);
               await rerunActionRequiredWorkflowRuns(pr);
+
+              if (!(await checksAreGreen(pr))) {
+                continue;
+              }
 
               const { data: reviews } = await github.rest.pulls.listReviews({
                 owner,
