@@ -47,6 +47,83 @@ To add a new capability:
 
 Default sub-agent roles currently include: Coder, Planner, Architect, Analyst, Copywriter, Red Teamer, Philosopher, and Psychologist.
 
+## Configuration
+
+BertBot reads configuration from the process environment first and falls back to a local `.env` file in the workspace root.
+
+If you are setting up the project from scratch, copy [.env.example](.env.example) to `.env` and fill in your values.
+
+The runtime is provider-aware at the LLM adapter boundary. The repository currently ships the OpenAI adapter, and new providers can be added by implementing the `LlmGateway` contract.
+
+The current configuration variables are:
+
+- `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. The shipped value is `openai`.
+- `BERTBOT_AI_MODEL` - surfaces a model preference for the active provider adapter. The shipped OpenAI adapter still uses its built-in default model.
+- `BERTBOT_AI_API_KEY` - provider-specific API key for the active adapter.
+
+Example local `.env` entry:
+
+```bash
+BERTBOT_AI_PROVIDER=openai
+BERTBOT_AI_MODEL=gpt-4o-mini
+BERTBOT_AI_API_KEY=your-api-key-here
+```
+
+If you are running the repo-local Copilot agent or the MCP server from VS Code, make sure the command is launched from the repository root so `bertbot-state.json`, `bertbot-memory.txt`, and `.env` resolve correctly.
+
+The model field is kept in the config surface so the runtime can be pointed at different provider adapters without changing the command-line or manifest shape. The current OpenAI adapter still uses its built-in default model selection.
+
+## Run Modes
+
+### Interactive CLI
+
+Use this mode when you want the original chat-style terminal loop:
+
+```bash
+.\gradlew.bat run --no-daemon
+```
+
+This mode accepts free-form input from standard input and uses the graph runtime plus memory store.
+
+### Headless Prompt Mode
+
+Use this mode when another process should submit a single prompt and read a single response:
+
+```bash
+.\gradlew.bat runHeadless --args="--prompt \"your request\"" --no-daemon
+```
+
+The headless entrypoint is the simplest option for scripted invocation and is the backend used by future automation layers.
+
+### Local MCP Server
+
+Use this mode when Copilot or another MCP client needs to call BertBot as a tool provider over stdio:
+
+```bash
+.\gradlew.bat runMcpServer --no-daemon
+```
+
+The server exposes a single tool, `ask_bertbot`, and should be launched from the repository root so the agent can locate local state files.
+
+### Copilot Custom Agent
+
+The repository-local agent is defined in [.github/agents/bertbot.agent.md](.github/agents/bertbot.agent.md) and points at the `bertbot-backend` MCP server.
+
+To use it in VS Code:
+
+1. Open Copilot Chat in the repository.
+2. Make sure the provider variables are available in the environment or `.env` file.
+3. Start the MCP backend with the `runMcpServer` task or the equivalent Gradle command.
+4. Select `@BertBot` from the agent picker, or invoke it directly from chat if your Copilot setup exposes custom agents.
+
+### Scenario Summary
+
+- Use `run` for human-in-the-loop interactive work.
+- Use `runHeadless` for one-shot scripted requests.
+- Use `runMcpServer` when Copilot should broker requests through MCP.
+- Use the repo-local agent manifest when you want Copilot to route work to BertBot automatically.
+- Use `BERTBOT_AI_PROVIDER` and `BERTBOT_AI_MODEL` when you want to change the LLM adapter settings without changing code.
+
 ## Build And Test
 
 Run the test suite with:
@@ -65,12 +142,6 @@ Auto-format Kotlin sources with:
 
 ```bash
 .\gradlew.bat ktlintFormat --no-daemon
-```
-
-Run the app with:
-
-```bash
-.\gradlew.bat run --no-daemon
 ```
 
 ## CI/CD
@@ -108,6 +179,8 @@ This repository includes GitHub Actions workflows:
 ## GitHub Copilot Automation
 
 This repository also includes GitHub Copilot repository instructions in `.github/copilot-instructions.md` and a review-focused skill in `.github/skills/code-review/SKILL.md`.
+
+The repository-local Copilot custom agent lives at `.github/agents/bertbot.agent.md` and launches the local MCP backend via the `bertbot-backend` server.
 
 To use GitHub-native review and implementation flow in pull requests:
 

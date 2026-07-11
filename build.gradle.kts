@@ -58,6 +58,22 @@ tasks.named<JavaExec>("run") {
     standardInput = System.`in`
 }
 
+tasks.register<JavaExec>("runHeadless") {
+    group = "application"
+    description = "Run BertBot in headless prompt mode."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.personalagent.bertbot.app.HeadlessMainKt")
+    standardInput = System.`in`
+}
+
+tasks.register<JavaExec>("runMcpServer") {
+    group = "application"
+    description = "Run BertBot as a local MCP server over stdio."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.personalagent.bertbot.app.McpServerMainKt")
+    standardInput = System.`in`
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
