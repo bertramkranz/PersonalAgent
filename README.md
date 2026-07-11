@@ -14,6 +14,7 @@ The project is organized around a small set of focused packages:
 - `com.personalagent.bertbot.graph.runtime` - graph contracts, edges, definitions, and runner.
 - `com.personalagent.bertbot.graph.store` - state store implementations.
 - `com.personalagent.bertbot.memory` - lightweight memory storage for learned personal context.
+- `com.personalagent.bertbot.ingestion` - external chat ingestion control plane, source approval, and connector adapters.
 - `com.personalagent.bertbot.agents` - sub-agent registry and capability matching.
 
 ## Runtime Flow
@@ -46,11 +47,11 @@ These files are local to the workspace. Memory and profile files retain conversa
 To add a new capability:
 
 - Add a new graph node in `com.personalagent.bertbot.graph.nodes`.
-- Register the node in the graph definition in `com.personalagent.bertbot.app.BertBotApplication`.
+- Register the node in the graph definition in `com.personalagent.bertbot.app.BertBotGraphFactory`.
 - Add or update sub-agent definitions in `com.personalagent.bertbot.agents.SubAgentRegistry`.
 - Refine the persona, tools, or skills in `com.personalagent.bertbot.config.BertBotAgentConfig`.
 
-Default sub-agent roles currently include: Coder Agent, Planner Agent, Architect Agent, Analyst Agent, Copywriter Agent, Red Team Agent, Philosopher Agent, and Psychologist Agent.
+Default sub-agent roles currently include: Coder Agent, Planner Agent, Architect Agent, Analyst Agent, Polymarket Analyst, Copywriter Agent, Red Team Agent, Philosopher Agent, and Psychologist Agent.
 
 ## Configuration
 
@@ -178,6 +179,16 @@ The server exposes core tools and should be launched from the repository root so
 - `workspace_list_dir` - list files and directories under a workspace-relative path.
 - `workspace_read_file` - read a workspace-relative file.
 - `workspace_search` - search workspace files for a text query.
+- `polymarket_gamma_query` - query Polymarket Gamma API public endpoints.
+- `polymarket_clob_query` - query Polymarket public CLOB market-data endpoints.
+- `polymarket_data_query` - query Polymarket Data API public analytics endpoints.
+
+When ingestion control is enabled, additional ingestion tools are also exposed:
+
+- `ingestion_set_approval` - set source approval state for ingestion.
+- `ingestion_list_approved_sources` - list approved ingestion sources.
+- `ingestion_ingest_manual` - ingest a normalized message payload manually.
+- `ingestion_chat_manual` - ingest a normalized message and return the assistant reply.
 
 When `BERTBOT_MACROFACTOR_ENABLED=true` and MacroFactor credentials are configured, additional MacroFactor proxy tools are surfaced in `tools/list` with the configured prefix (default `macrofactor_`).
 
