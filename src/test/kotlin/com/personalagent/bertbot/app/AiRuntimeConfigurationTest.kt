@@ -151,4 +151,53 @@ class AiRuntimeConfigurationTest {
         assertEquals("consent_table", configuration.ingestionConsentJdbcTable)
         assertEquals("source_state_table", configuration.ingestionSourceStateJdbcTable)
     }
+
+    @Test
+    fun `macrofactor configuration defaults are applied`() {
+        val configuration =
+            resolveMacrofactorRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_MACROFACTOR_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_MACROFACTOR_COMMAND, configuration.command)
+        assertEquals(DEFAULT_MACROFACTOR_ARGS, configuration.args)
+        assertEquals(DEFAULT_MACROFACTOR_TIMEOUT_SECONDS, configuration.timeoutSeconds)
+        assertEquals(DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX, configuration.toolNamePrefix)
+        assertNull(configuration.username)
+        assertNull(configuration.password)
+        assertEquals(false, configuration.isConfigured)
+    }
+
+    @Test
+    fun `macrofactor configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveMacrofactorRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_MACROFACTOR_ENABLED" to "true",
+                        "BERTBOT_MACROFACTOR_COMMAND" to "node",
+                        "BERTBOT_MACROFACTOR_ARGS" to "server.js,--stdio",
+                        "BERTBOT_MACROFACTOR_USERNAME" to "env-user",
+                        "BERTBOT_MACROFACTOR_PASSWORD" to "env-pass",
+                        "BERTBOT_MACROFACTOR_TIMEOUT_SECONDS" to "90",
+                        "BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX" to "mf_",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_MACROFACTOR_ENABLED" to "false",
+                        "BERTBOT_MACROFACTOR_USERNAME" to "dotenv-user",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals("node", configuration.command)
+        assertEquals(listOf("server.js", "--stdio"), configuration.args)
+        assertEquals("env-user", configuration.username)
+        assertEquals("env-pass", configuration.password)
+        assertEquals(90, configuration.timeoutSeconds)
+        assertEquals("mf_", configuration.toolNamePrefix)
+        assertEquals(true, configuration.isConfigured)
+    }
 }

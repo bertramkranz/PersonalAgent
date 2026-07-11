@@ -40,6 +40,19 @@ internal data class PersistenceRuntimeConfiguration(
     val ingestionSourceStateJdbcTable: String = DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
 )
 
+internal data class MacrofactorRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_MACROFACTOR_ENABLED,
+    val command: String = DEFAULT_MACROFACTOR_COMMAND,
+    val args: List<String> = DEFAULT_MACROFACTOR_ARGS,
+    val username: String? = null,
+    val password: String? = null,
+    val timeoutSeconds: Long = DEFAULT_MACROFACTOR_TIMEOUT_SECONDS,
+    val toolNamePrefix: String = DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX,
+) {
+    val isConfigured: Boolean
+        get() = enabled && !username.isNullOrBlank() && !password.isNullOrBlank()
+}
+
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
 internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -57,6 +70,11 @@ internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic
 internal const val DEFAULT_PROFILE_JDBC_TABLE = "bertbot_profile_snapshot"
 internal const val DEFAULT_INGESTION_CONSENT_JDBC_TABLE = "bertbot_ingestion_consent_snapshot"
 internal const val DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE = "bertbot_ingestion_source_state_snapshot"
+internal const val DEFAULT_MACROFACTOR_ENABLED = false
+internal const val DEFAULT_MACROFACTOR_COMMAND = "npx"
+internal val DEFAULT_MACROFACTOR_ARGS = listOf("-y", "sjawhar-macrofactor")
+internal const val DEFAULT_MACROFACTOR_TIMEOUT_SECONDS: Long = 45
+internal const val DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX = "macrofactor_"
 
 internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
@@ -218,6 +236,54 @@ internal fun resolvePersistenceRuntimeConfiguration(
     )
 }
 
+internal fun resolveMacrofactorRuntimeConfiguration(): MacrofactorRuntimeConfiguration =
+    resolveMacrofactorRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveMacrofactorRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): MacrofactorRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_MACROFACTOR_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_MACROFACTOR_ENABLED
+
+    val command =
+        resolveRuntimeSetting("BERTBOT_MACROFACTOR_COMMAND", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_MACROFACTOR_COMMAND
+
+    val args =
+        resolveRuntimeSetting("BERTBOT_MACROFACTOR_ARGS", environment, dotEnvValues)
+            ?.let { parseCommandArgs(it) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: DEFAULT_MACROFACTOR_ARGS
+
+    val timeoutSeconds =
+        resolveRuntimeSetting("BERTBOT_MACROFACTOR_TIMEOUT_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceAtLeast(1)
+            ?: DEFAULT_MACROFACTOR_TIMEOUT_SECONDS
+
+    val toolNamePrefix =
+        resolveRuntimeSetting("BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX
+
+    return MacrofactorRuntimeConfiguration(
+        enabled = enabled,
+        command = command,
+        args = args,
+        username = resolveRuntimeSetting("BERTBOT_MACROFACTOR_USERNAME", environment, dotEnvValues),
+        password = resolveRuntimeSetting("BERTBOT_MACROFACTOR_PASSWORD", environment, dotEnvValues),
+        timeoutSeconds = timeoutSeconds,
+        toolNamePrefix = toolNamePrefix,
+    )
+}
+
 internal fun resolveRuntimeSetting(
     name: String,
     environment: Map<String, String>,
@@ -255,6 +321,13 @@ private fun parseDotEnvEntry(line: String): Pair<String, String>? {
     val key = normalized.substring(0, separatorIndex).trim()
     val value = normalized.substring(separatorIndex + 1).trim().removeSurrounding("\"")
     return key to value
+}
+
+private fun parseCommandArgs(value: String): List<String> {
+    return value
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
 }
 
 internal fun printMissingApiKeyHelp() {

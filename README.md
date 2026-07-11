@@ -68,6 +68,16 @@ The current configuration variables are:
 - `BERTBOT_OLLAMA_BASE_URL` - Ollama server base URL (used when `BERTBOT_AI_PROVIDER=ollama`). Default: `http://localhost:11434`.
 - `BERTBOT_OLLAMA_TIMEOUT_SECONDS` - Ollama request timeout in seconds. Default: `120`.
 
+MacroFactor MCP proxy variables:
+
+- `BERTBOT_MACROFACTOR_ENABLED` - enable MacroFactor MCP proxy tool registration. Default: `false`.
+- `BERTBOT_MACROFACTOR_COMMAND` - executable used to launch the MacroFactor MCP server. Default: `npx`.
+- `BERTBOT_MACROFACTOR_ARGS` - comma-separated command args used to launch MacroFactor MCP. Default: `-y,sjawhar-macrofactor`.
+- `BERTBOT_MACROFACTOR_USERNAME` - MacroFactor account username/email.
+- `BERTBOT_MACROFACTOR_PASSWORD` - MacroFactor account password.
+- `BERTBOT_MACROFACTOR_TIMEOUT_SECONDS` - timeout for upstream MacroFactor MCP responses. Default: `45`.
+- `BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX` - proxy tool name prefix exposed by BertBot. Default: `macrofactor_`.
+
 State persistence backend variables:
 
 - `BERTBOT_STATE_STORE` - state store backend. Supported values: `file` (default), `jdbc`, `postgres`, `postgresql`.
@@ -161,10 +171,15 @@ Use this mode when Copilot or another MCP client needs to call BertBot as a tool
 .\gradlew.bat runMcpServer --no-daemon
 ```
 
-The server exposes two tools and should be launched from the repository root so the agent can locate local state files:
+The server exposes core tools and should be launched from the repository root so the agent can locate local state files:
 
 - `ask_bertbot` - pass a prompt to BertBot and get the orchestration response.
 - `bertbot_status` - return runtime backend status for the active MCP session (provider/model/tool surface/timestamp).
+- `workspace_list_dir` - list files and directories under a workspace-relative path.
+- `workspace_read_file` - read a workspace-relative file.
+- `workspace_search` - search workspace files for a text query.
+
+When `BERTBOT_MACROFACTOR_ENABLED=true` and MacroFactor credentials are configured, additional MacroFactor proxy tools are surfaced in `tools/list` with the configured prefix (default `macrofactor_`).
 
 For workspace-managed startup in VS Code, this repository uses a stale-process-safe launcher at [scripts/mcp-stdio-launcher.ps1](scripts/mcp-stdio-launcher.ps1). It clears old workspace/task-matching processes before starting the selected Gradle MCP task.
 
@@ -349,6 +364,22 @@ Run the test suite with:
 
 ```bash
 .\gradlew.bat test --no-daemon
+```
+
+Run opt-in live MacroFactor proxy integration tests with explicit environment flags:
+
+```bash
+$env:BERTBOT_MACROFACTOR_LIVE_TEST="true"
+$env:BERTBOT_MACROFACTOR_USERNAME="you@example.com"
+$env:BERTBOT_MACROFACTOR_PASSWORD="your-password"
+# Optional: enable live tools/call coverage.
+$env:BERTBOT_MACROFACTOR_LIVE_TOOL="get_nutrition"
+$env:BERTBOT_MACROFACTOR_LIVE_ARGS_JSON='{"day":"2026-07-11"}'
+# Optional: enforce a stable tools/list contract assertion for a known upstream tool.
+$env:BERTBOT_MACROFACTOR_EXPECTED_TOOL="get_nutrition"
+# Optional: assert a known schema argument key exists for that expected tool.
+$env:BERTBOT_MACROFACTOR_EXPECTED_ARG="day"
+.\gradlew.bat test --tests "*MacrofactorToolRouterLiveIntegrationTest" --no-daemon
 ```
 
 Run static analysis and formatting checks with:
