@@ -15,7 +15,8 @@ Get-CimInstance Win32_Process |
         ($_.Name -in @("cmd.exe", "java.exe")) -and
             $_.CommandLine -and
             ($_.CommandLine -match "(?i)\\b$escapedTaskName\\b") -and
-            $_.CommandLine -like "*$workspaceRootNormalized*"
+            $_.CommandLine -like "*$workspaceRootNormalized*" -and
+            ($_.CommandLine -match "(?i)(gradlew|gradle-wrapper|GradleDaemon|gradle\.jar|gradle-launcher)")
     } |
     ForEach-Object {
         try {
