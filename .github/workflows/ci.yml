@@ -23,6 +23,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Require architecture diagram update on architecture changes
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+
+          ARCH_SIGNIFICANT_REGEX='^(src/main/kotlin/com/personalagent/bertbot/(app|graph|agents|memory|llm|ingestion|config)/|build\.gradle\.kts|settings\.gradle\.kts)$'
+
+          if echo "$CHANGED_FILES" | grep -E "$ARCH_SIGNIFICANT_REGEX" > /dev/null; then
+            if ! echo "$CHANGED_FILES" | grep -Fx "architecture.mmd" > /dev/null; then
+              echo "Architecture-significant files changed, but architecture.mmd was not updated."
+              echo "Changed files:"
+              echo "$CHANGED_FILES"
+              exit 1
+            fi
+          fi
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
