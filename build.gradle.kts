@@ -74,6 +74,14 @@ tasks.register<JavaExec>("runMcpServer") {
     standardInput = System.`in`
 }
 
+tasks.register<JavaExec>("runWebhookServer") {
+    group = "application"
+    description = "Run BertBot webhook server for Telegram, Slack, and WhatsApp payload routing."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.personalagent.bertbot.app.WebhookMainKt")
+    standardInput = System.`in`
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

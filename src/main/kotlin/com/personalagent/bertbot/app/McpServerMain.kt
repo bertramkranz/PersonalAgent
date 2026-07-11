@@ -6,6 +6,14 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.personalagent.bertbot.ingestion.ApprovalScope
+import com.personalagent.bertbot.ingestion.ApprovalUpdateRequest
+import com.personalagent.bertbot.ingestion.ExternalChatOutcome
+import com.personalagent.bertbot.ingestion.IngestionControlPlane
+import com.personalagent.bertbot.ingestion.IngestionPlatform
+import com.personalagent.bertbot.ingestion.IngestionSource
+import com.personalagent.bertbot.ingestion.IngestionSourceKind
+import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
 import java.io.File
 import java.time.Instant
 
@@ -17,6 +25,10 @@ private const val BERTBOT_STATUS_TOOL_NAME = "bertbot_status"
 private const val WORKSPACE_LIST_DIR_TOOL_NAME = "workspace_list_dir"
 private const val WORKSPACE_READ_FILE_TOOL_NAME = "workspace_read_file"
 private const val WORKSPACE_SEARCH_TOOL_NAME = "workspace_search"
+private const val INGESTION_SET_APPROVAL_TOOL_NAME = "ingestion_set_approval"
+private const val INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME = "ingestion_list_approved_sources"
+private const val INGESTION_INGEST_MANUAL_TOOL_NAME = "ingestion_ingest_manual"
+private const val INGESTION_CHAT_MANUAL_TOOL_NAME = "ingestion_chat_manual"
 private const val WORKSPACE_ROOT_ENV_VAR = "BERTBOT_WORKSPACE_ROOT"
 private val BACKEND_UNAVAILABLE_MARKERS =
     listOf(
@@ -76,10 +88,26 @@ fun main() {
                 )
             },
             workspaceRoot = workspaceRoot,
+            ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
+            externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
             statusProvider = {
+                val baseTools =
+                    mutableListOf(
+                        ASK_BERTBOT_TOOL_NAME,
+                        BERTBOT_STATUS_TOOL_NAME,
+                        WORKSPACE_LIST_DIR_TOOL_NAME,
+                        WORKSPACE_READ_FILE_TOOL_NAME,
+                        WORKSPACE_SEARCH_TOOL_NAME,
+                    )
+                if (startup.runtime?.ingestionControlPlane() != null) {
+                    baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
+                    baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
+                    baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
+                    baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
+                }
                 """
                 Connected to $MCP_SERVER_NAME MCP server.
-                Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME
+                Active tool surface: ${baseTools.joinToString()}
                 Workspace root: ${workspaceRoot.absolutePath}
                 Runtime ready: ${startup.runtime != null}
                 Runtime provider: ${aiRuntimeConfiguration.provider}
@@ -133,6 +161,8 @@ internal fun runMcpSession(
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
+    private val ingestionControlPlane: IngestionControlPlane? = null,
+    private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val statusProvider: () -> String = {
         "Connected to $MCP_SERVER_NAME MCP server. Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME"
     },
@@ -152,7 +182,7 @@ internal class McpRequestDispatcher(
             "initialize" -> successResponse(requestId, buildInitializeResult())
             "initialized" -> null
             "ping" -> successResponse(requestId, JsonObject())
-            "tools/list" -> successResponse(requestId, buildToolsListResult())
+            "tools/list" -> successResponse(requestId, buildToolsListResult(includeIngestionTools = ingestionControlPlane != null))
             "tools/call" -> handleToolCall(requestId, request.params)
             else -> errorResponse(requestId, -32601, "Method not found: ${request.method}")
         }
@@ -169,8 +199,122 @@ internal class McpRequestDispatcher(
             WORKSPACE_LIST_DIR_TOOL_NAME -> handleWorkspaceListDir(requestId, params)
             WORKSPACE_READ_FILE_TOOL_NAME -> handleWorkspaceReadFile(requestId, params)
             WORKSPACE_SEARCH_TOOL_NAME -> handleWorkspaceSearch(requestId, params)
+            INGESTION_SET_APPROVAL_TOOL_NAME -> handleIngestionSetApproval(requestId, params)
+            INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME -> handleIngestionListApprovedSources(requestId)
+            INGESTION_INGEST_MANUAL_TOOL_NAME -> handleIngestionManualIngest(requestId, params)
+            INGESTION_CHAT_MANUAL_TOOL_NAME -> handleIngestionManualChat(requestId, params)
             else -> errorResponse(requestId, -32601, "Unknown tool: ${toolName ?: "<missing>"}")
         }
+    }
+
+    private fun handleIngestionSetApproval(
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String {
+        val control = ingestionControlPlane ?: return toolResultResponse(requestId, true, "Ingestion control is disabled.")
+        val arguments = params.objectValue("arguments") ?: params
+        val source = arguments.toSource() ?: return toolResultResponse(requestId, true, "Missing or invalid source parameters.")
+        val approved = arguments.booleanValue("approved") ?: return toolResultResponse(requestId, true, "Missing required field: approved")
+        val scope = arguments.stringValue("scope")?.toApprovalScope() ?: ApprovalScope.CHAT
+
+        val record = control.setApproval(ApprovalUpdateRequest(source = source, scope = scope, approved = approved))
+        val status = if (record.approved) "approved" else "revoked"
+        return toolResultResponse(
+            requestId,
+            false,
+            "${record.source.platform.name.lowercase()}:${record.source.sourceId} $status at scope ${record.scope.name.lowercase()}.",
+        )
+    }
+
+    private fun handleIngestionListApprovedSources(requestId: JsonElement): String {
+        val control = ingestionControlPlane ?: return toolResultResponse(requestId, true, "Ingestion control is disabled.")
+        val approved = control.listApprovedSources()
+        if (approved.isEmpty()) {
+            return toolResultResponse(requestId, false, "No approved ingestion sources.")
+        }
+
+        val lines =
+            approved.joinToString(separator = "\n") { record ->
+                "${record.source.platform.name.lowercase()} ${record.source.sourceKind.name.lowercase()} ${record.source.sourceId} scope=${record.scope.name.lowercase()}"
+            }
+        return toolResultResponse(requestId, false, lines)
+    }
+
+    private fun handleIngestionManualIngest(
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String {
+        val control = ingestionControlPlane ?: return toolResultResponse(requestId, true, "Ingestion control is disabled.")
+        val arguments = params.objectValue("arguments") ?: params
+        val source = arguments.toSource() ?: return toolResultResponse(requestId, true, "Missing or invalid source parameters.")
+        val text = arguments.stringValue("text")
+        val messageId = arguments.stringValue("messageId") ?: "manual-${System.currentTimeMillis()}"
+        val dryRun = arguments.booleanValue("dryRun") ?: true
+        val senderId = arguments.stringValue("senderId")
+        val senderDisplayName = arguments.stringValue("senderDisplayName")
+        val threadId = arguments.stringValue("threadId")
+        val occurredAt = arguments.stringValue("occurredAt") ?: Instant.now().toString()
+
+        val outcome =
+            control.ingestManual(
+                messages =
+                    listOf(
+                        NormalizedIngestionMessage(
+                            messageId = messageId,
+                            source = source,
+                            senderId = senderId,
+                            senderDisplayName = senderDisplayName,
+                            text = text,
+                            threadId = threadId,
+                            occurredAt = occurredAt,
+                        ),
+                    ),
+                dryRun = dryRun,
+            ).firstOrNull()
+
+        if (outcome == null) {
+            return toolResultResponse(requestId, true, "Ingestion returned no outcome.")
+        }
+
+        return toolResultResponse(
+            requestId,
+            false,
+            "decision=${outcome.decision.name.lowercase()} dryRun=${outcome.dryRun} attachments=${outcome.attachmentRecords.size}",
+        )
+    }
+
+    private fun handleIngestionManualChat(
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String {
+        val responder = externalChatResponder ?: return toolResultResponse(requestId, true, "External chat bridge is disabled.")
+        val arguments = params.objectValue("arguments") ?: params
+        val source = arguments.toSource() ?: return toolResultResponse(requestId, true, "Missing or invalid source parameters.")
+        val text = arguments.stringValue("text")
+        if (text.isNullOrBlank()) {
+            return toolResultResponse(requestId, true, "Missing required field: text")
+        }
+
+        val message =
+            NormalizedIngestionMessage(
+                messageId = arguments.stringValue("messageId") ?: "manual-${System.currentTimeMillis()}",
+                source = source,
+                senderId = arguments.stringValue("senderId"),
+                senderDisplayName = arguments.stringValue("senderDisplayName"),
+                text = text,
+                threadId = arguments.stringValue("threadId"),
+                occurredAt = arguments.stringValue("occurredAt") ?: Instant.now().toString(),
+            )
+
+        val dryRun = arguments.booleanValue("dryRun") ?: false
+        val outcome = responder(message, dryRun)
+        val reply = outcome.outbound?.text ?: ""
+        val replySummary = if (reply.isBlank()) "(no reply generated)" else reply
+        return toolResultResponse(
+            requestId,
+            false,
+            "decision=${outcome.ingestion.decision.name.lowercase()} dryRun=${outcome.dryRun}\nreply=$replySummary",
+        )
     }
 
     private fun handleWorkspaceListDir(
@@ -554,11 +698,20 @@ private fun buildInitializeResult(): JsonObject {
     return result
 }
 
-private fun buildToolsListResult(): JsonObject {
+private fun buildToolsListResult(includeIngestionTools: Boolean): JsonObject {
     val result = JsonObject()
     val tools = JsonArray()
+    baseToolDefinitions().forEach { tool -> tools.add(tool) }
+    if (includeIngestionTools) {
+        ingestionToolDefinitions().forEach { tool -> tools.add(tool) }
+    }
 
-    tools.add(
+    result.add("tools", tools)
+    return result
+}
+
+private fun baseToolDefinitions(): List<JsonObject> =
+    listOf(
         buildToolDefinition(
             ASK_BERTBOT_TOOL_NAME,
             "Pass a prompt to BertBot and return the orchestration response.",
@@ -566,22 +719,16 @@ private fun buildToolsListResult(): JsonObject {
             property("prompt", "string", "Prompt to send to BertBot.")
             required("prompt")
         },
-    )
-    tools.add(
         buildToolDefinition(
             BERTBOT_STATUS_TOOL_NAME,
             "Return BertBot MCP backend status for this session.",
         ),
-    )
-    tools.add(
         buildToolDefinition(
             WORKSPACE_LIST_DIR_TOOL_NAME,
             "List files and directories under a workspace-relative path.",
         ) {
             property("path", "string", "Workspace-relative directory path. Defaults to '.'.")
         },
-    )
-    tools.add(
         buildToolDefinition(
             WORKSPACE_READ_FILE_TOOL_NAME,
             "Read a file from the workspace by relative path.",
@@ -589,8 +736,6 @@ private fun buildToolsListResult(): JsonObject {
             property("path", "string", "Workspace-relative file path.")
             required("path")
         },
-    )
-    tools.add(
         buildToolDefinition(
             WORKSPACE_SEARCH_TOOL_NAME,
             "Search workspace files for a text query.",
@@ -600,9 +745,68 @@ private fun buildToolsListResult(): JsonObject {
             required("query")
         },
     )
-    result.add("tools", tools)
-    return result
-}
+
+private fun ingestionToolDefinitions(): List<JsonObject> =
+    listOf(
+        buildToolDefinition(
+            INGESTION_SET_APPROVAL_TOOL_NAME,
+            "Set or revoke approval for a specific external source.",
+        ) {
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
+            property("sourceId", "string", "External source id (chat/channel/conversation).")
+            property("workspaceId", "string", "Optional workspace/team/phone-number id.")
+            property("scope", "string", "Approval scope (chat, channel, conversation, user).")
+            property("approved", "boolean", "True to approve, false to revoke.")
+            required("platform")
+            required("sourceKind")
+            required("sourceId")
+            required("approved")
+        },
+        buildToolDefinition(
+            INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME,
+            "List currently approved external ingestion sources.",
+        ),
+        buildToolDefinition(
+            INGESTION_INGEST_MANUAL_TOOL_NAME,
+            "Manually ingest or dry-run one normalized message payload.",
+        ) {
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
+            property("sourceId", "string", "External source id (chat/channel/conversation).")
+            property("workspaceId", "string", "Optional workspace/team/phone-number id.")
+            property("messageId", "string", "External message id; defaults to generated manual id.")
+            property("text", "string", "Message text body.")
+            property("senderId", "string", "Optional sender id.")
+            property("senderDisplayName", "string", "Optional sender display name.")
+            property("threadId", "string", "Optional thread id.")
+            property("occurredAt", "string", "Optional ISO timestamp.")
+            property("dryRun", "boolean", "Defaults to true.")
+            required("platform")
+            required("sourceKind")
+            required("sourceId")
+        },
+        buildToolDefinition(
+            INGESTION_CHAT_MANUAL_TOOL_NAME,
+            "Route one approved external message through BertBot and return the reply payload.",
+        ) {
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
+            property("sourceId", "string", "External source id (chat/channel/conversation).")
+            property("workspaceId", "string", "Optional workspace/team/phone-number id.")
+            property("messageId", "string", "External message id; defaults to generated manual id.")
+            property("text", "string", "Inbound message text.")
+            property("senderId", "string", "Optional sender id.")
+            property("senderDisplayName", "string", "Optional sender display name.")
+            property("threadId", "string", "Optional thread id.")
+            property("occurredAt", "string", "Optional ISO timestamp.")
+            property("dryRun", "boolean", "Run without persistence writes.")
+            required("platform")
+            required("sourceKind")
+            required("sourceId")
+            required("text")
+        },
+    )
 
 private fun buildToolDefinition(
     name: String,
@@ -667,6 +871,57 @@ private fun JsonObject.intValue(name: String): Int? {
     }
     return runCatching { element.asInt }.getOrNull()
 }
+
+private fun JsonObject.booleanValue(name: String): Boolean? {
+    val element = get(name) ?: return null
+    if (!element.isJsonPrimitive || !element.asJsonPrimitive.isBoolean) {
+        return null
+    }
+    return runCatching { element.asBoolean }.getOrNull()
+}
+
+private fun JsonObject.toSource(): IngestionSource? {
+    val platformValue = stringValue("platform") ?: return null
+    val sourceKindValue = stringValue("sourceKind") ?: return null
+    val sourceIdValue = stringValue("sourceId") ?: return null
+
+    val platform = platformValue.toIngestionPlatform() ?: return null
+    val sourceKind = sourceKindValue.toSourceKind() ?: return null
+
+    return IngestionSource(
+        platform = platform,
+        sourceKind = sourceKind,
+        sourceId = sourceIdValue,
+        workspaceId = stringValue("workspaceId"),
+    )
+}
+
+private fun String.toIngestionPlatform(): IngestionPlatform? =
+    when (lowercase()) {
+        "telegram" -> IngestionPlatform.TELEGRAM
+        "slack" -> IngestionPlatform.SLACK
+        "whatsapp" -> IngestionPlatform.WHATSAPP
+        "manual" -> IngestionPlatform.MANUAL
+        else -> null
+    }
+
+private fun String.toSourceKind(): IngestionSourceKind? =
+    when (lowercase()) {
+        "chat" -> IngestionSourceKind.CHAT
+        "channel" -> IngestionSourceKind.CHANNEL
+        "direct_message" -> IngestionSourceKind.DIRECT_MESSAGE
+        "business_conversation" -> IngestionSourceKind.BUSINESS_CONVERSATION
+        else -> null
+    }
+
+private fun String.toApprovalScope(): ApprovalScope? =
+    when (lowercase()) {
+        "chat" -> ApprovalScope.CHAT
+        "channel" -> ApprovalScope.CHANNEL
+        "conversation" -> ApprovalScope.CONVERSATION
+        "user" -> ApprovalScope.USER
+        else -> null
+    }
 
 private fun File.isWithin(root: File): Boolean {
     val targetPath = canonicalFile.toPath().normalize()

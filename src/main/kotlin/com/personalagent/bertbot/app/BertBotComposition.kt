@@ -16,6 +16,16 @@ import com.personalagent.bertbot.graph.runtime.DelegationToExecutorStateValidato
 import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
+import com.personalagent.bertbot.ingestion.FileConsentStore
+import com.personalagent.bertbot.ingestion.FileSourceStateStore
+import com.personalagent.bertbot.ingestion.IngestionService
+import com.personalagent.bertbot.ingestion.ReferenceOnlyMediaPolicy
+import com.personalagent.bertbot.ingestion.connectors.SlackChatBridge
+import com.personalagent.bertbot.ingestion.connectors.SlackConnectorAdapter
+import com.personalagent.bertbot.ingestion.connectors.TelegramChatBridge
+import com.personalagent.bertbot.ingestion.connectors.TelegramConnectorAdapter
+import com.personalagent.bertbot.ingestion.connectors.WhatsAppChatBridge
+import com.personalagent.bertbot.ingestion.connectors.WhatsAppConnectorAdapter
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
@@ -97,12 +107,39 @@ internal object BertBotRuntimeDependenciesFactory {
             userProfileStore = userProfileStore,
         )
     }
+
+    fun createIngestionRuntime(
+        config: BertBotAgentConfig,
+        memoryRuntime: BertBotMemoryRuntime,
+    ): BertBotIngestionRuntime? {
+        if (!config.ingestion.policy.enabled) {
+            return null
+        }
+
+        val service =
+            IngestionService(
+                consentStore = FileConsentStore(),
+                sourceStateStore = FileSourceStateStore(),
+                episodicMemory = memoryRuntime.episodicMemory,
+                semanticSummarizationTrigger = { memoryRuntime.memoryWorker.scheduleIfNeeded() },
+                userProfileStore = memoryRuntime.userProfileStore,
+                mediaPolicy = ReferenceOnlyMediaPolicy(),
+            )
+
+        return BertBotIngestionRuntime(controlPlane = service)
+    }
 }
 
 internal data class BertBotRequestContext(
     val initialState: BertBotState,
     val knownProfile: UserProfile,
     val requestTraceId: String,
+)
+
+internal data class BertBotConnectorRuntime(
+    val telegram: TelegramConnectorAdapter? = null,
+    val slack: SlackConnectorAdapter? = null,
+    val whatsapp: WhatsAppConnectorAdapter? = null,
 )
 
 internal class BertBotRequestContextBuilder(
@@ -141,5 +178,22 @@ internal class BertBotRequestContextBuilder(
             knownProfile = knownProfile,
             requestTraceId = requestTraceId,
         )
+    }
+}
+
+internal object BertBotConnectorRuntimeFactory {
+    fun create(
+        config: BertBotAgentConfig,
+        runtime: BertBotRuntime,
+    ): BertBotConnectorRuntime {
+        if (!config.ingestion.policy.enabled) {
+            return BertBotConnectorRuntime()
+        }
+
+        val responder = runtime.externalChatResponder()
+        val telegram = if (config.ingestion.telegram.connector.enabled) TelegramConnectorAdapter(TelegramChatBridge(responder)) else null
+        val slack = if (config.ingestion.slack.connector.enabled) SlackConnectorAdapter(SlackChatBridge(responder)) else null
+        val whatsapp = if (config.ingestion.whatsapp.connector.enabled) WhatsAppConnectorAdapter(WhatsAppChatBridge(responder)) else null
+        return BertBotConnectorRuntime(telegram = telegram, slack = slack, whatsapp = whatsapp)
     }
 }

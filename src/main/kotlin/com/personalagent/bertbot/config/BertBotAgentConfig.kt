@@ -20,12 +20,50 @@ data class SubAgentConfigDefinition(
     val enabled: Boolean = true,
 )
 
+data class ConnectorConfig(
+    val enabled: Boolean = false,
+    val approvalScope: String = "chat",
+    val dryRunDefault: Boolean = true,
+)
+
+data class TelegramIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(),
+    val approvedChatIds: Set<String> = emptySet(),
+)
+
+data class SlackIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(approvalScope = "channel"),
+    val workspaceId: String? = null,
+    val approvedChannelIds: Set<String> = emptySet(),
+    val approvedDirectMessageIds: Set<String> = emptySet(),
+)
+
+data class WhatsAppIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(approvalScope = "conversation"),
+    val businessPhoneNumberId: String? = null,
+    val approvedConversationIds: Set<String> = emptySet(),
+)
+
+data class IngestionPolicyConfig(
+    val enabled: Boolean = false,
+    val storeImageReferencesOnly: Boolean = true,
+    val requireApproval: Boolean = true,
+)
+
+data class IngestionConfig(
+    val policy: IngestionPolicyConfig = IngestionPolicyConfig(),
+    val telegram: TelegramIntegrationConfig = TelegramIntegrationConfig(),
+    val slack: SlackIntegrationConfig = SlackIntegrationConfig(),
+    val whatsapp: WhatsAppIntegrationConfig = WhatsAppIntegrationConfig(),
+)
+
 data class BertBotAgentConfig(
     val name: String = "BertBot",
     val maxSemanticContextEntries: Int = 5,
     val maxEpisodicContextEntries: Int = 10,
     val memorySummarizationThreshold: Int = 15,
     val memorySummarizationBatchSize: Int = 10,
+    val ingestion: IngestionConfig = IngestionConfig(),
     val nonActionableMessages: Set<String> =
         setOf(
             "hi",
@@ -213,6 +251,12 @@ data class BertBotAgentConfig(
         require(nonActionableMessages.none { it.isBlank() }) {
             "nonActionableMessages must not contain blank values"
         }
+        require(ingestion.policy.storeImageReferencesOnly) {
+            "ingestion.policy.storeImageReferencesOnly must remain true in the current media policy phase"
+        }
+        requireConnectorScope("telegram", ingestion.telegram.connector.approvalScope, setOf("chat", "conversation"))
+        requireConnectorScope("slack", ingestion.slack.connector.approvalScope, setOf("channel", "chat", "conversation"))
+        requireConnectorScope("whatsapp", ingestion.whatsapp.connector.approvalScope, setOf("conversation", "chat"))
     }
 
     fun enabledTools(): List<ToolDefinition> = tools.filter { it.enabled }
@@ -226,5 +270,15 @@ data class BertBotAgentConfig(
         const val MAX_EPISODIC_CONTEXT_ENTRIES: Int = 500
         const val MAX_MEMORY_SUMMARIZATION_THRESHOLD: Int = 1_000
         const val MAX_MEMORY_SUMMARIZATION_BATCH_SIZE: Int = 500
+    }
+}
+
+private fun requireConnectorScope(
+    connectorName: String,
+    scope: String,
+    supportedScopes: Set<String>,
+) {
+    require(scope in supportedScopes) {
+        "$connectorName approvalScope must be one of ${supportedScopes.joinToString()}"
     }
 }

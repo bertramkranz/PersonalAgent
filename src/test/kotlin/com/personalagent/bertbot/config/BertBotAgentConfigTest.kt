@@ -13,6 +13,8 @@ class BertBotAgentConfigTest {
         assertEquals(10, config.maxEpisodicContextEntries)
         assertEquals(15, config.memorySummarizationThreshold)
         assertEquals(10, config.memorySummarizationBatchSize)
+        assertEquals(false, config.ingestion.policy.enabled)
+        assertEquals(true, config.ingestion.policy.storeImageReferencesOnly)
         assertEquals(setOf("hi", "hello", "hey", "thanks", "thank you", "ok", "okay"), config.nonActionableMessages)
     }
 
@@ -80,6 +82,21 @@ class BertBotAgentConfigTest {
         assertFailsWith<IllegalArgumentException> {
             BertBotAgentConfig(
                 memorySummarizationBatchSize = BertBotAgentConfig.MAX_MEMORY_SUMMARIZATION_BATCH_SIZE + 1,
+            )
+        }
+    }
+
+    @Test
+    fun `ingestion connector approval scope must be supported`() {
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                ingestion =
+                    IngestionConfig(
+                        telegram =
+                            TelegramIntegrationConfig(
+                                connector = ConnectorConfig(approvalScope = "workspace"),
+                            ),
+                    ),
             )
         }
     }

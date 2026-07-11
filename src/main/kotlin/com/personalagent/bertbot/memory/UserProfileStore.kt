@@ -9,6 +9,9 @@ import java.nio.file.StandardCopyOption
 
 data class UserProfile(
     val displayName: String? = null,
+    val recurringPreferences: Set<String> = emptySet(),
+    val communicationStyleHints: Set<String> = emptySet(),
+    val stableInterests: Set<String> = emptySet(),
 )
 
 class UserProfileStore(
@@ -59,6 +62,45 @@ class UserProfileStore(
         persist()
     }
 
+    fun addRecurringPreference(preference: String) {
+        val normalized = normalizeLabel(preference)
+        if (normalized.isBlank() || cached.recurringPreferences.contains(normalized)) {
+            return
+        }
+
+        cached =
+            cached.copy(
+                recurringPreferences = normalizeSet(cached.recurringPreferences + normalized),
+            )
+        persist()
+    }
+
+    fun addCommunicationStyleHint(hint: String) {
+        val normalized = normalizeLabel(hint)
+        if (normalized.isBlank() || cached.communicationStyleHints.contains(normalized)) {
+            return
+        }
+
+        cached =
+            cached.copy(
+                communicationStyleHints = normalizeSet(cached.communicationStyleHints + normalized),
+            )
+        persist()
+    }
+
+    fun addStableInterest(interest: String) {
+        val normalized = normalizeLabel(interest)
+        if (normalized.isBlank() || cached.stableInterests.contains(normalized)) {
+            return
+        }
+
+        cached =
+            cached.copy(
+                stableInterests = normalizeSet(cached.stableInterests + normalized),
+            )
+        persist()
+    }
+
     private fun persist() {
         writeTextAtomically(storageFile, gson.toJson(cached))
     }
@@ -69,6 +111,21 @@ private fun normalizeDisplayName(raw: String): String =
         .trim()
         .trimEnd('.', '!', '?', ',', ';', ':')
         .replace(Regex("\\s+"), " ")
+
+private fun normalizeLabel(raw: String): String =
+    raw
+        .trim()
+        .trimEnd('.', '!', '?', ',', ';', ':')
+        .replace(Regex("\\s+"), " ")
+
+private fun normalizeSet(values: Set<String>): Set<String> =
+    values
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+        .sorted()
+        .takeLast(100)
+        .toSet()
 
 private fun preserveUnreadableStorageFile(storageFile: File) {
     val extension = storageFile.extension.takeIf { it.isNotBlank() } ?: "json"

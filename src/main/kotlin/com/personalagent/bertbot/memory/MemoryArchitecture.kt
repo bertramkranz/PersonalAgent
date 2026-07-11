@@ -28,6 +28,10 @@ class EpisodicMemory(
         backing.remember(text)
     }
 
+    fun append(entry: MemoryEntry) {
+        backing.remember(entry)
+    }
+
     override fun entries(): List<MemoryEntry> = backing.entries()
 
     override fun replaceAll(entries: List<MemoryEntry>) {

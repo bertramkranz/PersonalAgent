@@ -31,4 +31,21 @@ class UserProfileStoreTest {
         val backups = file.parentFile?.listFiles { _, name -> name.startsWith("${file.nameWithoutExtension}.corrupt-") }
         assertTrue(backups?.isNotEmpty() == true)
     }
+
+    @Test
+    fun `store persists conservative learning fields`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val store = UserProfileStore(file)
+        store.addRecurringPreference("concise updates")
+        store.addCommunicationStyleHint("prefers step-by-step explanations")
+        store.addStableInterest("kotlin")
+
+        val reloaded = UserProfileStore(file)
+        assertTrue(reloaded.current().recurringPreferences.contains("concise updates"))
+        assertTrue(reloaded.current().communicationStyleHints.contains("prefers step-by-step explanations"))
+        assertTrue(reloaded.current().stableInterests.contains("kotlin"))
+    }
 }
