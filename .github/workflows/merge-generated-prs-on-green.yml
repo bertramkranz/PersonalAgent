@@ -298,7 +298,17 @@ jobs:
               await rerunActionRequiredChecks(pr);
               await rerunActionRequiredWorkflowRuns(pr);
 
-              if (!(await checksAreGreen(pr))) {
+              let checksGreen = await checksAreGreen(pr);
+              if (!checksGreen) {
+                const deadline = Date.now() + 5 * 60 * 1000;
+                while (!checksGreen && Date.now() < deadline) {
+                  core.info(`Waiting 30s for PR #${pr.number} checks to turn green.`);
+                  await new Promise((resolve) => setTimeout(resolve, 30_000));
+                  checksGreen = await checksAreGreen(pr);
+                }
+              }
+
+              if (!checksGreen) {
                 continue;
               }
 
