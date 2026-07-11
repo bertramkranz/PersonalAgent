@@ -148,7 +148,12 @@ class JdbcBertBotMemoryStore(
                 try {
                     val updated = updateScopedPayload(connection, scopeKey, payload)
                     if (updated == 0) {
-                        insertScopedPayload(connection, scopeKey, payload)
+                        try {
+                            insertScopedPayload(connection, scopeKey, payload)
+                        } catch (_: SQLException) {
+                            // Concurrent writer inserted the row first; retry as an update.
+                            updateScopedPayload(connection, scopeKey, payload)
+                        }
                     }
                 } catch (_: SQLException) {
                     val updated = updateLegacyPayload(connection, payload)

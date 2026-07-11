@@ -55,7 +55,12 @@ class JdbcBertBotStateStore(
                     try {
                         val updated = updateScopedSnapshot(connection, scopeKey, payload)
                         if (updated == 0) {
-                            insertScopedSnapshot(connection, scopeKey, payload)
+                            try {
+                                insertScopedSnapshot(connection, scopeKey, payload)
+                            } catch (_: SQLException) {
+                                // Concurrent writer inserted the row first; retry as an update.
+                                updateScopedSnapshot(connection, scopeKey, payload)
+                            }
                         }
                     } catch (_: SQLException) {
                         val updated = updateLegacySnapshot(connection, payload)

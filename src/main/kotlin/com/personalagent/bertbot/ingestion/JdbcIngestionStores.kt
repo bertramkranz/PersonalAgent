@@ -45,7 +45,7 @@ class JdbcConsentStore(
             withConnection { connection ->
                 connection.autoCommit = false
                 try {
-                    val current = readPayload(connection, forUpdate = true).parseConsentRecords().toMutableList()
+                    val current = readPayload(connection, forUpdate = true).parseConsentRecords(gson).toMutableList()
                     val existingIndex = current.indexOfFirst { it.source.key() == record.source.key() }
                     if (existingIndex >= 0) {
                         current[existingIndex] = record
@@ -224,7 +224,7 @@ class JdbcSourceStateStore(
             withConnection { connection ->
                 connection.autoCommit = false
                 try {
-                    val current = readPayload(connection, forUpdate = true).parseSourceCursors().toMutableList()
+                    val current = readPayload(connection, forUpdate = true).parseSourceCursors(gson).toMutableList()
                     val existingIndex = current.indexOfFirst { it.source.key() == cursor.source.key() }
                     if (existingIndex >= 0) {
                         current[existingIndex] = cursor
@@ -358,25 +358,25 @@ class JdbcSourceStateStore(
     }
 }
 
-private fun String?.parseConsentRecords(): List<ApprovalRecord> {
+private fun String?.parseConsentRecords(gson: Gson): List<ApprovalRecord> {
     if (this.isNullOrBlank()) {
         return emptyList()
     }
 
     return try {
-        Gson().fromJson(this, JdbcPersistedConsentState::class.java)?.toRecords() ?: emptyList()
+        gson.fromJson(this, JdbcPersistedConsentState::class.java)?.toRecords() ?: emptyList()
     } catch (_: JsonSyntaxException) {
         emptyList()
     }
 }
 
-private fun String?.parseSourceCursors(): List<SyncCursor> {
+private fun String?.parseSourceCursors(gson: Gson): List<SyncCursor> {
     if (this.isNullOrBlank()) {
         return emptyList()
     }
 
     return try {
-        Gson().fromJson(this, JdbcPersistedSourceState::class.java)?.toCursors() ?: emptyList()
+        gson.fromJson(this, JdbcPersistedSourceState::class.java)?.toCursors() ?: emptyList()
     } catch (_: JsonSyntaxException) {
         emptyList()
     }

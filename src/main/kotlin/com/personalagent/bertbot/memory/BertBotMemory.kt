@@ -141,13 +141,14 @@ class BertBotMemory(
         }
     }
 
-    override fun snapshot(): String {
-        if (entries.isEmpty()) {
-            return "No remembered context yet."
-        }
+    override fun snapshot(): String =
+        synchronized(lock) {
+            if (entries.isEmpty()) {
+                return@synchronized "No remembered context yet."
+            }
 
-        return entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
-    }
+            entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
+        }
 
     override fun count(): Int = synchronized(lock) { entries.size }
 
