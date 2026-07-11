@@ -72,6 +72,7 @@ private fun createRuntimeForConnectorFactory(config: BertBotAgentConfig): BertBo
     return BertBotRuntime(
         config = config,
         aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+        stateStore = NoopStateStore(),
         graph = BertBotGraphRunner(definition = BertBotGraphDefinition(entryNodeId = "none", nodes = emptyList(), edges = emptyList()), stateStore = NoopStateStore()),
         assistantResponseSkill = createAssistantResponseSkill(FakeGatewayForConnectorFactory()),
         memoryRuntime = memoryRuntime,

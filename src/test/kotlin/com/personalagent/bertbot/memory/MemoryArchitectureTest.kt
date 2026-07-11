@@ -3,6 +3,9 @@ package com.personalagent.bertbot.memory
 import com.personalagent.bertbot.llm.LlmGateway
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -115,6 +118,54 @@ class MemoryArchitectureTest {
         assertTrue(memory.entries().isEmpty())
         val backups = tempDirectory.listFiles { _, name -> name.startsWith("bertbot-memory.corrupt-") }
         assertTrue(backups?.isNotEmpty() == true)
+    }
+
+    @Test
+    fun `memory store keeps all entries under concurrent writes`() {
+        val file = File.createTempFile("bertbot-memory", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val memory = BertBotMemory(file)
+        val workerCount = 6
+        val writesPerWorker = 40
+        val startLatch = CountDownLatch(1)
+        val doneLatch = CountDownLatch(workerCount)
+        val executor = Executors.newFixedThreadPool(workerCount)
+        val expected = mutableSetOf<String>()
+
+        try {
+            repeat(workerCount) { worker ->
+                repeat(writesPerWorker) { index ->
+                    expected.add("event-$worker-$index")
+                }
+            }
+
+            repeat(workerCount) { worker ->
+                executor.submit {
+                    try {
+                        startLatch.await()
+                        repeat(writesPerWorker) { index ->
+                            memory.remember("event-$worker-$index")
+                        }
+                    } finally {
+                        doneLatch.countDown()
+                    }
+                }
+            }
+
+            startLatch.countDown()
+            assertTrue(doneLatch.await(10, TimeUnit.SECONDS))
+        } finally {
+            executor.shutdownNow()
+        }
+
+        val reloaded = BertBotMemory(file)
+        val texts = reloaded.entries().map { it.text }.toSet()
+
+        assertEquals(expected.size, reloaded.count())
+        assertEquals(expected, texts)
+        assertTrue(file.readText().trim().startsWith("["))
     }
 }
 

@@ -23,6 +23,7 @@ flowchart TD
         Execute[Executor Node]
         State[(State Snapshot)]
         StateFile[(bertbot-state.json)]
+        JdbcState[(JDBC State Store)]
         TraceFile[(bertbot-trace.jsonl)]
         DiagramFile[(bertbot-interactions.mmd)]
     end
@@ -31,20 +32,20 @@ flowchart TD
         Config[BertBotAgentConfig]
         Registry[SubAgentRegistry]
         Skill[SelfCorrectingSkill]
-        LLM[LlmGateway / OpenAiLlmGateway]
+        LLM[LlmGateway / OpenAiLlmGateway / OllamaLlmGateway]
     end
 
     subgraph Memory
-        Episodic[(bertbot-memory.txt)]
+        Episodic[(Episodic Memory: File or JDBC)]
         Semantic[(bertbot-semantic-memory.txt)]
-        Profile[(bertbot-profile.json)]
+        Profile[(User Profile: File or JDBC)]
         Summarizer[MemorySummarizationWorker]
     end
 
     subgraph ExternalIngestion
         Control[IngestionControlPlane]
-        Consent[(FileConsentStore)]
-        SourceState[(FileSourceStateStore)]
+        Consent[(Consent Store: File or JDBC)]
+        SourceState[(Source State Store: File or JDBC)]
         Telegram[Telegram Adapter]
         Slack[Slack Adapter]
         WhatsApp[WhatsApp Adapter]
@@ -56,6 +57,11 @@ flowchart TD
         PolymarketGamma[(Polymarket Gamma API)]
         PolymarketCLOB[(Polymarket CLOB API)]
         PolymarketData[(Polymarket Data API)]
+    end
+
+    subgraph MacrofactorBridge
+        MacrofactorToolRouter[MacrofactorToolRouter]
+        MacrofactorMcp[(MacroFactor MCP Server)]
     end
 
     CLI --> RuntimeFactory
@@ -77,6 +83,7 @@ flowchart TD
     Runner --> Capture --> Planner --> Delegate --> Execute
     Execute --> State
     Runner --> StateFile
+    Runner --> JdbcState
     Runner --> TraceFile
     RuntimeCore --> DiagramFile
 
@@ -103,4 +110,7 @@ flowchart TD
     PolymarketApiClient --> PolymarketGamma
     PolymarketApiClient --> PolymarketCLOB
     PolymarketApiClient --> PolymarketData
+
+    MCP --> MacrofactorToolRouter
+    MacrofactorToolRouter --> MacrofactorMcp
 ```

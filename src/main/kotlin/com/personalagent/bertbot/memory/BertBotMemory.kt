@@ -39,25 +39,134 @@ data class MemoryAttachmentReference(
     val height: Int? = null,
 )
 
+interface BertBotMemoryStore {
+    fun load(): List<MemoryEntry>
+
+    fun remember(text: String)
+
+    fun remember(entry: MemoryEntry)
+
+    fun entries(): List<MemoryEntry>
+
+    fun replaceAll(newEntries: List<MemoryEntry>)
+
+    fun snapshot(): String
+
+    fun count(): Int
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = action()
+}
+
 class BertBotMemory(
     private val storageFile: File = File("bertbot-memory.txt"),
     private val gson: Gson = Gson(),
-) {
+) : BertBotMemoryStore {
+    private val lock = Any()
     private val entries = mutableListOf<MemoryEntry>()
+    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private var loadedScopeKey: String? = null
 
     init {
         load()
     }
 
-    fun load(): List<MemoryEntry> {
-        if (!storageFile.exists()) {
-            return emptyList()
+    override fun load(): List<MemoryEntry> {
+        synchronized(lock) {
+            forceReloadForCurrentScope()
+            return entries.toList()
+        }
+    }
+
+    override fun remember(text: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            if (text.isBlank()) {
+                return
+            }
+
+            entries.add(MemoryEntry(text = text.trim()))
+            persist()
+        }
+    }
+
+    override fun remember(entry: MemoryEntry) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            if (entry.text.isBlank()) {
+                return
+            }
+
+            entries.add(entry.normalized())
+            persist()
+        }
+    }
+
+    override fun entries(): List<MemoryEntry> =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            entries.toList()
         }
 
+    override fun replaceAll(newEntries: List<MemoryEntry>) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            entries.clear()
+            entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
+            persist()
+        }
+    }
+
+    override fun snapshot(): String =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            if (entries.isEmpty()) {
+                return "No remembered context yet."
+            }
+            entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
+        }
+
+    override fun count(): Int =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            entries.size
+        }
+
+    override fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T {
+        val previous = currentScope.get()
+        currentScope.set(normalizeScope(scopeKey))
+        return try {
+            action()
+        } finally {
+            currentScope.set(previous)
+        }
+    }
+
+    private fun ensureLoadedForCurrentScope() {
+        val scopeKey = currentScope.get()
+        if (loadedScopeKey == scopeKey) {
+            return
+        }
+        forceReloadForCurrentScope()
+    }
+
+    private fun forceReloadForCurrentScope() {
         entries.clear()
-        val content = storageFile.readText().trim()
+        loadedScopeKey = currentScope.get()
+        val file = scopedStorageFile()
+
+        if (!file.exists()) {
+            return
+        }
+
+        val content = file.readText().trim()
         if (content.isBlank()) {
-            return emptyList()
+            return
         }
 
         // Prefer structured JSON state but gracefully fall back to legacy line-based format.
@@ -70,63 +179,43 @@ class BertBotMemory(
 
         if (parsedEntries != null) {
             entries.addAll(parsedEntries.map { it.normalized() })
-            return entries.toList()
+            return
         }
 
         if (looksLikeStructuredJson(content)) {
-            preserveUnreadableStorageFile(storageFile)
-            return emptyList()
+            preserveUnreadableStorageFile(file)
+            return
         }
 
         content.lineSequence()
             .filter { it.isNotBlank() }
             .forEach { line -> entries.add(MemoryEntry(text = line.trim())) }
-
-        return entries.toList()
     }
-
-    fun remember(text: String) {
-        if (text.isBlank()) {
-            return
-        }
-
-        entries.add(MemoryEntry(text = text.trim()))
-        persist()
-    }
-
-    fun remember(entry: MemoryEntry) {
-        if (entry.text.isBlank()) {
-            return
-        }
-
-        entries.add(entry.normalized())
-        persist()
-    }
-
-    fun entries(): List<MemoryEntry> = entries.toList()
-
-    fun replaceAll(newEntries: List<MemoryEntry>) {
-        entries.clear()
-        entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
-        persist()
-    }
-
-    fun snapshot(): String {
-        if (entries.isEmpty()) {
-            return "No remembered context yet."
-        }
-
-        return entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
-    }
-
-    fun count(): Int = entries.size
 
     private fun persist() {
-        writeTextAtomically(storageFile, gson.toJson(entries))
+        writeTextAtomically(scopedStorageFile(), gson.toJson(entries))
+    }
+
+    private fun scopedStorageFile(): File {
+        val scope = currentScope.get()
+        if (scope == DEFAULT_SCOPE_KEY) {
+            return storageFile
+        }
+        val parent = storageFile.parentFile ?: File(".")
+        val stem = storageFile.nameWithoutExtension
+        val ext = storageFile.extension.takeIf { it.isNotBlank() } ?: "txt"
+        return File(parent, "$stem-$scope.$ext")
+    }
+
+    private companion object {
+        private const val DEFAULT_SCOPE_KEY = "global"
+
+        private fun normalizeScope(scopeKey: String): String =
+            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
     }
 }
 
-private fun MemoryEntry.normalized(): MemoryEntry =
+internal fun MemoryEntry.normalized(): MemoryEntry =
     copy(
         text = text.trim(),
         attachmentReferences = attachmentReferences.orEmpty().filter { it.attachmentId.isNotBlank() },
@@ -148,13 +237,18 @@ private fun writeTextAtomically(
     target: File,
     content: String,
 ) {
-    target.parentFile?.mkdirs()
-    val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
-    tempFile.writeText(content)
+    val parentDir = target.parentFile ?: File(".")
+    parentDir.mkdirs()
+    val tempPath = Files.createTempFile(parentDir.toPath(), "${target.nameWithoutExtension}-", ".tmp")
+    val tempFile = tempPath.toFile()
     try {
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        tempFile.writeText(content)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (_: AtomicMoveNotSupportedException) {
         println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    } catch (e: Exception) {
+        runCatching { tempFile.delete() }
+        throw e
     }
 }

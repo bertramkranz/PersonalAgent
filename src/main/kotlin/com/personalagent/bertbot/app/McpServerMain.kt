@@ -74,8 +74,15 @@ private val gson = GsonBuilder().disableHtmlEscaping().create()
 
 fun main() {
     val aiRuntimeConfiguration = resolveAiRuntimeConfiguration()
+    val macrofactorRuntimeConfiguration = resolveMacrofactorRuntimeConfiguration()
     val startup = createStartupState(aiRuntimeConfiguration)
     val workspaceRoot = resolveWorkspaceRoot()
+    val macrofactorToolRouter =
+        if (macrofactorRuntimeConfiguration.enabled) {
+            MacrofactorToolRouter(macrofactorRuntimeConfiguration)
+        } else {
+            null
+        }
 
     val dispatcher =
         McpRequestDispatcher(
@@ -91,38 +98,17 @@ fun main() {
                 )
             },
             workspaceRoot = workspaceRoot,
-            polymarketApiClient = PolymarketApiClient.fromEnvironment(),
+            macrofactorToolRouter = macrofactorToolRouter,
+            polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
             ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
             externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
-            statusProvider = {
-                val baseTools =
-                    mutableListOf(
-                        ASK_BERTBOT_TOOL_NAME,
-                        BERTBOT_STATUS_TOOL_NAME,
-                        WORKSPACE_LIST_DIR_TOOL_NAME,
-                        WORKSPACE_READ_FILE_TOOL_NAME,
-                        WORKSPACE_SEARCH_TOOL_NAME,
-                        POLYMARKET_GAMMA_TOOL_NAME,
-                        POLYMARKET_CLOB_TOOL_NAME,
-                        POLYMARKET_DATA_TOOL_NAME,
-                    )
-                if (startup.runtime?.ingestionControlPlane() != null) {
-                    baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
-                    baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
-                    baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
-                    baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
-                }
-                """
-                Connected to $MCP_SERVER_NAME MCP server.
-                Active tool surface: ${baseTools.joinToString()}
-                Workspace root: ${workspaceRoot.absolutePath}
-                Runtime ready: ${startup.runtime != null}
-                Runtime provider: ${aiRuntimeConfiguration.provider}
-                Runtime model: ${aiRuntimeConfiguration.model}
-                Runtime error: ${startup.errorMessage ?: "none"}
-                Session check timestamp: ${Instant.now()}
-                """.trimIndent()
-            },
+            statusProvider =
+                createStatusProvider(
+                    startup = startup,
+                    workspaceRoot = workspaceRoot,
+                    aiRuntimeConfiguration = aiRuntimeConfiguration,
+                    macrofactorToolRouter = macrofactorToolRouter,
+                ),
         )
 
     // Use stderr for startup diagnostics so stdout remains clean JSON-RPC for MCP transport.
@@ -134,6 +120,8 @@ fun main() {
         Workspace root: ${workspaceRoot.absolutePath}
         Provider: ${aiRuntimeConfiguration.provider}
         Model: ${aiRuntimeConfiguration.model}
+        MacroFactor enabled: ${macrofactorRuntimeConfiguration.enabled}
+        MacroFactor configured: ${macrofactorRuntimeConfiguration.isConfigured}
         Runtime ready: ${startup.runtime != null}
         Runtime error: ${startup.errorMessage ?: "none"}
         """.trimIndent(),
@@ -153,6 +141,49 @@ fun main() {
     }
 }
 
+private fun createStatusProvider(
+    startup: StartupState,
+    workspaceRoot: File,
+    aiRuntimeConfiguration: AiRuntimeConfiguration,
+    macrofactorToolRouter: MacrofactorToolRouter?,
+): () -> String {
+    val macrofactorToolNames =
+        macrofactorToolRouter
+            ?.toolDefinitions()
+            ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+            ?: emptyList()
+    return {
+        val baseTools =
+            mutableListOf(
+                ASK_BERTBOT_TOOL_NAME,
+                BERTBOT_STATUS_TOOL_NAME,
+                WORKSPACE_LIST_DIR_TOOL_NAME,
+                WORKSPACE_READ_FILE_TOOL_NAME,
+                WORKSPACE_SEARCH_TOOL_NAME,
+                POLYMARKET_GAMMA_TOOL_NAME,
+                POLYMARKET_CLOB_TOOL_NAME,
+                POLYMARKET_DATA_TOOL_NAME,
+            )
+        if (startup.runtime?.ingestionControlPlane() != null) {
+            baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
+            baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
+            baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
+            baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
+        }
+        macrofactorToolNames.forEach { name -> baseTools += name }
+        """
+        Connected to $MCP_SERVER_NAME MCP server.
+        Active tool surface: ${baseTools.joinToString()}
+        Workspace root: ${workspaceRoot.absolutePath}
+        Runtime ready: ${startup.runtime != null}
+        Runtime provider: ${aiRuntimeConfiguration.provider}
+        Runtime model: ${aiRuntimeConfiguration.model}
+        Runtime error: ${startup.errorMessage ?: "none"}
+        Session check timestamp: ${Instant.now()}
+        """.trimIndent()
+    }
+}
+
 internal fun runMcpSession(
     readLine: () -> String?,
     writeLine: (String) -> Unit,
@@ -165,10 +196,12 @@ internal fun runMcpSession(
     }
 }
 
+@Suppress("LongParameterList")
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
-    private val polymarketApiClient: PolymarketApiClient = PolymarketApiClient.fromEnvironment(),
+    private val macrofactorToolRouter: MacrofactorToolRouter? = null,
+    private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val statusProvider: () -> String = {
@@ -177,7 +210,6 @@ internal class McpRequestDispatcher(
 ) {
     private val workspaceRootFile = workspaceRoot.canonicalFile
     private val workspaceInspector = WorkspaceInspector(workspaceRootFile)
-    private val polymarketToolRouter = PolymarketToolRouter(polymarketApiClient)
 
     fun handle(rawMessage: String): String? {
         val request = parseRequest(rawMessage) ?: return errorResponse(null, -32700, "Invalid JSON")
@@ -191,17 +223,30 @@ internal class McpRequestDispatcher(
             "initialize" -> successResponse(requestId, buildInitializeResult())
             "initialized" -> null
             "ping" -> successResponse(requestId, JsonObject())
-            "tools/list" -> successResponse(requestId, buildToolsListResult(includeIngestionTools = ingestionControlPlane != null))
+            "tools/list" ->
+                successResponse(
+                    requestId,
+                    buildToolsListResult(
+                        includeIngestionTools = ingestionControlPlane != null,
+                        macrofactorToolDefinitions = macrofactorToolRouter?.toolDefinitions() ?: emptyList(),
+                    ),
+                )
             "tools/call" -> handleToolCall(requestId, request.params)
             else -> errorResponse(requestId, -32601, "Method not found: ${request.method}")
         }
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun handleToolCall(
         requestId: JsonElement,
         params: JsonObject,
     ): String {
         val toolName = params.stringValue("name") ?: params.stringValue("toolName")
+        val macrofactorResult = macrofactorToolRouter?.handle(toolName, params)
+        if (macrofactorResult != null) {
+            return toolResultResponse(requestId, macrofactorResult.first, macrofactorResult.second)
+        }
+
         return when (toolName) {
             ASK_BERTBOT_TOOL_NAME -> handleAskBertBot(requestId, params)
             BERTBOT_STATUS_TOOL_NAME -> toolResultResponse(requestId, false, statusProvider())
@@ -724,13 +769,18 @@ private fun buildInitializeResult(): JsonObject {
     return result
 }
 
-private fun buildToolsListResult(includeIngestionTools: Boolean): JsonObject {
+private fun buildToolsListResult(
+    includeIngestionTools: Boolean,
+    macrofactorToolDefinitions: List<JsonObject> = emptyList(),
+): JsonObject {
     val result = JsonObject()
     val tools = JsonArray()
     baseToolDefinitions().forEach { tool -> tools.add(tool) }
     if (includeIngestionTools) {
         ingestionToolDefinitions().forEach { tool -> tools.add(tool) }
     }
+
+    macrofactorToolDefinitions.forEach { tool -> tools.add(tool) }
 
     result.add("tools", tools)
     return result
@@ -1012,19 +1062,6 @@ internal fun resolveWorkspaceRoot(
 
     val fromMarkers = findWorkspaceRootByMarkers(currentDirectory)
     return fromMarkers ?: currentDirectory.canonicalFile
-}
-
-internal fun findWorkspaceRootByMarkers(start: File): File? {
-    var cursor: File? = start.canonicalFile
-    while (cursor != null) {
-        val hasGit = File(cursor, ".git").exists()
-        val hasGradleSettings = File(cursor, "settings.gradle.kts").exists()
-        if (hasGit || hasGradleSettings) {
-            return cursor
-        }
-        cursor = cursor.parentFile
-    }
-    return null
 }
 
 private fun createStartupState(aiRuntimeConfiguration: AiRuntimeConfiguration): StartupState {

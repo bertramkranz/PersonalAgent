@@ -29,8 +29,12 @@ dependencies {
     // Coroutines (optional, for async operations)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
+    // JDBC driver for optional PostgreSQL-backed state persistence.
+    runtimeOnly("org.postgresql:postgresql:42.7.4")
+
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("com.h2database:h2:2.2.224")
 }
 
 tasks.test {

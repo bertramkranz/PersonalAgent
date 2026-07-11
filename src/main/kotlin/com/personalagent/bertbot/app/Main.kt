@@ -44,8 +44,7 @@ private fun runInteractiveLoop(runtime: BertBotRuntime) {
         }
 
         if (isLikelyPromptInjection(userMessage)) {
-            println("Assistant: I can't comply with requests to override hidden instructions, reveal protected prompts, or exfiltrate secrets.")
-            println("Please restate your request as a normal task without jailbreak or instruction-override content.")
+            println("Assistant: ${promptInjectionRefusalMessage()}")
             println("")
             continue
         }

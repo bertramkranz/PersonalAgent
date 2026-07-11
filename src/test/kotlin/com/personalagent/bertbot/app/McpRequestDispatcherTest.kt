@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.app
 
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.personalagent.bertbot.ingestion.ApprovalRecord
 import com.personalagent.bertbot.ingestion.ApprovalUpdateRequest
@@ -81,7 +82,7 @@ class McpRequestDispatcherTest {
             val dispatcher =
                 McpRequestDispatcher(
                     respondToPrompt = { _, _ -> "unused" },
-                    polymarketApiClient = client,
+                    polymarketToolRouter = PolymarketToolRouter(client),
                 )
 
             val response =
@@ -123,7 +124,7 @@ class McpRequestDispatcherTest {
             val dispatcher =
                 McpRequestDispatcher(
                     respondToPrompt = { _, _ -> "unused" },
-                    polymarketApiClient = client,
+                    polymarketToolRouter = PolymarketToolRouter(client),
                 )
 
             val response =
@@ -553,6 +554,72 @@ class McpRequestDispatcherTest {
         val chatText = chatJson.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
         assertTrue(chatText.contains("reply from bertbot"))
     }
+
+    @Test
+    fun `tools list includes macrofactor proxy tools when router is configured`() {
+        val macrofactorRouter =
+            MacrofactorToolRouter(
+                runtimeConfiguration =
+                    MacrofactorRuntimeConfiguration(
+                        enabled = true,
+                        username = "user@example.com",
+                        password = "secret",
+                    ),
+                transport = FakeMacrofactorTransport(),
+            )
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                macrofactorToolRouter = macrofactorRouter,
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":14,"method":"tools/list","params":{}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val names =
+            json
+                .getAsJsonObject("result")
+                .getAsJsonArray("tools")
+                .map { it.asJsonObject.get("name").asString }
+        assertTrue(names.contains("macrofactor_get_nutrition"))
+    }
+
+    @Test
+    fun `tools call routes macrofactor proxy tools through router`() {
+        val transport = FakeMacrofactorTransport()
+        val macrofactorRouter =
+            MacrofactorToolRouter(
+                runtimeConfiguration =
+                    MacrofactorRuntimeConfiguration(
+                        enabled = true,
+                        username = "user@example.com",
+                        password = "secret",
+                    ),
+                transport = transport,
+            )
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                macrofactorToolRouter = macrofactorRouter,
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":15,"method":"tools/call","params":{"name":"macrofactor_get_nutrition","arguments":{"day":"2026-07-11"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("calories=2400"))
+        assertEquals("get_nutrition", transport.lastToolName)
+    }
 }
 
 private class FakeIngestionControlPlane : IngestionControlPlane {
@@ -580,5 +647,30 @@ private class FakeIngestionControlPlane : IngestionControlPlane {
                 dryRun = dryRun,
             )
         }
+    }
+}
+
+private class FakeMacrofactorTransport : MacrofactorMcpTransport {
+    var lastToolName: String? = null
+
+    override fun listTools(): List<MacrofactorDiscoveredTool> {
+        val schema = JsonObject()
+        schema.addProperty("type", "object")
+        schema.add("properties", JsonObject())
+        return listOf(
+            MacrofactorDiscoveredTool(
+                name = "get_nutrition",
+                description = "Get nutrition entries for a day.",
+                inputSchema = schema,
+            ),
+        )
+    }
+
+    override fun callTool(
+        toolName: String,
+        arguments: JsonObject,
+    ): Pair<Boolean, String> {
+        lastToolName = toolName
+        return false to "calories=2400"
     }
 }

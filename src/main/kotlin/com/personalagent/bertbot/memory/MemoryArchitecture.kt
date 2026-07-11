@@ -22,7 +22,7 @@ interface MemoryStore {
 }
 
 class EpisodicMemory(
-    private val backing: BertBotMemory = BertBotMemory(File("bertbot-memory.txt")),
+    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-memory.txt")),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)
@@ -37,10 +37,15 @@ class EpisodicMemory(
     override fun replaceAll(entries: List<MemoryEntry>) {
         backing.replaceAll(entries)
     }
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = backing.withScope(scopeKey, action)
 }
 
 class SemanticMemory(
-    private val backing: BertBotMemory = BertBotMemory(File("bertbot-semantic-memory.txt")),
+    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-semantic-memory.txt")),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)
@@ -51,6 +56,11 @@ class SemanticMemory(
     override fun replaceAll(entries: List<MemoryEntry>) {
         backing.replaceAll(entries)
     }
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = backing.withScope(scopeKey, action)
 }
 
 class DualMemoryContextAssembler(

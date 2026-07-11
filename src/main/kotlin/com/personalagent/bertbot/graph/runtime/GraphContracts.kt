@@ -15,6 +15,11 @@ interface BertBotStateStore {
     fun load(): BertBotState
 
     fun save(state: BertBotState)
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = action()
 }
 
 data class BertBotGraphEdge(

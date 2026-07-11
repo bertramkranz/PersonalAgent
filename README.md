@@ -58,13 +58,44 @@ BertBot reads configuration from the process environment first and falls back to
 
 If you are setting up the project from scratch, copy [.env.example](.env.example) to `.env` and fill in your values.
 
-The runtime is provider-aware at the LLM adapter boundary. The repository currently ships the OpenAI adapter, and new providers can be added by implementing the `LlmGateway` contract.
+The runtime is provider-aware at the LLM adapter boundary. The repository ships OpenAI and Ollama adapters, and new providers can be added by implementing the `LlmGateway` contract.
 
 The current configuration variables are:
 
-- `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. The shipped value is `openai`.
+- `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. Supported values: `openai`, `ollama`.
 - `BERTBOT_AI_MODEL` - selects the chat model for the active provider adapter.
-- `BERTBOT_AI_API_KEY` - provider-specific API key for the active adapter.
+- `BERTBOT_AI_API_KEY` - OpenAI API key (required when `BERTBOT_AI_PROVIDER=openai`).
+- `BERTBOT_OLLAMA_BASE_URL` - Ollama server base URL (used when `BERTBOT_AI_PROVIDER=ollama`). Default: `http://localhost:11434`.
+- `BERTBOT_OLLAMA_TIMEOUT_SECONDS` - Ollama request timeout in seconds. Default: `120`.
+
+MacroFactor MCP proxy variables:
+
+- `BERTBOT_MACROFACTOR_ENABLED` - enable MacroFactor MCP proxy tool registration. Default: `false`.
+- `BERTBOT_MACROFACTOR_COMMAND` - executable used to launch the MacroFactor MCP server. Default: `npx`.
+- `BERTBOT_MACROFACTOR_ARGS` - comma-separated command args used to launch MacroFactor MCP. Default: `-y,sjawhar-macrofactor`.
+- `BERTBOT_MACROFACTOR_USERNAME` - MacroFactor account username/email.
+- `BERTBOT_MACROFACTOR_PASSWORD` - MacroFactor account password.
+- `BERTBOT_MACROFACTOR_TIMEOUT_SECONDS` - timeout for upstream MacroFactor MCP responses. Default: `45`.
+- `BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX` - proxy tool name prefix exposed by BertBot. Default: `macrofactor_`.
+
+State persistence backend variables:
+
+- `BERTBOT_STATE_STORE` - state store backend. Supported values: `file` (default), `jdbc`, `postgres`, `postgresql`.
+- `BERTBOT_STATE_FILE_PATH` - state snapshot file path when file backend is used. Default: `bertbot-state.json`.
+- `BERTBOT_MEMORY_EPISODIC_FILE_PATH` - episodic memory file path when file backend is used. Default: `bertbot-memory.txt`.
+- `BERTBOT_MEMORY_SEMANTIC_FILE_PATH` - semantic memory file path when file backend is used. Default: `bertbot-semantic-memory.txt`.
+- `BERTBOT_PROFILE_FILE_PATH` - user profile file path when file backend is used. Default: `bertbot-profile.json`.
+- `BERTBOT_INGESTION_CONSENT_FILE_PATH` - ingestion consent file path when file backend is used. Default: `bertbot-ingestion-consent.json`.
+- `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` - ingestion source-state file path when file backend is used. Default: `bertbot-ingestion-source-state.json`.
+- `BERTBOT_STATE_JDBC_URL` - JDBC connection URL when JDBC/PostgreSQL backend is used.
+- `BERTBOT_STATE_JDBC_USER` - optional JDBC username.
+- `BERTBOT_STATE_JDBC_PASSWORD` - optional JDBC password.
+- `BERTBOT_STATE_JDBC_TABLE` - graph state snapshot table name. Default: `bertbot_state_snapshot`.
+- `BERTBOT_MEMORY_EPISODIC_JDBC_TABLE` - episodic memory snapshot table name. Default: `bertbot_memory_episodic_snapshot`.
+- `BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE` - semantic memory snapshot table name. Default: `bertbot_memory_semantic_snapshot`.
+- `BERTBOT_PROFILE_JDBC_TABLE` - user profile snapshot table name. Default: `bertbot_profile_snapshot`.
+- `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` - ingestion consent snapshot table name. Default: `bertbot_ingestion_consent_snapshot`.
+- `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` - ingestion source-state snapshot table name. Default: `bertbot_ingestion_source_state_snapshot`.
 
 Webhook server and connector variables:
 
@@ -140,10 +171,15 @@ Use this mode when Copilot or another MCP client needs to call BertBot as a tool
 .\gradlew.bat runMcpServer --no-daemon
 ```
 
-The server exposes two tools and should be launched from the repository root so the agent can locate local state files:
+The server exposes core tools and should be launched from the repository root so the agent can locate local state files:
 
 - `ask_bertbot` - pass a prompt to BertBot and get the orchestration response.
 - `bertbot_status` - return runtime backend status for the active MCP session (provider/model/tool surface/timestamp).
+- `workspace_list_dir` - list files and directories under a workspace-relative path.
+- `workspace_read_file` - read a workspace-relative file.
+- `workspace_search` - search workspace files for a text query.
+
+When `BERTBOT_MACROFACTOR_ENABLED=true` and MacroFactor credentials are configured, additional MacroFactor proxy tools are surfaced in `tools/list` with the configured prefix (default `macrofactor_`).
 
 For workspace-managed startup in VS Code, this repository uses a stale-process-safe launcher at [scripts/mcp-stdio-launcher.ps1](scripts/mcp-stdio-launcher.ps1). It clears old workspace/task-matching processes before starting the selected Gradle MCP task.
 
@@ -255,6 +291,69 @@ Quick self-check: call `bertbot-backend/bertbot_status` from chat tools. If the 
 - Use the repo-local agent manifest when you want Copilot to route work to BertBot automatically.
 - Use `BERTBOT_AI_PROVIDER` and `BERTBOT_AI_MODEL` when you want to change the LLM adapter settings without changing code.
 
+## Self-Hosted Docker Compose
+
+This repository now includes a Day 1 self-hosted container baseline:
+
+- `Dockerfile` - multi-stage build and runtime image.
+- `docker-compose.yml` - app + PostgreSQL + optional Ollama services.
+- `docker/entrypoint.sh` - runtime mode switch (`webhook`, `mcp`, `headless`, `interactive`).
+- `.env.compose.example` - compose-specific runtime settings template.
+
+### Quick Start
+
+1. Copy `.env.compose.example` to `.env.compose` and set your API key.
+2. Start the compose stack:
+
+```bash
+docker compose up --build -d
+```
+
+3. Check logs:
+
+```bash
+docker compose logs -f bertbot
+```
+
+4. Verify health endpoint:
+
+```bash
+curl http://localhost:8088/health
+```
+
+5. Stop the stack:
+
+```bash
+docker compose down
+```
+
+### Optional Ollama Service
+
+The compose file includes an optional Ollama container profile:
+
+```bash
+docker compose --profile ollama up --build -d
+```
+
+When `BERTBOT_AI_PROVIDER=ollama`, set `BERTBOT_AI_MODEL` to a model present in your Ollama instance (for example `llama3.1`).
+
+### Compose Runtime Defaults
+
+- App listens on `0.0.0.0:8088` inside the container.
+- Host port mapping: `8088:8088`.
+- Persistence backend is configured to PostgreSQL in compose:
+	- `BERTBOT_STATE_STORE=postgres`
+	- `BERTBOT_STATE_JDBC_URL=jdbc:postgresql://postgres:5432/bertbot`
+
+### Switching Runtime Modes In Container
+
+Use `BERTBOT_RUN_MODE` in compose env or overrides:
+
+- `webhook` (default)
+- `mcp`
+- `headless`
+- `interactive`
+
 ## Build And Test
 
 This project targets Java 17. If `.\gradlew.bat test --no-daemon` fails with `JAVA_HOME is set to an invalid directory`, point `JAVA_HOME` at a valid JDK 17 installation on your machine and make sure the path exists.
@@ -265,6 +364,22 @@ Run the test suite with:
 
 ```bash
 .\gradlew.bat test --no-daemon
+```
+
+Run opt-in live MacroFactor proxy integration tests with explicit environment flags:
+
+```bash
+$env:BERTBOT_MACROFACTOR_LIVE_TEST="true"
+$env:BERTBOT_MACROFACTOR_USERNAME="you@example.com"
+$env:BERTBOT_MACROFACTOR_PASSWORD="your-password"
+# Optional: enable live tools/call coverage.
+$env:BERTBOT_MACROFACTOR_LIVE_TOOL="get_nutrition"
+$env:BERTBOT_MACROFACTOR_LIVE_ARGS_JSON='{"day":"2026-07-11"}'
+# Optional: enforce a stable tools/list contract assertion for a known upstream tool.
+$env:BERTBOT_MACROFACTOR_EXPECTED_TOOL="get_nutrition"
+# Optional: assert a known schema argument key exists for that expected tool.
+$env:BERTBOT_MACROFACTOR_EXPECTED_ARG="day"
+.\gradlew.bat test --tests "*MacrofactorToolRouterLiveIntegrationTest" --no-daemon
 ```
 
 Run static analysis and formatting checks with:

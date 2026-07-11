@@ -15,27 +15,60 @@ class FileBertBotStateStore(
     private val file: File,
     private val gson: Gson = Gson(),
 ) : BertBotStateStore {
+    private val lock = Any()
+    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+
     override fun load(): BertBotState {
-        if (!file.exists()) {
-            return BertBotState()
-        }
+        synchronized(lock) {
+            val scopedFile = scopedFile()
+            if (!scopedFile.exists()) {
+                return BertBotState()
+            }
 
-        val content = file.readText()
-        if (content.isBlank()) {
-            return BertBotState()
-        }
+            val content = scopedFile.readText()
+            if (content.isBlank()) {
+                return BertBotState()
+            }
 
-        return try {
-            loadPersistedState(content)
-        } catch (_: JsonSyntaxException) {
-            preserveUnreadableFile(file, "state")
-            BertBotState()
+            return try {
+                loadPersistedState(content)
+            } catch (_: JsonSyntaxException) {
+                preserveUnreadableFile(scopedFile, "state")
+                BertBotState()
+            }
         }
     }
 
     override fun save(state: BertBotState) {
-        file.parentFile?.mkdirs()
-        writeTextAtomically(file, gson.toJson(PersistedBertBotStateSnapshot.fromState(state)))
+        synchronized(lock) {
+            val scopedFile = scopedFile()
+            scopedFile.parentFile?.mkdirs()
+            writeTextAtomically(scopedFile, gson.toJson(PersistedBertBotStateSnapshot.fromState(state)))
+        }
+    }
+
+    override fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T {
+        val previous = currentScope.get()
+        currentScope.set(normalizeScope(scopeKey))
+        return try {
+            action()
+        } finally {
+            currentScope.set(previous)
+        }
+    }
+
+    private fun scopedFile(): File {
+        val scope = currentScope.get()
+        if (scope == DEFAULT_SCOPE_KEY) {
+            return file
+        }
+        val parent = file.parentFile ?: File(".")
+        val stem = file.nameWithoutExtension
+        val ext = file.extension.takeIf { it.isNotBlank() } ?: "json"
+        return File(parent, "$stem-$scope.$ext")
     }
 
     private fun loadPersistedState(content: String): BertBotState {
@@ -50,6 +83,13 @@ class FileBertBotStateStore(
         }
 
         return gson.fromJson(content, BertBotState::class.java) ?: BertBotState()
+    }
+
+    private companion object {
+        private const val DEFAULT_SCOPE_KEY = "global"
+
+        private fun normalizeScope(scopeKey: String): String =
+            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
     }
 }
 

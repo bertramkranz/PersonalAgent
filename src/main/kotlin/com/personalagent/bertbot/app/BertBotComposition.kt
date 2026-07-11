@@ -16,9 +16,12 @@ import com.personalagent.bertbot.graph.runtime.DelegationToExecutorStateValidato
 import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
+import com.personalagent.bertbot.graph.store.JdbcBertBotStateStore
 import com.personalagent.bertbot.ingestion.FileConsentStore
 import com.personalagent.bertbot.ingestion.FileSourceStateStore
 import com.personalagent.bertbot.ingestion.IngestionService
+import com.personalagent.bertbot.ingestion.JdbcConsentStore
+import com.personalagent.bertbot.ingestion.JdbcSourceStateStore
 import com.personalagent.bertbot.ingestion.ReferenceOnlyMediaPolicy
 import com.personalagent.bertbot.ingestion.connectors.SlackChatBridge
 import com.personalagent.bertbot.ingestion.connectors.SlackConnectorAdapter
@@ -27,8 +30,11 @@ import com.personalagent.bertbot.ingestion.connectors.TelegramConnectorAdapter
 import com.personalagent.bertbot.ingestion.connectors.WhatsAppChatBridge
 import com.personalagent.bertbot.ingestion.connectors.WhatsAppConnectorAdapter
 import com.personalagent.bertbot.llm.LlmGateway
+import com.personalagent.bertbot.memory.BertBotMemory
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
+import com.personalagent.bertbot.memory.JdbcBertBotMemoryStore
+import com.personalagent.bertbot.memory.JdbcUserProfileStore
 import com.personalagent.bertbot.memory.LlmMemorySummarizer
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
 import com.personalagent.bertbot.memory.SafeMemorySummarizer
@@ -80,17 +86,41 @@ internal object BertBotGraphFactory {
 }
 
 internal object BertBotRuntimeDependenciesFactory {
-    fun createStateStore(): BertBotStateStore = FileBertBotStateStore(File("bertbot-state.json"))
+    private val jdbcBackends = setOf("jdbc", "postgres", "postgresql")
+
+    fun createStateStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): BertBotStateStore {
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        return when (normalizedBackend) {
+            "file" -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+            "jdbc", "postgres", "postgresql" -> {
+                val jdbcUrl =
+                    requireNotNull(persistenceConfiguration.jdbcUrl) {
+                        "BERTBOT_STATE_JDBC_URL must be set when BERTBOT_STATE_STORE is '$normalizedBackend'."
+                    }
+                JdbcBertBotStateStore(
+                    jdbcUrl = jdbcUrl,
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.jdbcTable,
+                )
+            }
+            else -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+        }
+    }
 
     fun createMemoryRuntime(
         config: BertBotAgentConfig,
         llmGateway: LlmGateway,
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): BertBotMemoryRuntime {
-        val episodicMemory = EpisodicMemory()
-        val semanticMemory = SemanticMemory()
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        val episodicMemory = createEpisodicMemory(normalizedBackend, persistenceConfiguration)
+        val semanticMemory = createSemanticMemory(normalizedBackend, persistenceConfiguration)
         val memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory)
         val memorySummarizer = SafeMemorySummarizer(primary = LlmMemorySummarizer(llmGateway))
-        val userProfileStore = UserProfileStore()
+        val userProfileStore = createUserProfileStore(normalizedBackend, persistenceConfiguration)
         val memoryWorker =
             MemorySummarizationWorker(
                 episodicMemory,
@@ -102,6 +132,7 @@ internal object BertBotRuntimeDependenciesFactory {
 
         return BertBotMemoryRuntime(
             episodicMemory = episodicMemory,
+            semanticMemory = semanticMemory,
             memoryAssembler = memoryAssembler,
             memoryWorker = memoryWorker,
             userProfileStore = userProfileStore,
@@ -111,15 +142,20 @@ internal object BertBotRuntimeDependenciesFactory {
     fun createIngestionRuntime(
         config: BertBotAgentConfig,
         memoryRuntime: BertBotMemoryRuntime,
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): BertBotIngestionRuntime? {
         if (!config.ingestion.policy.enabled) {
             return null
         }
 
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        val consentStore = createConsentStore(normalizedBackend, persistenceConfiguration)
+        val sourceStateStore = createSourceStateStore(normalizedBackend, persistenceConfiguration)
+
         val service =
             IngestionService(
-                consentStore = FileConsentStore(),
-                sourceStateStore = FileSourceStateStore(),
+                consentStore = consentStore,
+                sourceStateStore = sourceStateStore,
                 episodicMemory = memoryRuntime.episodicMemory,
                 semanticSummarizationTrigger = { memoryRuntime.memoryWorker.scheduleIfNeeded() },
                 userProfileStore = memoryRuntime.userProfileStore,
@@ -128,6 +164,98 @@ internal object BertBotRuntimeDependenciesFactory {
 
         return BertBotIngestionRuntime(controlPlane = service)
     }
+
+    private fun createEpisodicMemory(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): EpisodicMemory {
+        if (normalizedBackend in jdbcBackends) {
+            return EpisodicMemory(
+                JdbcBertBotMemoryStore(
+                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.episodicMemoryJdbcTable,
+                ),
+            )
+        }
+
+        return EpisodicMemory(BertBotMemory(File(persistenceConfiguration.episodicMemoryFilePath)))
+    }
+
+    private fun createSemanticMemory(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): SemanticMemory {
+        if (normalizedBackend in jdbcBackends) {
+            return SemanticMemory(
+                JdbcBertBotMemoryStore(
+                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.semanticMemoryJdbcTable,
+                ),
+            )
+        }
+
+        return SemanticMemory(BertBotMemory(File(persistenceConfiguration.semanticMemoryFilePath)))
+    }
+
+    private fun createUserProfileStore(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): UserProfileStore {
+        if (normalizedBackend in jdbcBackends) {
+            return UserProfileStore(
+                JdbcUserProfileStore(
+                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.profileJdbcTable,
+                ),
+            )
+        }
+
+        return UserProfileStore(File(persistenceConfiguration.profileFilePath))
+    }
+
+    private fun createConsentStore(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ) =
+        if (normalizedBackend in jdbcBackends) {
+            JdbcConsentStore(
+                jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                username = persistenceConfiguration.jdbcUser,
+                password = persistenceConfiguration.jdbcPassword,
+                tableName = persistenceConfiguration.ingestionConsentJdbcTable,
+            )
+        } else {
+            FileConsentStore(File(persistenceConfiguration.ingestionConsentFilePath))
+        }
+
+    private fun createSourceStateStore(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ) =
+        if (normalizedBackend in jdbcBackends) {
+            JdbcSourceStateStore(
+                jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                username = persistenceConfiguration.jdbcUser,
+                password = persistenceConfiguration.jdbcPassword,
+                tableName = persistenceConfiguration.ingestionSourceStateJdbcTable,
+            )
+        } else {
+            FileSourceStateStore(File(persistenceConfiguration.ingestionSourceStateFilePath))
+        }
+
+    private fun requireJdbcUrl(
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+        normalizedBackend: String,
+    ): String =
+        requireNotNull(persistenceConfiguration.jdbcUrl) {
+            "BERTBOT_STATE_JDBC_URL must be set when BERTBOT_STATE_STORE is '$normalizedBackend'."
+        }
 }
 
 internal data class BertBotRequestContext(
