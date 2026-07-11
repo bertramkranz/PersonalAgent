@@ -118,8 +118,12 @@ object TraceLogger {
         }
 
         synchronized(writeLock) {
-            traceFile.parentFile?.mkdirs()
-            traceFile.appendText(gson.toJson(record) + System.lineSeparator())
+            runCatching {
+                traceFile.parentFile?.mkdirs()
+                traceFile.appendText(gson.toJson(record) + System.lineSeparator())
+            }.onFailure { e ->
+                logger.log(Level.WARNING, "TraceLogger: failed to persist trace event to file '${traceFile.path}': ${e.message}")
+            }
         }
     }
 

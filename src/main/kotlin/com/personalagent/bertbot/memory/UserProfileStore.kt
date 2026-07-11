@@ -130,23 +130,35 @@ private fun normalizeSet(values: Set<String>): Set<String> =
 private fun preserveUnreadableStorageFile(storageFile: File) {
     val extension = storageFile.extension.takeIf { it.isNotBlank() } ?: "json"
     val backupFile = File(storageFile.parentFile ?: File("."), "${storageFile.nameWithoutExtension}.corrupt-${System.currentTimeMillis()}.$extension")
-    runCatching {
-        Files.copy(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    val copied =
+        runCatching {
+            Files.copy(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }.isSuccess
+    if (copied) {
+        println("Warning: failed to parse user profile file '${storageFile.path}'. A backup was preserved at '${backupFile.path}'.")
+    } else {
+        println("Warning: failed to parse user profile file '${storageFile.path}'. Backup could not be created.")
     }
-    println("Warning: failed to parse user profile file '${storageFile.path}'. A backup was preserved at '${backupFile.path}'.")
 }
 
 private fun writeTextAtomically(
     target: File,
     content: String,
 ) {
-    target.parentFile?.mkdirs()
-    val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
-    tempFile.writeText(content)
+    val parentDir = target.parentFile ?: File(".")
+    parentDir.mkdirs()
+    val tempPath = Files.createTempFile(parentDir.toPath(), "${target.nameWithoutExtension}-", ".tmp")
+    val tempFile = tempPath.toFile()
     try {
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-    } catch (_: AtomicMoveNotSupportedException) {
-        println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        tempFile.writeText(content)
+        try {
+            Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
+            Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    } catch (e: Exception) {
+        runCatching { tempFile.delete() }
+        throw e
     }
 }

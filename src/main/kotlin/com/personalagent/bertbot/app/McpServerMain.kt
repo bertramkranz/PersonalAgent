@@ -412,15 +412,19 @@ internal class McpRequestDispatcher(
                 return@forEach
             }
 
-            val lines = runCatching { file.readLines() }.getOrDefault(emptyList())
-            val lineMatch =
-                lines.withIndex().firstOrNull { indexed ->
-                    indexed.value.contains(query, ignoreCase = true)
+            var lineNumber = 0
+            var matched = false
+            runCatching {
+                file.bufferedReader().use { reader ->
+                    reader.forEachLine { line ->
+                        lineNumber++
+                        if (!matched && line.contains(query, ignoreCase = true)) {
+                            matched = true
+                            val snippet = line.trim().take(200)
+                            matches.add("${workspaceInspector.toWorkspaceRelativePath(file)}:$lineNumber: $snippet")
+                        }
+                    }
                 }
-
-            if (lineMatch != null) {
-                val snippet = lineMatch.value.trim().take(200)
-                matches.add("${workspaceInspector.toWorkspaceRelativePath(file)}:${lineMatch.index + 1}: $snippet")
             }
         }
 

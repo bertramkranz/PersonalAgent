@@ -68,11 +68,15 @@ internal class BertBotRuntime(
                     ).response
             }
 
-        interactionGraphWriter.write(
-            traceId = tracingContext.traceId,
-            state = state,
-            events = TraceLogger.snapshot(tracingContext.traceId),
-        )
+        runCatching {
+            interactionGraphWriter.write(
+                traceId = tracingContext.traceId,
+                state = state,
+                events = TraceLogger.snapshot(tracingContext.traceId),
+            )
+        }.onFailure { e ->
+            TraceLogger.warn(tracingContext, "diagram-write-failed", "InteractionGraphWriter failed: ${e.message}")
+        }
 
         memoryRuntime.episodicMemory.append("ASSISTANT: $response")
         memoryRuntime.memoryWorker.scheduleIfNeeded()
