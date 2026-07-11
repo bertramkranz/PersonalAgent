@@ -164,4 +164,31 @@ class InteractionGraphWriterTest {
         val generated = output.readText()
         assertTrue(generated.contains("delegation skipped (no_sub_agent_match)"))
     }
+
+    @Test
+    fun `writer renders graph node visit summary`() {
+        val output = File.createTempFile("bertbot-interactions", ".mmd")
+        output.deleteOnExit()
+
+        val writer = InteractionGraphWriter(output)
+        val events =
+            listOf(
+                TraceEventRecord(
+                    timestamp = 1,
+                    traceId = "trace-5",
+                    level = "INFO",
+                    event = "graph_node_visits",
+                    details = "counts=capture:1,planner:1,delegation:1,executor:1",
+                ),
+            )
+
+        writer.write(
+            traceId = "trace-5",
+            state = BertBotState(lastUserMessage = "test"),
+            events = events,
+        )
+
+        val generated = output.readText()
+        assertTrue(generated.contains("node visits capture:1,planner:1,delegation:1,executor:1"))
+    }
 }

@@ -9,8 +9,7 @@ class BertBotGraphRunner(
     private val handoffValidators: List<StateHandoffValidator<BertBotState>> = emptyList(),
 ) {
     fun run(initialState: BertBotState): BertBotState {
-        val persistedState = stateStore.load()
-        val tracingContext = TracingContext(initialState.traceId ?: persistedState.traceId ?: "")
+        val tracingContext = TracingContext(initialState.traceId ?: "")
         val effectiveTracingContext =
             if (tracingContext.traceId.isBlank()) {
                 TracingContext()
@@ -21,19 +20,21 @@ class BertBotGraphRunner(
         var state =
             BertBotState(
                 traceId = effectiveTracingContext.traceId,
-                lastUserMessage = initialState.lastUserMessage.ifBlank { persistedState.lastUserMessage },
+                lastUserMessage = initialState.lastUserMessage,
                 pendingTasks = initialState.pendingTasks.toMutableList(),
                 delegationPlan = initialState.delegationPlan.toMutableList(),
                 memorySummary = initialState.memorySummary.toMutableList(),
                 profileSummary = initialState.profileSummary.toMutableList(),
                 executionSummary = initialState.executionSummary.toMutableList(),
                 selectedSubAgent = initialState.selectedSubAgent,
+                intentResolved = initialState.intentResolved,
             )
 
         TraceLogger.intentParsed(effectiveTracingContext, "initial_message_length=${state.lastUserMessage.length}")
 
         var currentNodeId = definition.entryNodeId
         var unresolvedTurns = 0
+        val nodeVisitCounts = linkedMapOf<String, Int>()
 
         while (currentNodeId.isNotBlank()) {
             if (unresolvedTurns >= maxTurns) {
@@ -48,6 +49,7 @@ class BertBotGraphRunner(
             }
 
             val node = definition.nodes.firstOrNull { it.id == currentNodeId } ?: break
+            nodeVisitCounts[node.id] = (nodeVisitCounts[node.id] ?: 0) + 1
             TraceLogger.info(effectiveTracingContext, "node_start", "node_id=${node.id}")
             state = node.execute(state, effectiveTracingContext)
             TraceLogger.info(effectiveTracingContext, "node_complete", "node_id=${node.id}")
@@ -76,12 +78,14 @@ class BertBotGraphRunner(
         }
 
         stateStore.save(state)
+        val nodeVisitSummary = nodeVisitCounts.entries.joinToString(separator = ",") { (node, count) -> "$node:$count" }
+        TraceLogger.info(effectiveTracingContext, "graph_node_visits", "counts=$nodeVisitSummary")
         TraceLogger.info(effectiveTracingContext, "graph_completed", "execution_summary_size=${state.executionSummary.size}")
         return state
     }
 
     private fun isIntentResolved(state: BertBotState): Boolean =
-        state.executionSummary.any { item -> item.contains("Executed delegated workflow", ignoreCase = true) }
+        state.intentResolved
 
     private fun validateHandoff(
         fromNodeId: String,

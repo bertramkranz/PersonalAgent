@@ -26,6 +26,16 @@ data class BertBotAgentConfig(
     val maxEpisodicContextEntries: Int = 10,
     val memorySummarizationThreshold: Int = 15,
     val memorySummarizationBatchSize: Int = 10,
+    val nonActionableMessages: Set<String> =
+        setOf(
+            "hi",
+            "hello",
+            "hey",
+            "thanks",
+            "thank you",
+            "ok",
+            "okay",
+        ),
     val systemPrompt: String =
         """
         You are BertBot, my premium personal assistant and chief orchestration agent.
@@ -199,6 +209,9 @@ data class BertBotAgentConfig(
         }
         require(memorySummarizationBatchSize <= memorySummarizationThreshold) {
             "memorySummarizationBatchSize must be less than or equal to memorySummarizationThreshold"
+        }
+        require(nonActionableMessages.none { it.isBlank() }) {
+            "nonActionableMessages must not contain blank values"
         }
     }
 

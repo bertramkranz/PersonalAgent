@@ -24,7 +24,7 @@ BertBot runs as a graph of named nodes:
 2. Plan the work and identify priorities.
 3. Match the task to a specialized sub-agent when appropriate.
 4. Execute the delegated workflow.
-5. Persist the resulting state to disk.
+5. Persist the resulting execution snapshot to disk.
 
 This structure keeps the orchestration logic easy to visualize and makes it straightforward to add more nodes later.
 
@@ -32,14 +32,14 @@ This structure keeps the orchestration logic easy to visualize and makes it stra
 
 BertBot currently persists local state in these files:
 
-- `bertbot-state.json` - graph execution state and delegation context.
+- `bertbot-state.json` - latest graph execution snapshot and delegation context for inspection/debugging.
 - `bertbot-memory.txt` - episodic memory entries from recent interactions.
 - `bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
 - `bertbot-profile.json` - structured profile facts (for example, remembered user name).
 - `bertbot-trace.jsonl` - structured runtime trace events with trace IDs.
 - `bertbot-interactions.mmd` - Mermaid sequence diagram generated from the latest trace and graph state.
 
-These files are local to the workspace and help BertBot retain context across runs.
+These files are local to the workspace. Memory and profile files retain conversational context across runs, while the state, trace, and Mermaid files capture the latest orchestration run for inspection.
 
 ## Extending BertBot
 
@@ -112,6 +112,48 @@ The server exposes two tools and should be launched from the repository root so 
 
 - `ask_bertbot` - pass a prompt to BertBot and get the orchestration response.
 - `bertbot_status` - return runtime backend status for the active MCP session (provider/model/tool surface/timestamp).
+
+For workspace-managed startup in VS Code, this repository uses a stale-process-safe launcher at [scripts/mcp-stdio-launcher.ps1](scripts/mcp-stdio-launcher.ps1). It clears old workspace/task-matching processes before starting the selected Gradle MCP task.
+
+A second launcher variant is available at [scripts/mcp-stdio-launcher-bertbot.ps1](scripts/mcp-stdio-launcher-bertbot.ps1). This wrapper pins the task to `runMcpServer` and is useful as a copy pattern for future backends that should each have their own task-specific wrapper.
+
+Sample workspace MCP config for adding a second backend entry:
+
+```json
+{
+	"servers": {
+		"bertbot-backend": {
+			"type": "stdio",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/mcp-stdio-launcher-bertbot.ps1"
+			],
+			"cwd": "${workspaceFolder}",
+			"envFile": "${workspaceFolder}/.env"
+		},
+		"another-backend": {
+			"type": "stdio",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/mcp-stdio-launcher.ps1",
+				"runAnotherMcpServerTask"
+			],
+			"cwd": "${workspaceFolder}",
+			"envFile": "${workspaceFolder}/.env"
+		}
+	}
+}
+```
+
+The second entry is only a template. It requires a real Gradle task (`runAnotherMcpServerTask`) that starts a valid MCP stdio server.
 
 ### Tracing And Graph Visualization
 

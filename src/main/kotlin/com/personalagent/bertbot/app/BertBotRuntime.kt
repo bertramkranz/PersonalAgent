@@ -3,20 +3,14 @@ package com.personalagent.bertbot.app
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
 import com.personalagent.bertbot.config.BertBotAgentConfig
-import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
-import com.personalagent.bertbot.graph.store.FileBertBotStateStore
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
-import com.personalagent.bertbot.memory.LlmMemorySummarizer
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
-import com.personalagent.bertbot.memory.SafeMemorySummarizer
-import com.personalagent.bertbot.memory.SemanticMemory
 import com.personalagent.bertbot.memory.UserProfileStore
-import java.io.File
 
 internal class BertBotRuntime(
     val config: BertBotAgentConfig,
@@ -26,36 +20,18 @@ internal class BertBotRuntime(
     private val memoryRuntime: BertBotMemoryRuntime,
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter(),
 ) : AutoCloseable {
+    private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
+
     fun respondTo(
         userMessage: String,
         emitFallbackMessage: Boolean = true,
+        traceCorrelationId: String? = null,
     ): String? {
-        extractDisplayNameFromMessage(userMessage)?.let { extractedName ->
-            memoryRuntime.userProfileStore.updateDisplayName(extractedName)
-        }
-
-        memoryRuntime.episodicMemory.append("USER: $userMessage")
-        memoryRuntime.memoryWorker.scheduleIfNeeded()
-        val knownProfile = memoryRuntime.userProfileStore.current()
-        val profileSummary = knownProfile.displayName?.let { name -> listOf("Known user name: $name") } ?: emptyList()
-        val requestTraceId = TracingContext().traceId
-
-        val initialState =
-            BertBotState(
-                traceId = requestTraceId,
-                lastUserMessage = userMessage,
-                memorySummary =
-                    memoryRuntime.memoryAssembler
-                        .buildContext(
-                            maxSemanticEntries = config.maxSemanticContextEntries,
-                            maxEpisodicEntries = config.maxEpisodicContextEntries,
-                        ).toMutableList(),
-                profileSummary = profileSummary.toMutableList(),
-            )
+        val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
 
         val state =
             try {
-                graph.run(initialState)
+                graph.run(requestContext.initialState)
             } catch (e: MaxTurnsExceededException) {
                 if (emitFallbackMessage) {
                     println("Assistant: ${e.fallbackMessage}")
@@ -65,11 +41,11 @@ internal class BertBotRuntime(
             }
 
         val systemPrompt = buildSystemPrompt(config, state)
-        val tracingContext = TracingContext(traceId = state.traceId ?: requestTraceId)
+        val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
         val response =
-            if (isNameRecallQuestion(userMessage) && !knownProfile.displayName.isNullOrBlank()) {
+            if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
                 TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
-                "Your name is ${knownProfile.displayName}."
+                "Your name is ${requestContext.knownProfile.displayName}."
             } else {
                 assistantResponseSkill
                     .invoke(
@@ -116,35 +92,17 @@ internal object BertBotRuntimeFactory {
 
         val apiKey = aiRuntimeConfiguration.apiKey ?: return null
 
-        val stateStore = FileBertBotStateStore(File("bertbot-state.json"))
+        val stateStore = BertBotRuntimeDependenciesFactory.createStateStore()
         val graph = BertBotApplication.createGraph(stateStore, config)
         val llmGateway = createOpenAiLlmGateway(apiKey, aiRuntimeConfiguration.model)
-        val episodicMemory = EpisodicMemory()
-        val semanticMemory = SemanticMemory()
-        val memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory)
-        val memorySummarizer = SafeMemorySummarizer(primary = LlmMemorySummarizer(llmGateway))
-        val userProfileStore = UserProfileStore()
-        val memoryWorker =
-            MemorySummarizationWorker(
-                episodicMemory,
-                semanticMemory,
-                summarizer = memorySummarizer,
-                threshold = config.memorySummarizationThreshold,
-                summarizeCount = config.memorySummarizationBatchSize,
-            )
+        val memoryRuntime = BertBotRuntimeDependenciesFactory.createMemoryRuntime(config, llmGateway)
 
         return BertBotRuntime(
             config = config,
             aiRuntimeConfiguration = aiRuntimeConfiguration,
             graph = graph,
             assistantResponseSkill = createAssistantResponseSkill(llmGateway),
-            memoryRuntime =
-                BertBotMemoryRuntime(
-                    episodicMemory = episodicMemory,
-                    memoryAssembler = memoryAssembler,
-                    memoryWorker = memoryWorker,
-                    userProfileStore = userProfileStore,
-                ),
+            memoryRuntime = memoryRuntime,
         )
     }
 }

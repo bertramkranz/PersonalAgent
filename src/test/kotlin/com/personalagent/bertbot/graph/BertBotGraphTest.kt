@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.graph
 
+import com.personalagent.bertbot.graph.model.BertBotPriority
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.nodes.DelegationNode
 import com.personalagent.bertbot.graph.nodes.ExecutorNode
@@ -26,7 +27,7 @@ import kotlin.test.assertTrue
 
 class BertBotGraphTest {
     @Test
-    fun `graph persists state and routes through planner and executor nodes`() {
+    fun `graph persists latest execution snapshot and routes through planner and executor nodes`() {
         val tempFile = File.createTempFile("bertbot-state", ".json")
         tempFile.deleteOnExit()
 
@@ -62,6 +63,8 @@ class BertBotGraphTest {
         assertTrue(state.pendingTasks.isNotEmpty())
         assertTrue(state.delegationPlan.isNotEmpty())
         assertTrue(state.executionSummary.any { it.contains("delegated", ignoreCase = true) })
+        assertEquals(BertBotPriority.ROUTINE, state.currentIntent?.priority)
+        assertTrue(state.intentResolved)
         assertNotNull(state.traceId)
         assertTrue(state.traceId?.isNotBlank() == true)
         assertTrue(tempFile.exists())
@@ -69,6 +72,90 @@ class BertBotGraphTest {
         val reloadedState = stateStore.load()
         assertEquals(state.lastUserMessage, reloadedState.lastUserMessage)
         assertEquals(state.pendingTasks.size, reloadedState.pendingTasks.size)
+        assertEquals(state.currentIntent, reloadedState.currentIntent)
+        val storedContent = tempFile.readText()
+        assertTrue(storedContent.contains("\"schemaVersion\":2"))
+        assertTrue(storedContent.contains("\"lastUserMessage\":"))
+        assertTrue(!storedContent.contains("\"state\":"))
+    }
+
+    @Test
+    fun `graph starts each request from the provided state instead of persisted workflow fields`() {
+        val tempFile = File.createTempFile("bertbot-state", ".json")
+        tempFile.deleteOnExit()
+
+        val stateStore = FileBertBotStateStore(tempFile)
+        stateStore.save(
+            BertBotState(
+                traceId = "persisted-trace",
+                lastUserMessage = "stale message",
+                pendingTasks = mutableListOf("stale task"),
+                delegationPlan = mutableListOf("stale delegation"),
+                memorySummary = mutableListOf("stale memory"),
+                profileSummary = mutableListOf("stale profile"),
+                executionSummary = mutableListOf("stale execution"),
+                selectedSubAgent = "architect",
+                intentResolved = true,
+            ),
+        )
+
+        val definition =
+            BertBotGraphDefinition(
+                entryNodeId = NodeIds.CAPTURE,
+                nodes = listOf(MessageCaptureNode()),
+                edges = emptyList(),
+            )
+        val graph = BertBotGraphRunner(definition, stateStore)
+
+        val state = graph.run(BertBotState(lastUserMessage = "fresh request"))
+
+        assertEquals("fresh request", state.lastUserMessage)
+        assertTrue(state.pendingTasks.isEmpty())
+        assertTrue(state.delegationPlan.isEmpty())
+        assertTrue(state.profileSummary.isEmpty())
+        assertTrue(state.executionSummary.any { it.contains("Captured input", ignoreCase = true) })
+        assertTrue(state.executionSummary.none { it.contains("stale", ignoreCase = true) })
+        assertTrue(state.traceId?.startsWith("persisted") != true)
+    }
+
+    @Test
+    fun `state store loads legacy unversioned state payloads`() {
+        val tempFile = File.createTempFile("bertbot-state", ".json")
+        tempFile.deleteOnExit()
+        tempFile.writeText(
+            """
+            {"lastUserMessage":"legacy request","pendingTasks":["legacy task"]}
+            """.trimIndent(),
+        )
+
+        val state = FileBertBotStateStore(tempFile).load()
+
+        assertEquals("legacy request", state.lastUserMessage)
+        assertEquals(listOf("legacy task"), state.pendingTasks)
+    }
+
+    @Test
+    fun `state store loads legacy versioned wrapper payloads`() {
+        val tempFile = File.createTempFile("bertbot-state", ".json")
+        tempFile.deleteOnExit()
+        tempFile.writeText(
+            """
+            {
+              "schemaVersion": 1,
+              "state": {
+                "lastUserMessage": "legacy wrapped request",
+                "pendingTasks": ["legacy wrapped task"],
+                "intentResolved": true
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val state = FileBertBotStateStore(tempFile).load()
+
+        assertEquals("legacy wrapped request", state.lastUserMessage)
+        assertEquals(listOf("legacy wrapped task"), state.pendingTasks)
+        assertTrue(state.intentResolved)
     }
 
     @Test
@@ -100,14 +187,47 @@ class BertBotGraphTest {
         val state =
             graph.run(
                 BertBotState(
-                    lastUserMessage = "Hello there",
+                    lastUserMessage = "Please handle banana shipment details",
                 ),
             )
 
         assertTrue(state.delegationPlan.isEmpty())
         assertEquals(null, state.selectedSubAgent)
         assertTrue(state.executionSummary.any { it.contains("Skipped delegation", ignoreCase = true) })
-        assertTrue(state.executionSummary.none { it.contains("Executed delegated workflow", ignoreCase = true) })
+        assertTrue(!state.intentResolved)
+    }
+
+    @Test
+    fun `graph can route planner directly to executor when no follow-up is needed`() {
+        val tempFile = File.createTempFile("bertbot-state", ".json")
+        tempFile.deleteOnExit()
+
+        val stateStore = FileBertBotStateStore(tempFile)
+        val definition =
+            BertBotGraphDefinition(
+                entryNodeId = NodeIds.CAPTURE,
+                nodes =
+                    listOf(
+                        MessageCaptureNode(),
+                        PlannerNode(),
+                        DelegationNode(),
+                        ExecutorNode(),
+                    ),
+                edges =
+                    listOf(
+                        BertBotGraphEdge(NodeIds.CAPTURE, NodeIds.PLANNER) { true },
+                        BertBotGraphEdge(NodeIds.PLANNER, NodeIds.DELEGATION) { it.pendingTasks.isNotEmpty() },
+                        BertBotGraphEdge(NodeIds.PLANNER, NodeIds.EXECUTOR) { it.pendingTasks.isEmpty() },
+                        BertBotGraphEdge(NodeIds.DELEGATION, NodeIds.EXECUTOR) { true },
+                    ),
+            )
+        val graph = BertBotGraphRunner(definition, stateStore)
+
+        val state = graph.run(BertBotState(lastUserMessage = "hello"))
+
+        assertTrue(state.pendingTasks.isEmpty())
+        assertTrue(state.executionSummary.any { it.contains("No delegated execution required", ignoreCase = true) })
+        assertTrue(state.intentResolved)
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.personalagent.bertbot.memory
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.Instant
@@ -119,5 +120,10 @@ private fun writeTextAtomically(
     target.parentFile?.mkdirs()
     val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
     tempFile.writeText(content)
-    Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    try {
+        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    } catch (_: AtomicMoveNotSupportedException) {
+        println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
+        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
 }

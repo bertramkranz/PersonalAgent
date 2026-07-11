@@ -110,6 +110,10 @@ internal class InteractionGraphWriter(
             "delegation_started" -> renderDelegationStarted(event, participantAliases)
             "delegation_completed" -> renderDelegationCompleted(event, participantAliases)
             "delegation_skipped" -> renderDelegationSkipped(event)
+            "graph_node_visits" -> {
+                val summary = extractField(event.details, "counts") ?: "unknown"
+                "    Note over BertBot: node visits $summary"
+            }
             "profile_lookup" -> PROFILE_LOOKUP_NOTE
             else -> null
         }
