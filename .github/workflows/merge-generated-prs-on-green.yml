@@ -30,7 +30,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'pull_request' ||
       (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
-      (github.event_name == 'check_suite' && contains(fromJSON('["success","neutral","skipped","action_required"]'), github.event.check_suite.conclusion))
+      (github.event_name == 'check_suite' && contains(fromJSON('["success","neutral","skipped"]'), github.event.check_suite.conclusion))
 
     steps:
       - name: Approve and merge trusted generated PR when ready
