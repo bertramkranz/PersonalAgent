@@ -5,10 +5,22 @@ import com.personalagent.bertbot.graph.model.BertBotState
 class BertBotGraphRunner(
     private val definition: BertBotGraphDefinition,
     private val stateStore: BertBotStateStore,
+    private val maxTurns: Int = 5,
+    private val handoffValidators: List<StateHandoffValidator<BertBotState>> = emptyList(),
 ) {
     fun run(initialState: BertBotState): BertBotState {
+        val persistedState = stateStore.load()
+        val tracingContext = TracingContext(initialState.traceId ?: persistedState.traceId ?: "")
+        val effectiveTracingContext =
+            if (tracingContext.traceId.isBlank()) {
+                TracingContext()
+            } else {
+                tracingContext
+            }
+
         var state =
-            stateStore.load().apply {
+            persistedState.apply {
+                traceId = effectiveTracingContext.traceId
                 lastUserMessage = initialState.lastUserMessage.ifBlank { lastUserMessage }
                 pendingTasks = (pendingTasks + initialState.pendingTasks).toMutableList()
                 delegationPlan = (delegationPlan + initialState.delegationPlan).toMutableList()
@@ -16,18 +28,71 @@ class BertBotGraphRunner(
                 executionSummary = (executionSummary + initialState.executionSummary).toMutableList()
             }
 
-        var currentNodeId = definition.entryNodeId
-        while (currentNodeId.isNotBlank()) {
-            val node = definition.nodes.firstOrNull { it.id == currentNodeId } ?: break
-            state = node.execute(state)
+        TraceLogger.intentParsed(effectiveTracingContext, "initial_message_length=${state.lastUserMessage.length}")
 
-            currentNodeId = definition.edges
-                .firstOrNull { it.fromNodeId == currentNodeId && it.condition(state) }
-                ?.toNodeId
-                ?: ""
+        var currentNodeId = definition.entryNodeId
+        var unresolvedTurns = 0
+
+        while (currentNodeId.isNotBlank()) {
+            if (unresolvedTurns >= maxTurns) {
+                val fallbackMessage =
+                    "I could not complete your request in time, so I stopped to avoid an infinite loop. Please try rephrasing your request."
+                TraceLogger.warn(
+                    effectiveTracingContext,
+                    "max_turns_exceeded",
+                    "max_turns=$maxTurns unresolved_turns=$unresolvedTurns",
+                )
+                throw MaxTurnsExceededException(maxTurns = maxTurns, fallbackMessage = fallbackMessage)
+            }
+
+            val node = definition.nodes.firstOrNull { it.id == currentNodeId } ?: break
+            TraceLogger.info(effectiveTracingContext, "node_start", "node_id=${node.id}")
+            state = node.execute(state, effectiveTracingContext)
+            TraceLogger.info(effectiveTracingContext, "node_complete", "node_id=${node.id}")
+
+            if (isIntentResolved(state)) {
+                unresolvedTurns = 0
+            } else {
+                unresolvedTurns += 1
+            }
+
+            val nextEdge =
+                definition.edges
+                    .firstOrNull { it.fromNodeId == currentNodeId && it.condition(state) }
+
+            if (nextEdge != null) {
+                validateHandoff(currentNodeId, nextEdge.toNodeId, state, effectiveTracingContext)
+            }
+
+            currentNodeId = nextEdge?.toNodeId ?: ""
         }
 
         stateStore.save(state)
+        TraceLogger.info(effectiveTracingContext, "graph_completed", "execution_summary_size=${state.executionSummary.size}")
         return state
+    }
+
+    private fun isIntentResolved(state: BertBotState): Boolean =
+        state.executionSummary.any { item -> item.contains("Executed delegated workflow", ignoreCase = true) }
+
+    private fun validateHandoff(
+        fromNodeId: String,
+        toNodeId: String,
+        state: BertBotState,
+        context: TracingContext,
+    ) {
+        handoffValidators
+            .filter { validator -> validator.fromNodeId == fromNodeId && validator.toNodeId == toNodeId }
+            .forEach { handoff ->
+                val result = handoff.validator.validate(state)
+                if (!result.isValid) {
+                    TraceLogger.warn(
+                        context,
+                        "handoff_validation_failed",
+                        "from=$fromNodeId to=$toNodeId errors=${result.errors.joinToString(separator = "|")}",
+                    )
+                    throw InvalidStateHandoffException(fromNodeId, toNodeId, result.errors)
+                }
+            }
     }
 }
