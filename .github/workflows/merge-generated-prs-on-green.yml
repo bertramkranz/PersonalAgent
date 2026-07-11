@@ -263,7 +263,7 @@ jobs:
                     repo,
                     pull_number: pullNumber,
                     event: 'APPROVE',
-                    body: 'Automated approval for trusted generated PR after successful checks.',
+                    body: 'Automated approval for eligible PR after successful checks.',
                   });
 
                   core.info(`Approved PR #${pullNumber}.`);
