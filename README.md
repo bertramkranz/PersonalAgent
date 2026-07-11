@@ -8,6 +8,7 @@ The project is organized around a small set of focused packages:
 
 - `com.personalagent.bertbot.app` - application entrypoint and runtime wiring.
 - `com.personalagent.bertbot.config` - BertBot persona, prompt, tool, and skill configuration.
+- `com.personalagent.bertbot.llm` - LLM gateway contracts and provider adapters.
 - `com.personalagent.bertbot.graph.model` - graph state model.
 - `com.personalagent.bertbot.graph.nodes` - node implementations and node identifiers.
 - `com.personalagent.bertbot.graph.runtime` - graph contracts, edges, definitions, and runner.
@@ -29,10 +30,11 @@ This structure keeps the orchestration logic easy to visualize and makes it stra
 
 ## Persistence
 
-BertBot currently persists two kinds of local state:
+BertBot currently persists local state in these files:
 
 - `bertbot-state.json` - graph execution state and delegation context.
-- `bertbot-memory.txt` - remembered personal context and preferences.
+- `bertbot-memory.txt` - episodic memory entries from recent interactions.
+- `bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
 
 These files are local to the workspace and help BertBot retain context across runs.
 
@@ -126,6 +128,10 @@ To use it in VS Code:
 
 ## Build And Test
 
+This project targets Java 17. If `.\gradlew.bat test --no-daemon` fails with `JAVA_HOME is set to an invalid directory`, point `JAVA_HOME` at a valid JDK 17 installation on your machine and make sure the path exists.
+
+On Windows, a typical fix is to update `JAVA_HOME` to something like `C:\Program Files\Eclipse Adoptium\jdk-17.x.x.x-hotspot` and then open a new terminal before rerunning Gradle.
+
 Run the test suite with:
 
 ```bash
@@ -152,6 +158,10 @@ This repository includes GitHub Actions workflows:
 	- Triggers on pushes to `main` (excluding tags), pull requests into `main`, and manual dispatch.
 	- Validates the Gradle wrapper, runs the full `check` quality gate, and uploads reports as workflow artifacts.
 
+- Actionlint workflow: `.github/workflows/actionlint.yml`
+	- Triggers on workflow file changes in pushes and pull requests targeting `main`, and manual dispatch.
+	- Lints GitHub Actions workflow syntax and configuration.
+
 - Dependency review workflow: `.github/workflows/dependency-review.yml`
 	- Triggers on pull requests into `main`.
 	- Fails the pull request when newly introduced dependencies include vulnerable packages.
@@ -167,6 +177,14 @@ This repository includes GitHub Actions workflows:
 - Auto PR workflow: `.github/workflows/auto-pr.yml`
 	- Triggers on pushes to branches other than the repository default branch (and ignores `main`).
 	- Opens a pull request into the repository default branch when one is not already open.
+
+- Auto-approve Copilot-reviewed PRs workflow: `.github/workflows/auto-approve-copilot-reviewed-prs.yml`
+	- Triggers when `copilot-pull-request-reviewer[bot]` submits an approval review.
+	- Adds an approval review via `hmarr/auto-approve-action` to streamline merge readiness.
+
+- Merge generated PRs workflow: `.github/workflows/merge-generated-prs-on-green.yml`
+	- Triggers on generated PR activity, selected upstream workflow completions, a 10-minute schedule, and manual dispatch.
+	- Applies guardrails for trusted generated PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
 
 - Copilot review workflow: `.github/workflows/copilot-review.yml`
 	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.
