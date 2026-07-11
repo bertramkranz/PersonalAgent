@@ -133,7 +133,7 @@ internal class PolymarketApiClient(
 
         private fun prettyPrintIfJson(raw: String): String {
             val parsed = runCatching { JsonParser.parseString(raw) }.getOrNull() ?: return raw
-            return parsed.toString()
+            return com.google.gson.GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(parsed)
         }
 
         private fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
