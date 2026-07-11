@@ -15,27 +15,33 @@ class FileBertBotStateStore(
     private val file: File,
     private val gson: Gson = Gson(),
 ) : BertBotStateStore {
+    private val lock = Any()
+
     override fun load(): BertBotState {
-        if (!file.exists()) {
-            return BertBotState()
-        }
+        synchronized(lock) {
+            if (!file.exists()) {
+                return BertBotState()
+            }
 
-        val content = file.readText()
-        if (content.isBlank()) {
-            return BertBotState()
-        }
+            val content = file.readText()
+            if (content.isBlank()) {
+                return BertBotState()
+            }
 
-        return try {
-            loadPersistedState(content)
-        } catch (_: JsonSyntaxException) {
-            preserveUnreadableFile(file, "state")
-            BertBotState()
+            return try {
+                loadPersistedState(content)
+            } catch (_: JsonSyntaxException) {
+                preserveUnreadableFile(file, "state")
+                BertBotState()
+            }
         }
     }
 
     override fun save(state: BertBotState) {
-        file.parentFile?.mkdirs()
-        writeTextAtomically(file, gson.toJson(PersistedBertBotStateSnapshot.fromState(state)))
+        synchronized(lock) {
+            file.parentFile?.mkdirs()
+            writeTextAtomically(file, gson.toJson(PersistedBertBotStateSnapshot.fromState(state)))
+        }
     }
 
     private fun loadPersistedState(content: String): BertBotState {

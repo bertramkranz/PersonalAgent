@@ -14,91 +14,115 @@ data class UserProfile(
     val stableInterests: Set<String> = emptySet(),
 )
 
-class UserProfileStore(
-    private val storageFile: File = File("bertbot-profile.json"),
-    private val gson: Gson = Gson(),
+class UserProfileStore internal constructor(
+    private val persistence: UserProfilePersistence,
 ) {
+    constructor(
+        storageFile: File = File("bertbot-profile.json"),
+        gson: Gson = Gson(),
+    ) : this(FileUserProfileStore(storageFile, gson))
+
+    fun load(): UserProfile = persistence.load()
+
+    fun current(): UserProfile = persistence.current()
+
+    fun updateDisplayName(displayName: String) = persistence.updateDisplayName(displayName)
+
+    fun addRecurringPreference(preference: String) = persistence.addRecurringPreference(preference)
+
+    fun addCommunicationStyleHint(hint: String) = persistence.addCommunicationStyleHint(hint)
+
+    fun addStableInterest(interest: String) = persistence.addStableInterest(interest)
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = persistence.withScope(scopeKey, action)
+}
+
+private class FileUserProfileStore(
+    private val storageFile: File,
+    private val gson: Gson,
+) : UserProfilePersistence {
+    private val lock = Any()
     private var cached: UserProfile = UserProfile()
 
     init {
         cached = load()
     }
 
-    fun load(): UserProfile {
-        if (!storageFile.exists()) {
-            cached = UserProfile()
-            return cached
-        }
+    override fun load(): UserProfile {
+        synchronized(lock) {
+            if (!storageFile.exists()) {
+                cached = UserProfile()
+                return cached
+            }
 
-        val content = storageFile.readText().trim()
-        if (content.isBlank()) {
-            cached = UserProfile()
-            return cached
-        }
+            val content = storageFile.readText().trim()
+            if (content.isBlank()) {
+                cached = UserProfile()
+                return cached
+            }
 
-        return try {
-            cached = gson.fromJson(content, UserProfile::class.java) ?: UserProfile()
-            cached
-        } catch (_: JsonSyntaxException) {
-            preserveUnreadableStorageFile(storageFile)
-            cached = UserProfile()
-            cached
+            return try {
+                cached = gson.fromJson(content, UserProfile::class.java) ?: UserProfile()
+                cached
+            } catch (_: JsonSyntaxException) {
+                preserveUnreadableStorageFile(storageFile)
+                cached = UserProfile()
+                cached
+            }
         }
     }
 
-    fun current(): UserProfile = cached
+    override fun current(): UserProfile = synchronized(lock) { cached }
 
-    fun updateDisplayName(displayName: String) {
-        val normalized = normalizeDisplayName(displayName)
-        if (normalized.isBlank()) {
-            return
+    override fun updateDisplayName(displayName: String) {
+        synchronized(lock) {
+            val normalized = normalizeDisplayName(displayName)
+            if (normalized.isBlank() || cached.displayName == normalized) {
+                return
+            }
+
+            cached = cached.copy(displayName = normalized)
+            persist()
         }
-
-        if (cached.displayName == normalized) {
-            return
-        }
-
-        cached = cached.copy(displayName = normalized)
-        persist()
     }
 
-    fun addRecurringPreference(preference: String) {
-        val normalized = normalizeLabel(preference)
-        if (normalized.isBlank() || cached.recurringPreferences.contains(normalized)) {
-            return
-        }
+    override fun addRecurringPreference(preference: String) {
+        synchronized(lock) {
+            val normalized = normalizeLabel(preference)
+            if (normalized.isBlank() || cached.recurringPreferences.contains(normalized)) {
+                return
+            }
 
-        cached =
-            cached.copy(
-                recurringPreferences = normalizeSet(cached.recurringPreferences + normalized),
-            )
-        persist()
+            cached = cached.copy(recurringPreferences = normalizeSet(cached.recurringPreferences + normalized))
+            persist()
+        }
     }
 
-    fun addCommunicationStyleHint(hint: String) {
-        val normalized = normalizeLabel(hint)
-        if (normalized.isBlank() || cached.communicationStyleHints.contains(normalized)) {
-            return
-        }
+    override fun addCommunicationStyleHint(hint: String) {
+        synchronized(lock) {
+            val normalized = normalizeLabel(hint)
+            if (normalized.isBlank() || cached.communicationStyleHints.contains(normalized)) {
+                return
+            }
 
-        cached =
-            cached.copy(
-                communicationStyleHints = normalizeSet(cached.communicationStyleHints + normalized),
-            )
-        persist()
+            cached = cached.copy(communicationStyleHints = normalizeSet(cached.communicationStyleHints + normalized))
+            persist()
+        }
     }
 
-    fun addStableInterest(interest: String) {
-        val normalized = normalizeLabel(interest)
-        if (normalized.isBlank() || cached.stableInterests.contains(normalized)) {
-            return
-        }
+    override fun addStableInterest(interest: String) {
+        synchronized(lock) {
+            val normalized = normalizeLabel(interest)
+            if (normalized.isBlank() || cached.stableInterests.contains(normalized)) {
+                return
+            }
 
-        cached =
-            cached.copy(
-                stableInterests = normalizeSet(cached.stableInterests + normalized),
-            )
-        persist()
+            cached = cached.copy(stableInterests = normalizeSet(cached.stableInterests + normalized))
+            persist()
+        }
     }
 
     private fun persist() {
@@ -106,19 +130,19 @@ class UserProfileStore(
     }
 }
 
-private fun normalizeDisplayName(raw: String): String =
+internal fun normalizeDisplayName(raw: String): String =
     raw
         .trim()
         .trimEnd('.', '!', '?', ',', ';', ':')
         .replace(Regex("\\s+"), " ")
 
-private fun normalizeLabel(raw: String): String =
+internal fun normalizeLabel(raw: String): String =
     raw
         .trim()
         .trimEnd('.', '!', '?', ',', ';', ':')
         .replace(Regex("\\s+"), " ")
 
-private fun normalizeSet(values: Set<String>): Set<String> =
+internal fun normalizeSet(values: Set<String>): Set<String> =
     values
         .map { it.trim() }
         .filter { it.isNotBlank() }

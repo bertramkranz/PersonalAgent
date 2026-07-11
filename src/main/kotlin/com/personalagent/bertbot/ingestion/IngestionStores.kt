@@ -29,6 +29,7 @@ class FileConsentStore(
     private val storageFile: File = File("bertbot-ingestion-consent.json"),
     private val gson: Gson = Gson(),
 ) : ConsentStore {
+    private val lock = Any()
     private var cached: MutableList<ApprovalRecord> = mutableListOf()
 
     init {
@@ -36,49 +37,57 @@ class FileConsentStore(
     }
 
     override fun load(): List<ApprovalRecord> {
-        if (!storageFile.exists()) {
-            cached = mutableListOf()
-            return cached
-        }
+        synchronized(lock) {
+            if (!storageFile.exists()) {
+                cached = mutableListOf()
+                return cached.toList()
+            }
 
-        val content = storageFile.readText().trim()
-        if (content.isBlank()) {
-            cached = mutableListOf()
-            return cached
-        }
+            val content = storageFile.readText().trim()
+            if (content.isBlank()) {
+                cached = mutableListOf()
+                return cached.toList()
+            }
 
-        return try {
-            val payload = gson.fromJson(content, PersistedConsentState::class.java)
-            val records = payload.toRecords()
-            cached = records.toMutableList()
-            cached
-        } catch (_: JsonSyntaxException) {
-            preserveUnreadableStorageFile(storageFile, "consent")
-            cached = mutableListOf()
-            cached
+            return try {
+                val payload = gson.fromJson(content, PersistedConsentState::class.java)
+                val records = payload.toRecords()
+                cached = records.toMutableList()
+                cached.toList()
+            } catch (_: JsonSyntaxException) {
+                preserveUnreadableStorageFile(storageFile, "consent")
+                cached = mutableListOf()
+                cached.toList()
+            }
         }
     }
 
     override fun upsert(record: ApprovalRecord) {
-        val existingIndex = cached.indexOfFirst { it.source.key() == record.source.key() }
-        if (existingIndex >= 0) {
-            cached[existingIndex] = record
-        } else {
-            cached.add(record)
+        synchronized(lock) {
+            val existingIndex = cached.indexOfFirst { it.source.key() == record.source.key() }
+            if (existingIndex >= 0) {
+                cached[existingIndex] = record
+            } else {
+                cached.add(record)
+            }
+            persist()
         }
-        persist()
     }
 
     override fun isApproved(source: IngestionSource): Boolean {
-        val match = cached.lastOrNull { it.source.key() == source.key() } ?: return false
-        return match.approved
+        synchronized(lock) {
+            val match = cached.lastOrNull { it.source.key() == source.key() } ?: return false
+            return match.approved
+        }
     }
 
     override fun listApproved(): List<ApprovalRecord> =
-        cached
-            .filter { it.approved }
-            .sortedBy { it.source.key() }
-            .toList()
+        synchronized(lock) {
+            cached
+                .filter { it.approved }
+                .sortedBy { it.source.key() }
+                .toList()
+        }
 
     private fun persist() {
         writeTextAtomically(storageFile, gson.toJson(PersistedConsentState.fromRecords(cached)))
@@ -89,6 +98,7 @@ class FileSourceStateStore(
     private val storageFile: File = File("bertbot-ingestion-source-state.json"),
     private val gson: Gson = Gson(),
 ) : SourceStateStore {
+    private val lock = Any()
     private var cached: MutableList<SyncCursor> = mutableListOf()
 
     init {
@@ -96,41 +106,47 @@ class FileSourceStateStore(
     }
 
     override fun load(): List<SyncCursor> {
-        if (!storageFile.exists()) {
-            cached = mutableListOf()
-            return cached
-        }
+        synchronized(lock) {
+            if (!storageFile.exists()) {
+                cached = mutableListOf()
+                return cached.toList()
+            }
 
-        val content = storageFile.readText().trim()
-        if (content.isBlank()) {
-            cached = mutableListOf()
-            return cached
-        }
+            val content = storageFile.readText().trim()
+            if (content.isBlank()) {
+                cached = mutableListOf()
+                return cached.toList()
+            }
 
-        return try {
-            val payload = gson.fromJson(content, PersistedSourceState::class.java)
-            val cursors = payload.toCursors()
-            cached = cursors.toMutableList()
-            cached
-        } catch (_: JsonSyntaxException) {
-            preserveUnreadableStorageFile(storageFile, "source state")
-            cached = mutableListOf()
-            cached
+            return try {
+                val payload = gson.fromJson(content, PersistedSourceState::class.java)
+                val cursors = payload.toCursors()
+                cached = cursors.toMutableList()
+                cached.toList()
+            } catch (_: JsonSyntaxException) {
+                preserveUnreadableStorageFile(storageFile, "source state")
+                cached = mutableListOf()
+                cached.toList()
+            }
         }
     }
 
     override fun upsert(cursor: SyncCursor) {
-        val existingIndex = cached.indexOfFirst { it.source.key() == cursor.source.key() }
-        if (existingIndex >= 0) {
-            cached[existingIndex] = cursor
-        } else {
-            cached.add(cursor)
+        synchronized(lock) {
+            val existingIndex = cached.indexOfFirst { it.source.key() == cursor.source.key() }
+            if (existingIndex >= 0) {
+                cached[existingIndex] = cursor
+            } else {
+                cached.add(cursor)
+            }
+            persist()
         }
-        persist()
     }
 
     override fun find(source: IngestionSource): SyncCursor? =
-        cached.lastOrNull { it.source.key() == source.key() }
+        synchronized(lock) {
+            cached.lastOrNull { it.source.key() == source.key() }
+        }
 
     private fun persist() {
         writeTextAtomically(storageFile, gson.toJson(PersistedSourceState.fromCursors(cached)))
@@ -186,14 +202,19 @@ private fun writeTextAtomically(
     target: File,
     content: String,
 ) {
-    target.parentFile?.mkdirs()
-    val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
-    tempFile.writeText(content)
+    val parentDir = target.parentFile ?: File(".")
+    parentDir.mkdirs()
+    val tempPath = Files.createTempFile(parentDir.toPath(), "${target.nameWithoutExtension}-", ".tmp")
+    val tempFile = tempPath.toFile()
     try {
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        tempFile.writeText(content)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (_: AtomicMoveNotSupportedException) {
         println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    } catch (e: Exception) {
+        runCatching { tempFile.delete() }
+        throw e
     }
 }
 

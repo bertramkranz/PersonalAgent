@@ -8,6 +8,7 @@ import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.llm.LlmGateway
+import com.personalagent.bertbot.llm.OllamaLlmGateway
 import com.personalagent.bertbot.llm.OpenAiLlmGateway
 import java.io.File
 import java.time.Duration
@@ -16,10 +17,46 @@ internal data class AiRuntimeConfiguration(
     val provider: String = DEFAULT_AI_PROVIDER,
     val model: String = DEFAULT_AI_MODEL,
     val apiKey: String? = null,
+    val ollamaBaseUrl: String = DEFAULT_OLLAMA_BASE_URL,
+    val ollamaTimeoutSeconds: Long = DEFAULT_OLLAMA_TIMEOUT_SECONDS,
+)
+
+internal data class PersistenceRuntimeConfiguration(
+    val backend: String = DEFAULT_PERSISTENCE_BACKEND,
+    val stateFilePath: String = DEFAULT_STATE_FILE_PATH,
+    val episodicMemoryFilePath: String = DEFAULT_EPISODIC_MEMORY_FILE_PATH,
+    val semanticMemoryFilePath: String = DEFAULT_SEMANTIC_MEMORY_FILE_PATH,
+    val profileFilePath: String = DEFAULT_PROFILE_FILE_PATH,
+    val ingestionConsentFilePath: String = DEFAULT_INGESTION_CONSENT_FILE_PATH,
+    val ingestionSourceStateFilePath: String = DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH,
+    val jdbcUrl: String? = null,
+    val jdbcUser: String? = null,
+    val jdbcPassword: String? = null,
+    val jdbcTable: String = DEFAULT_STATE_JDBC_TABLE,
+    val episodicMemoryJdbcTable: String = DEFAULT_EPISODIC_MEMORY_JDBC_TABLE,
+    val semanticMemoryJdbcTable: String = DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE,
+    val profileJdbcTable: String = DEFAULT_PROFILE_JDBC_TABLE,
+    val ingestionConsentJdbcTable: String = DEFAULT_INGESTION_CONSENT_JDBC_TABLE,
+    val ingestionSourceStateJdbcTable: String = DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
 )
 
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
+internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+internal const val DEFAULT_OLLAMA_TIMEOUT_SECONDS: Long = 120
+internal const val DEFAULT_PERSISTENCE_BACKEND = "file"
+internal const val DEFAULT_STATE_FILE_PATH = "bertbot-state.json"
+internal const val DEFAULT_EPISODIC_MEMORY_FILE_PATH = "bertbot-memory.txt"
+internal const val DEFAULT_SEMANTIC_MEMORY_FILE_PATH = "bertbot-semantic-memory.txt"
+internal const val DEFAULT_PROFILE_FILE_PATH = "bertbot-profile.json"
+internal const val DEFAULT_INGESTION_CONSENT_FILE_PATH = "bertbot-ingestion-consent.json"
+internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "bertbot-ingestion-source-state.json"
+internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
+internal const val DEFAULT_EPISODIC_MEMORY_JDBC_TABLE = "bertbot_memory_episodic_snapshot"
+internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic_snapshot"
+internal const val DEFAULT_PROFILE_JDBC_TABLE = "bertbot_profile_snapshot"
+internal const val DEFAULT_INGESTION_CONSENT_JDBC_TABLE = "bertbot_ingestion_consent_snapshot"
+internal const val DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE = "bertbot_ingestion_source_state_snapshot"
 
 internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
@@ -49,6 +86,20 @@ internal fun resolveOpenAiChatModel(modelName: String): ChatModel {
     return ChatModel.of(modelName)
 }
 
+internal fun createOllamaLlmGateway(
+    baseUrl: String,
+    modelName: String,
+    timeoutSeconds: Long,
+): OllamaLlmGateway {
+    require(modelName.isNotBlank()) { "modelName must not be blank" }
+    require(timeoutSeconds > 0) { "timeoutSeconds must be positive" }
+    return OllamaLlmGateway(
+        baseUrl = baseUrl,
+        model = modelName,
+        timeout = Duration.ofSeconds(timeoutSeconds),
+    )
+}
+
 internal fun resolveAiRuntimeConfiguration(): AiRuntimeConfiguration =
     resolveAiRuntimeConfiguration(
         environment = System.getenv(),
@@ -63,7 +114,109 @@ internal fun resolveAiRuntimeConfiguration(
         provider = resolveRuntimeSetting("BERTBOT_AI_PROVIDER", environment, dotEnvValues) ?: DEFAULT_AI_PROVIDER,
         model = resolveRuntimeSetting("BERTBOT_AI_MODEL", environment, dotEnvValues) ?: DEFAULT_AI_MODEL,
         apiKey = resolveRuntimeSetting("BERTBOT_AI_API_KEY", environment, dotEnvValues),
+        ollamaBaseUrl = resolveRuntimeSetting("BERTBOT_OLLAMA_BASE_URL", environment, dotEnvValues) ?: DEFAULT_OLLAMA_BASE_URL,
+        ollamaTimeoutSeconds =
+            resolveRuntimeSetting("BERTBOT_OLLAMA_TIMEOUT_SECONDS", environment, dotEnvValues)
+                ?.toLongOrNull()
+                ?.coerceAtLeast(1)
+                ?: DEFAULT_OLLAMA_TIMEOUT_SECONDS,
     )
+
+internal fun resolvePersistenceRuntimeConfiguration(): PersistenceRuntimeConfiguration =
+    resolvePersistenceRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolvePersistenceRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): PersistenceRuntimeConfiguration {
+    val backend =
+        resolveRuntimeSetting("BERTBOT_STATE_STORE", environment, dotEnvValues)
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_PERSISTENCE_BACKEND
+
+    val stateFilePath =
+        resolveRuntimeSetting("BERTBOT_STATE_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_STATE_FILE_PATH
+
+    val episodicMemoryFilePath =
+        resolveRuntimeSetting("BERTBOT_MEMORY_EPISODIC_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_EPISODIC_MEMORY_FILE_PATH
+
+    val semanticMemoryFilePath =
+        resolveRuntimeSetting("BERTBOT_MEMORY_SEMANTIC_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_SEMANTIC_MEMORY_FILE_PATH
+
+    val profileFilePath =
+        resolveRuntimeSetting("BERTBOT_PROFILE_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_PROFILE_FILE_PATH
+
+    val ingestionConsentFilePath =
+        resolveRuntimeSetting("BERTBOT_INGESTION_CONSENT_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_INGESTION_CONSENT_FILE_PATH
+
+    val ingestionSourceStateFilePath =
+        resolveRuntimeSetting("BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH
+
+    val jdbcTable =
+        resolveRuntimeSetting("BERTBOT_STATE_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_STATE_JDBC_TABLE
+
+    val episodicMemoryJdbcTable =
+        resolveRuntimeSetting("BERTBOT_MEMORY_EPISODIC_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_EPISODIC_MEMORY_JDBC_TABLE
+
+    val semanticMemoryJdbcTable =
+        resolveRuntimeSetting("BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE
+
+    val profileJdbcTable =
+        resolveRuntimeSetting("BERTBOT_PROFILE_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_PROFILE_JDBC_TABLE
+
+    val ingestionConsentJdbcTable =
+        resolveRuntimeSetting("BERTBOT_INGESTION_CONSENT_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_INGESTION_CONSENT_JDBC_TABLE
+
+    val ingestionSourceStateJdbcTable =
+        resolveRuntimeSetting("BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE
+
+    return PersistenceRuntimeConfiguration(
+        backend = backend,
+        stateFilePath = stateFilePath,
+        episodicMemoryFilePath = episodicMemoryFilePath,
+        semanticMemoryFilePath = semanticMemoryFilePath,
+        profileFilePath = profileFilePath,
+        ingestionConsentFilePath = ingestionConsentFilePath,
+        ingestionSourceStateFilePath = ingestionSourceStateFilePath,
+        jdbcUrl = resolveRuntimeSetting("BERTBOT_STATE_JDBC_URL", environment, dotEnvValues),
+        jdbcUser = resolveRuntimeSetting("BERTBOT_STATE_JDBC_USER", environment, dotEnvValues),
+        jdbcPassword = resolveRuntimeSetting("BERTBOT_STATE_JDBC_PASSWORD", environment, dotEnvValues),
+        jdbcTable = jdbcTable,
+        episodicMemoryJdbcTable = episodicMemoryJdbcTable,
+        semanticMemoryJdbcTable = semanticMemoryJdbcTable,
+        profileJdbcTable = profileJdbcTable,
+        ingestionConsentJdbcTable = ingestionConsentJdbcTable,
+        ingestionSourceStateJdbcTable = ingestionSourceStateJdbcTable,
+    )
+}
 
 internal fun resolveRuntimeSetting(
     name: String,

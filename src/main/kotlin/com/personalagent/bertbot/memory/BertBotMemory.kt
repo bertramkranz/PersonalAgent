@@ -39,79 +39,109 @@ data class MemoryAttachmentReference(
     val height: Int? = null,
 )
 
+interface BertBotMemoryStore {
+    fun load(): List<MemoryEntry>
+
+    fun remember(text: String)
+
+    fun remember(entry: MemoryEntry)
+
+    fun entries(): List<MemoryEntry>
+
+    fun replaceAll(newEntries: List<MemoryEntry>)
+
+    fun snapshot(): String
+
+    fun count(): Int
+
+    fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T = action()
+}
+
 class BertBotMemory(
     private val storageFile: File = File("bertbot-memory.txt"),
     private val gson: Gson = Gson(),
-) {
+) : BertBotMemoryStore {
+    private val lock = Any()
     private val entries = mutableListOf<MemoryEntry>()
 
     init {
         load()
     }
 
-    fun load(): List<MemoryEntry> {
-        if (!storageFile.exists()) {
-            return emptyList()
-        }
-
-        entries.clear()
-        val content = storageFile.readText().trim()
-        if (content.isBlank()) {
-            return emptyList()
-        }
-
-        // Prefer structured JSON state but gracefully fall back to legacy line-based format.
-        val parsedEntries =
-            try {
-                gson.fromJson(content, Array<MemoryEntry>::class.java)?.toList()
-            } catch (_: JsonSyntaxException) {
-                null
+    override fun load(): List<MemoryEntry> {
+        synchronized(lock) {
+            entries.clear()
+            if (!storageFile.exists()) {
+                return entries.toList()
             }
 
-        if (parsedEntries != null) {
-            entries.addAll(parsedEntries.map { it.normalized() })
+            val content = storageFile.readText().trim()
+            if (content.isBlank()) {
+                return entries.toList()
+            }
+
+            // Prefer structured JSON state but gracefully fall back to legacy line-based format.
+            val parsedEntries =
+                try {
+                    gson.fromJson(content, Array<MemoryEntry>::class.java)?.toList()
+                } catch (_: JsonSyntaxException) {
+                    null
+                }
+
+            if (parsedEntries != null) {
+                entries.addAll(parsedEntries.map { it.normalized() })
+                return entries.toList()
+            }
+
+            if (looksLikeStructuredJson(content)) {
+                preserveUnreadableStorageFile(storageFile)
+                return entries.toList()
+            }
+
+            content.lineSequence()
+                .filter { it.isNotBlank() }
+                .forEach { line -> entries.add(MemoryEntry(text = line.trim())) }
+
             return entries.toList()
         }
+    }
 
-        if (looksLikeStructuredJson(content)) {
-            preserveUnreadableStorageFile(storageFile)
-            return emptyList()
+    override fun remember(text: String) {
+        synchronized(lock) {
+            if (text.isBlank()) {
+                return
+            }
+
+            entries.add(MemoryEntry(text = text.trim()))
+            persist()
         }
-
-        content.lineSequence()
-            .filter { it.isNotBlank() }
-            .forEach { line -> entries.add(MemoryEntry(text = line.trim())) }
-
-        return entries.toList()
     }
 
-    fun remember(text: String) {
-        if (text.isBlank()) {
-            return
+    override fun remember(entry: MemoryEntry) {
+        synchronized(lock) {
+            if (entry.text.isBlank()) {
+                return
+            }
+
+            entries.add(entry.normalized())
+            persist()
         }
-
-        entries.add(MemoryEntry(text = text.trim()))
-        persist()
     }
 
-    fun remember(entry: MemoryEntry) {
-        if (entry.text.isBlank()) {
-            return
+    override fun entries(): List<MemoryEntry> = synchronized(lock) { entries.toList() }
+
+    override fun replaceAll(newEntries: List<MemoryEntry>) {
+        synchronized(lock) {
+            entries.clear()
+            entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
+            persist()
         }
-
-        entries.add(entry.normalized())
-        persist()
     }
 
-    fun entries(): List<MemoryEntry> = entries.toList()
-
-    fun replaceAll(newEntries: List<MemoryEntry>) {
-        entries.clear()
-        entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
-        persist()
-    }
-
-    fun snapshot(): String {
+    override fun snapshot(): String {
         if (entries.isEmpty()) {
             return "No remembered context yet."
         }
@@ -119,14 +149,14 @@ class BertBotMemory(
         return entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
     }
 
-    fun count(): Int = entries.size
+    override fun count(): Int = synchronized(lock) { entries.size }
 
     private fun persist() {
         writeTextAtomically(storageFile, gson.toJson(entries))
     }
 }
 
-private fun MemoryEntry.normalized(): MemoryEntry =
+internal fun MemoryEntry.normalized(): MemoryEntry =
     copy(
         text = text.trim(),
         attachmentReferences = attachmentReferences.orEmpty().filter { it.attachmentId.isNotBlank() },
@@ -148,13 +178,18 @@ private fun writeTextAtomically(
     target: File,
     content: String,
 ) {
-    target.parentFile?.mkdirs()
-    val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
-    tempFile.writeText(content)
+    val parentDir = target.parentFile ?: File(".")
+    parentDir.mkdirs()
+    val tempPath = Files.createTempFile(parentDir.toPath(), "${target.nameWithoutExtension}-", ".tmp")
+    val tempFile = tempPath.toFile()
     try {
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        tempFile.writeText(content)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     } catch (_: AtomicMoveNotSupportedException) {
         println("Warning: atomic move unsupported for '${target.path}'. Falling back to non-atomic replace.")
-        Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        Files.move(tempPath, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    } catch (e: Exception) {
+        runCatching { tempFile.delete() }
+        throw e
     }
 }

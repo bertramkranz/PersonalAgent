@@ -10,6 +10,10 @@ private val promptInjectionPatterns =
         Regex("\\b(exfiltrate|extract)\\b.{0,40}\\b(secret|api\\s*key|token|credential)\\b", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)),
     )
 
+private const val PROMPT_INJECTION_REFUSAL_MESSAGE =
+    "I can't comply with requests to override hidden instructions, reveal protected prompts, or exfiltrate secrets. " +
+        "Please restate your request as a normal task without jailbreak or instruction-override content."
+
 internal fun isLikelyPromptInjection(input: String): Boolean {
     if (input.isBlank()) {
         return false
@@ -17,6 +21,8 @@ internal fun isLikelyPromptInjection(input: String): Boolean {
 
     return promptInjectionPatterns.any { it.containsMatchIn(input) }
 }
+
+internal fun promptInjectionRefusalMessage(): String = PROMPT_INJECTION_REFUSAL_MESSAGE
 
 internal fun escapeForSystemContext(input: String): String =
     input
