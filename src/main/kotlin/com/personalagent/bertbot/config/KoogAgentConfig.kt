@@ -22,6 +22,10 @@ data class SubAgentConfigDefinition(
 
 data class KoogAgentConfig(
     val name: String = "BertBot",
+    val maxSemanticContextEntries: Int = 5,
+    val maxEpisodicContextEntries: Int = 10,
+    val memorySummarizationThreshold: Int = 15,
+    val memorySummarizationBatchSize: Int = 10,
     val systemPrompt: String =
         """
         You are BertBot, my premium personal assistant and chief orchestration agent.
@@ -168,9 +172,46 @@ data class KoogAgentConfig(
             ),
         ),
 ) {
+    init {
+        require(maxSemanticContextEntries > 0) {
+            "maxSemanticContextEntries must be greater than 0"
+        }
+        require(maxSemanticContextEntries <= MAX_SEMANTIC_CONTEXT_ENTRIES) {
+            "maxSemanticContextEntries must be less than or equal to $MAX_SEMANTIC_CONTEXT_ENTRIES"
+        }
+        require(maxEpisodicContextEntries > 0) {
+            "maxEpisodicContextEntries must be greater than 0"
+        }
+        require(maxEpisodicContextEntries <= MAX_EPISODIC_CONTEXT_ENTRIES) {
+            "maxEpisodicContextEntries must be less than or equal to $MAX_EPISODIC_CONTEXT_ENTRIES"
+        }
+        require(memorySummarizationThreshold > 0) {
+            "memorySummarizationThreshold must be greater than 0"
+        }
+        require(memorySummarizationThreshold <= MAX_MEMORY_SUMMARIZATION_THRESHOLD) {
+            "memorySummarizationThreshold must be less than or equal to $MAX_MEMORY_SUMMARIZATION_THRESHOLD"
+        }
+        require(memorySummarizationBatchSize > 0) {
+            "memorySummarizationBatchSize must be greater than 0"
+        }
+        require(memorySummarizationBatchSize <= MAX_MEMORY_SUMMARIZATION_BATCH_SIZE) {
+            "memorySummarizationBatchSize must be less than or equal to $MAX_MEMORY_SUMMARIZATION_BATCH_SIZE"
+        }
+        require(memorySummarizationBatchSize <= memorySummarizationThreshold) {
+            "memorySummarizationBatchSize must be less than or equal to memorySummarizationThreshold"
+        }
+    }
+
     fun enabledTools(): List<ToolDefinition> = tools.filter { it.enabled }
 
     fun enabledSkills(): List<SkillDefinition> = skills.filter { it.enabled }
 
     fun enabledSubAgents(): List<SubAgentConfigDefinition> = subAgents.filter { it.enabled }
+
+    companion object {
+        const val MAX_SEMANTIC_CONTEXT_ENTRIES: Int = 100
+        const val MAX_EPISODIC_CONTEXT_ENTRIES: Int = 500
+        const val MAX_MEMORY_SUMMARIZATION_THRESHOLD: Int = 1_000
+        const val MAX_MEMORY_SUMMARIZATION_BATCH_SIZE: Int = 500
+    }
 }

@@ -5,7 +5,10 @@ import com.personalagent.bertbot.graph.model.BertBotState
 interface BertBotGraphNode {
     val id: String
 
-    fun execute(state: BertBotState): BertBotState
+    fun execute(
+        state: BertBotState,
+        tracingContext: TracingContext,
+    ): BertBotState
 }
 
 interface BertBotStateStore {
@@ -25,3 +28,29 @@ data class BertBotGraphDefinition(
     val nodes: List<BertBotGraphNode>,
     val edges: List<BertBotGraphEdge>,
 )
+
+data class ValidationResult(
+    val isValid: Boolean,
+    val errors: List<String> = emptyList(),
+)
+
+interface StateValidator<T> {
+    fun validate(value: T): ValidationResult
+}
+
+data class StateHandoffValidator<T>(
+    val fromNodeId: String,
+    val toNodeId: String,
+    val validator: StateValidator<T>,
+)
+
+class MaxTurnsExceededException(
+    val maxTurns: Int,
+    val fallbackMessage: String,
+) : RuntimeException("Maximum orchestration turns exceeded: $maxTurns")
+
+class InvalidStateHandoffException(
+    fromNodeId: String,
+    toNodeId: String,
+    errors: List<String>,
+) : RuntimeException("Invalid handoff from $fromNodeId to $toNodeId: ${errors.joinToString(separator = "; ")}")

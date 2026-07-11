@@ -61,6 +61,23 @@ class BertBotMemory(
         persist()
     }
 
+    fun remember(entry: MemoryEntry) {
+        if (entry.text.isBlank()) {
+            return
+        }
+
+        entries.add(entry.copy(text = entry.text.trim()))
+        persist()
+    }
+
+    fun entries(): List<MemoryEntry> = entries.toList()
+
+    fun replaceAll(newEntries: List<MemoryEntry>) {
+        entries.clear()
+        entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.copy(text = entry.text.trim()) })
+        persist()
+    }
+
     fun snapshot(): String {
         if (entries.isEmpty()) {
             return "No remembered context yet."

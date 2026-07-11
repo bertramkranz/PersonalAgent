@@ -11,6 +11,8 @@ import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphEdge
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.graph.runtime.DelegationToExecutorStateValidator
+import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
 
 object BertBotApplication {
     fun createGraph(
@@ -39,6 +41,14 @@ object BertBotApplication {
                         ),
                 ),
             stateStore = stateStore,
+            handoffValidators =
+                listOf(
+                    StateHandoffValidator(
+                        fromNodeId = NodeIds.DELEGATION,
+                        toNodeId = NodeIds.EXECUTOR,
+                        validator = DelegationToExecutorStateValidator(),
+                    ),
+                ),
         )
     }
 }
