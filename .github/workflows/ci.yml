@@ -36,7 +36,7 @@ jobs:
 
           CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
 
-          ARCH_SIGNIFICANT_REGEX='^(src/main/kotlin/com/personalagent/bertbot/(app|graph|agents|memory|llm|ingestion|config)/|build\.gradle\.kts|settings\.gradle\.kts)$'
+          ARCH_SIGNIFICANT_REGEX='^(src/main/kotlin/com/personalagent/bertbot/(app|graph|agents|memory|llm|ingestion|config)/.+|build\.gradle\.kts|settings\.gradle\.kts)$'
 
           if echo "$CHANGED_FILES" | grep -E "$ARCH_SIGNIFICANT_REGEX" > /dev/null; then
             if ! echo "$CHANGED_FILES" | grep -Fx "architecture.mmd" > /dev/null; then
