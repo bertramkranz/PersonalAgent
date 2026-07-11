@@ -57,17 +57,23 @@ jobs:
             const autoMergeLabel = 'auto-merge';
             const ignoredStatusContexts = new Set(['merge-generated-pr', 'open-pr']);
             const ignoredCheckNames = new Set(['merge-generated-pr', 'open-pr']);
+<<<<<<< HEAD
             const baseRequiredStatusContexts = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
             const checkPollIntervalMs = 30_000;
             const checkWaitTimeoutMs = 20 * 60 * 1000;
+=======
+>>>>>>> origin/main
 
             function isAcceptedCheckConclusion(conclusion) {
               return acceptedCheckConclusions.has(conclusion || '');
             }
+<<<<<<< HEAD
 
             function sleep(milliseconds) {
               return new Promise((resolve) => setTimeout(resolve, milliseconds));
             }
+=======
+>>>>>>> origin/main
 
             function isSameRepoEligiblePr(pr) {
               return (
@@ -245,6 +251,7 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
+<<<<<<< HEAD
               const requiredContexts = await requiredStatusContextsForPr(pr);
               const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
               const observedContexts = new Set(statuses.map((status) => status.context || '').filter(Boolean));
@@ -261,6 +268,13 @@ jobs:
 
               if (blockingStatuses.length > 0) {
                 core.info(
+=======
+              const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
+              const blockingStatuses = statuses.filter((status) => status.state !== 'success');
+
+              if (blockingStatuses.length > 0) {
+                core.info(
+>>>>>>> origin/main
                   `PR #${pr.number} has blocking statuses: ${blockingStatuses
                     .map((status) => `${status.context}:${status.state}`)
                     .join(', ')}`
