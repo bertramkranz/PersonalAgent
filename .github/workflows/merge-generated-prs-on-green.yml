@@ -1,6 +1,14 @@
 name: Merge Generated PRs On Green
 
 on:
+  pull_request:
+    branches: ["main"]
+    types:
+      - opened
+      - labeled
+      - reopened
+      - synchronize
+      - ready_for_review
   pull_request_target:
     types:
       - opened
@@ -64,7 +72,7 @@ jobs:
             }
 
             async function resolveCandidatePullNumbers() {
-              if (context.eventName === 'pull_request_target') {
+              if (['pull_request', 'pull_request_target'].includes(context.eventName)) {
                 return [context.payload.pull_request.number];
               }
 
