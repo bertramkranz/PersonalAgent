@@ -67,9 +67,10 @@ flowchart TD
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
-    Webhook --> PayloadDispatcher
-    PayloadDispatcher --> ConnectorFactory
-    ConnectorFactory --> RuntimeCore
+    Webhook --> RuntimeFactory
+    RuntimeFactory --> ConnectorFactory
+    ConnectorFactory --> PayloadDispatcher
+    PayloadDispatcher --> RuntimeCore
 
     RuntimeFactory --> RuntimeCore
     RuntimeFactory --> GraphFactory
