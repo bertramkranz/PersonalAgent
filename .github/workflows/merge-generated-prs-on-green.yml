@@ -1,31 +1,15 @@
 name: Merge Generated PRs On Green
 
 on:
-  pull_request:
-    branches: ["main"]
-    types:
-      - opened
-      - labeled
-      - reopened
-      - synchronize
-      - ready_for_review
-  pull_request_target:
-    types:
-      - opened
-      - labeled
-      - reopened
-      - synchronize
-      - ready_for_review
   workflow_run:
     workflows:
       - CI
       - CodeQL
       - Dependency Review
       - Secret Scan
+      - Actionlint
     types:
       - completed
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -36,8 +20,8 @@ permissions:
   statuses: read
 
 concurrency:
-  group: merge-generated-prs
-  cancel-in-progress: false
+  group: merge-generated-pr-${{ github.event.workflow_run.head_branch || github.ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   merge-generated-pr:
@@ -53,27 +37,21 @@ jobs:
             const repo = context.repo.repo;
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
+            const requiredWorkflowNames = new Set([
+              'CI',
+              'CodeQL',
+              'Dependency Review',
+              'Secret Scan',
+              'Actionlint',
+            ]);
+            const baseRequiredStatusContexts = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
             const autoMergeLabel = 'auto-merge';
             const ignoredStatusContexts = new Set(['merge-generated-pr', 'open-pr']);
-            const ignoredCheckNames = new Set(['merge-generated-pr', 'open-pr']);
-<<<<<<< HEAD
-            const baseRequiredStatusContexts = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
-            const checkPollIntervalMs = 30_000;
-            const checkWaitTimeoutMs = 20 * 60 * 1000;
-=======
->>>>>>> origin/main
 
             function isAcceptedCheckConclusion(conclusion) {
               return acceptedCheckConclusions.has(conclusion || '');
             }
-<<<<<<< HEAD
-
-            function sleep(milliseconds) {
-              return new Promise((resolve) => setTimeout(resolve, milliseconds));
-            }
-=======
->>>>>>> origin/main
 
             function isSameRepoEligiblePr(pr) {
               return (
@@ -85,20 +63,20 @@ jobs:
             }
 
             async function resolveCandidatePullNumbers() {
-              if (['pull_request', 'pull_request_target'].includes(context.eventName)) {
-                return [context.payload.pull_request.number];
-              }
-
               if (context.eventName === 'workflow_run') {
                 const workflowRun = context.payload.workflow_run;
-                if (!['success', 'action_required'].includes(workflowRun.conclusion || '')) {
+                if (workflowRun.event !== 'pull_request') {
+                  core.info(`Skipping workflow_run triggered by '${workflowRun.event}'.`);
+                  return [];
+                }
+
+                if (!['success', 'neutral', 'skipped', 'action_required'].includes(workflowRun.conclusion || '')) {
                   core.info(`Skipping workflow_run with conclusion '${workflowRun.conclusion}'.`);
                   return [];
                 }
 
-                const pullNumbers = new Set((workflowRun.pull_requests || []).map((pr) => pr.number));
+                const pullNumbers = new Set((workflowRun.pull_requests || []).map((pr) => pr.number).filter(Boolean));
 
-                // GitHub can emit workflow_run without linked PR metadata; map by head branch as fallback.
                 if (pullNumbers.size === 0 && workflowRun.head_branch) {
                   const { data: branchPullRequests } = await github.rest.pulls.list({
                     owner,
@@ -233,7 +211,7 @@ jobs:
               const workflowRuns = Array.isArray(runs?.workflow_runs) ? runs.workflow_runs.filter(Boolean) : [];
 
               for (const run of workflowRuns) {
-                if (run?.conclusion !== 'action_required') {
+                if (!requiredWorkflowNames.has(run?.name || '') || run?.conclusion !== 'action_required') {
                   continue;
                 }
 
@@ -251,30 +229,22 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
-<<<<<<< HEAD
               const requiredContexts = await requiredStatusContextsForPr(pr);
               const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
               const observedContexts = new Set(statuses.map((status) => status.context || '').filter(Boolean));
               const missingContexts = requiredContexts.filter((contextName) => !observedContexts.has(contextName));
 
               if (missingContexts.length > 0) {
-                core.info(
-                  `PR #${pr.number} is still waiting for statuses: ${missingContexts.join(', ')}`
-                );
+                core.info(`PR #${pr.number} is still waiting for statuses: ${missingContexts.join(', ')}`);
                 return false;
               }
 
-              const blockingStatuses = statuses.filter((status) => status.state !== 'success');
+              const blockingStatuses = statuses.filter(
+                (status) => requiredContexts.includes(status.context || '') && status.state !== 'success'
+              );
 
               if (blockingStatuses.length > 0) {
                 core.info(
-=======
-              const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
-              const blockingStatuses = statuses.filter((status) => status.state !== 'success');
-
-              if (blockingStatuses.length > 0) {
-                core.info(
->>>>>>> origin/main
                   `PR #${pr.number} has blocking statuses: ${blockingStatuses
                     .map((status) => `${status.context}:${status.state}`)
                     .join(', ')}`
@@ -283,11 +253,11 @@ jobs:
               }
 
               const checks = await listAllCheckRunsForRef(pr.head.sha);
-              const blockingChecks = checks.filter(
+              const relevantChecks = checks.filter((checkRun) => requiredContexts.includes(checkRun?.name || ''));
+              const blockingChecks = relevantChecks.filter(
                 (checkRun) =>
-                  !ignoredCheckNames.has(checkRun?.name || '') &&
-                  (checkRun?.status !== 'completed' ||
-                    !isAcceptedCheckConclusion(checkRun?.conclusion))
+                  checkRun?.status !== 'completed' ||
+                  !isAcceptedCheckConclusion(checkRun?.conclusion)
               );
 
               if (blockingChecks.length > 0) {
@@ -302,28 +272,6 @@ jobs:
               return true;
             }
 
-            async function waitForGreenChecks(pr) {
-              const deadline = Date.now() + checkWaitTimeoutMs;
-
-              while (Date.now() <= deadline) {
-                if (await checksAreGreen(pr)) {
-                  return true;
-                }
-
-                if (Date.now() + checkPollIntervalMs > deadline) {
-                  break;
-                }
-
-                core.info(
-                  `Waiting ${Math.floor(checkPollIntervalMs / 1000)}s for PR #${pr.number} checks to complete.`
-                );
-                await sleep(checkPollIntervalMs);
-              }
-
-              core.info(`Timed out waiting for PR #${pr.number} checks to complete.`);
-              return false;
-            }
-
             const candidatePullNumbers = await resolveCandidatePullNumbers();
             if (candidatePullNumbers.length === 0) {
               core.info('No candidate pull requests found for this event.');
@@ -331,7 +279,6 @@ jobs:
             }
 
             for (const pullNumber of candidatePullNumbers) {
-
               const { data: pr } = await github.rest.pulls.get({
                 owner,
                 repo,
@@ -351,37 +298,39 @@ jobs:
               await rerunActionRequiredChecks(pr);
               await rerunActionRequiredWorkflowRuns(pr);
 
-              if (!(await waitForGreenChecks(pr))) {
+              if (!(await checksAreGreen(pr))) {
                 continue;
               }
 
-              const { data: reviews } = await github.rest.pulls.listReviews({
-                owner,
-                repo,
-                pull_number: pullNumber,
-              });
+              if (trustedGeneratedPr) {
+                const { data: reviews } = await github.rest.pulls.listReviews({
+                  owner,
+                  repo,
+                  pull_number: pullNumber,
+                });
 
-              const alreadyApproved = reviews.some(
-                (review) => review.state === 'APPROVED' && trustedAuthors.has(review.user?.login || '')
-              );
+                const alreadyApproved = reviews.some(
+                  (review) => review.state === 'APPROVED' && trustedAuthors.has(review.user?.login || '')
+                );
 
-              if (!alreadyApproved) {
-                try {
-                  await github.rest.pulls.createReview({
-                    owner,
-                    repo,
-                    pull_number: pullNumber,
-                    event: 'APPROVE',
-                    body: 'Automated approval for eligible PR after successful checks.',
-                  });
+                if (!alreadyApproved) {
+                  try {
+                    await github.rest.pulls.createReview({
+                      owner,
+                      repo,
+                      pull_number: pullNumber,
+                      event: 'APPROVE',
+                      body: 'Automated approval for trusted generated PR after successful checks.',
+                    });
 
-                  core.info(`Approved PR #${pullNumber}.`);
-                } catch (error) {
-                  const message = String(error.message || error);
-                  if (error.status === 422 && message.includes('approve your own pull request')) {
-                    core.info(`Approval skipped for PR #${pullNumber}: token identity matches PR author.`);
-                  } else {
-                    throw error;
+                    core.info(`Approved PR #${pullNumber}.`);
+                  } catch (error) {
+                    const message = String(error.message || error);
+                    if (error.status === 422 && message.includes('approve your own pull request')) {
+                      core.info(`Approval skipped for PR #${pullNumber}: token identity matches PR author.`);
+                    } else {
+                      throw error;
+                    }
                   }
                 }
               }
