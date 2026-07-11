@@ -43,6 +43,7 @@ jobs:
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
+            const autoMergeLabel = 'auto-merge';
 
             async function resolveCandidatePullNumbers() {
               if (context.eventName === 'pull_request_target') {
@@ -96,6 +97,20 @@ jobs:
                 trustedAuthors.has(pr.user?.login || '') &&
                 pr.title.startsWith('chore: merge ') &&
                 (pr.body || '').includes('Automated pull request created after a branch push.')
+              );
+            }
+
+            function hasAutoMergeLabel(pr) {
+              return (pr.labels || []).some((label) => (label.name || '').toLowerCase() === autoMergeLabel);
+            }
+
+            function isLabelEligiblePr(pr) {
+              return (
+                pr.state === 'open' &&
+                !pr.draft &&
+                pr.base.ref === defaultBranch &&
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                hasAutoMergeLabel(pr)
               );
             }
 
@@ -214,8 +229,13 @@ jobs:
                 pull_number: pullNumber,
               });
 
-              if (!isTrustedGeneratedPr(pr)) {
-                core.info(`Skipping PR #${pullNumber}: does not match trusted generated PR guardrails.`);
+              const trustedGeneratedPr = isTrustedGeneratedPr(pr);
+              const labelEligiblePr = isLabelEligiblePr(pr);
+
+              if (!trustedGeneratedPr && !labelEligiblePr) {
+                core.info(
+                  `Skipping PR #${pullNumber}: does not match trusted generated PR guardrails or '${autoMergeLabel}' label policy.`
+                );
                 continue;
               }
 
