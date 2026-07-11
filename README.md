@@ -35,6 +35,9 @@ BertBot currently persists local state in these files:
 - `bertbot-state.json` - graph execution state and delegation context.
 - `bertbot-memory.txt` - episodic memory entries from recent interactions.
 - `bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
+- `bertbot-profile.json` - structured profile facts (for example, remembered user name).
+- `bertbot-trace.jsonl` - structured runtime trace events with trace IDs.
+- `bertbot-interactions.mmd` - Mermaid sequence diagram generated from the latest trace and graph state.
 
 These files are local to the workspace and help BertBot retain context across runs.
 
@@ -47,7 +50,7 @@ To add a new capability:
 - Add or update sub-agent definitions in `com.personalagent.bertbot.agents.SubAgentRegistry`.
 - Refine the persona, tools, or skills in `com.personalagent.bertbot.config.BertBotAgentConfig`.
 
-Default sub-agent roles currently include: Coder, Planner, Architect, Analyst, Copywriter, Red Teamer, Philosopher, and Psychologist.
+Default sub-agent roles currently include: Coder Agent, Planner Agent, Architect Agent, Analyst Agent, Copywriter Agent, Red Team Agent, Philosopher Agent, and Psychologist Agent.
 
 ## Configuration
 
@@ -105,24 +108,46 @@ Use this mode when Copilot or another MCP client needs to call BertBot as a tool
 .\gradlew.bat runMcpServer --no-daemon
 ```
 
-The server exposes a single tool, `ask_bertbot`, and should be launched from the repository root so the agent can locate local state files.
+The server exposes two tools and should be launched from the repository root so the agent can locate local state files:
+
+- `ask_bertbot` - pass a prompt to BertBot and get the orchestration response.
+- `bertbot_status` - return runtime backend status for the active MCP session (provider/model/tool surface/timestamp).
+
+### Tracing And Graph Visualization
+
+BertBot emits structured tracing for graph execution and delegation lifecycles, including events like node start/completion, edge transitions, delegation requested/started/completed, and skill invocation.
+
+The generated `bertbot-trace.jsonl` file can be tailed or filtered by `traceId` for debugging.
+
+For a quick graphical view of interactions, open `bertbot-interactions.mmd` in VS Code Markdown preview (or Mermaid-compatible viewers). The file is refreshed after each request and renders a time-ordered sequence of delegation and node transitions.
 
 ### Copilot Custom Agent
 
 The repository-local agent is defined in [.github/agents/bertbot.agent.md](.github/agents/bertbot.agent.md) and points at the `bertbot-backend` MCP server.
 
+The MCP server registration is workspace-local in [.vscode/mcp.json](.vscode/mcp.json). This is what lets VS Code discover and start `bertbot-backend`.
+
 To use it in VS Code:
 
 1. Open Copilot Chat in the repository.
 2. Make sure the provider variables are available in the environment or `.env` file.
-3. Start the MCP backend with the `runMcpServer` task or the equivalent Gradle command.
+3. Run `MCP: List Servers` and confirm `bertbot-backend` is enabled/trusted and started.
 4. Select `@BertBot` from the agent picker, or invoke it directly from chat if your Copilot setup exposes custom agents.
+
+If `bertbot-backend` tools do not appear in chat:
+
+1. Run `MCP: Open Workspace Folder MCP Configuration` and verify `.vscode/mcp.json` is loaded for this workspace.
+2. Run `MCP: Reset Cached Tools`, then `MCP: List Servers` and restart `bertbot-backend`.
+3. Run `MCP: Reset Trust` if server trust was previously denied.
+4. Reload the VS Code window after MCP configuration changes.
+
+Quick self-check: call `bertbot-backend/bertbot_status` from chat tools. If the call succeeds, your chat session is actively routed through the workspace MCP backend.
 
 ### Scenario Summary
 
 - Use `run` for human-in-the-loop interactive work.
 - Use `runHeadless` for one-shot scripted requests.
-- Use `runMcpServer` when Copilot should broker requests through MCP.
+- Use `runMcpServer` for manual MCP backend startup outside VS Code server management, or rely on `.vscode/mcp.json` for workspace-managed startup.
 - Use the repo-local agent manifest when you want Copilot to route work to BertBot automatically.
 - Use `BERTBOT_AI_PROVIDER` and `BERTBOT_AI_MODEL` when you want to change the LLM adapter settings without changing code.
 
@@ -198,7 +223,7 @@ This repository includes GitHub Actions workflows:
 
 This repository also includes GitHub Copilot repository instructions in `.github/copilot-instructions.md` and a review-focused skill in `.github/skills/code-review/SKILL.md`.
 
-The repository-local Copilot custom agent lives at `.github/agents/bertbot.agent.md` and launches the local MCP backend via the `bertbot-backend` server.
+The repository-local Copilot custom agent lives at `.github/agents/bertbot.agent.md` and uses the `bertbot-backend` MCP tool surface. The server itself is configured in `.vscode/mcp.json`.
 
 To use GitHub-native review and implementation flow in pull requests:
 

@@ -54,11 +54,11 @@ class BertBotGraphTest {
         val state =
             graph.run(
                 BertBotState(
-                    lastUserMessage = "Please review my inbox and delegate urgent items to the right sub-agent.",
+                    lastUserMessage = "Please review the system architecture and dependency structure.",
                 ),
             )
 
-        assertEquals("Please review my inbox and delegate urgent items to the right sub-agent.", state.lastUserMessage)
+        assertEquals("Please review the system architecture and dependency structure.", state.lastUserMessage)
         assertTrue(state.pendingTasks.isNotEmpty())
         assertTrue(state.delegationPlan.isNotEmpty())
         assertTrue(state.executionSummary.any { it.contains("delegated", ignoreCase = true) })
@@ -69,6 +69,45 @@ class BertBotGraphTest {
         val reloadedState = stateStore.load()
         assertEquals(state.lastUserMessage, reloadedState.lastUserMessage)
         assertEquals(state.pendingTasks.size, reloadedState.pendingTasks.size)
+    }
+
+    @Test
+    fun `graph skips delegation execution when no sub-agent match is found`() {
+        val tempFile = File.createTempFile("bertbot-state", ".json")
+        tempFile.deleteOnExit()
+
+        val stateStore = FileBertBotStateStore(tempFile)
+        val definition =
+            BertBotGraphDefinition(
+                entryNodeId = NodeIds.CAPTURE,
+                nodes =
+                    listOf(
+                        MessageCaptureNode(),
+                        PlannerNode(),
+                        DelegationNode(),
+                        ExecutorNode(),
+                    ),
+                edges =
+                    listOf(
+                        BertBotGraphEdge(NodeIds.CAPTURE, NodeIds.PLANNER) { true },
+                        BertBotGraphEdge(NodeIds.PLANNER, NodeIds.DELEGATION) { it.pendingTasks.isNotEmpty() },
+                        BertBotGraphEdge(NodeIds.PLANNER, NodeIds.EXECUTOR) { it.pendingTasks.isEmpty() },
+                        BertBotGraphEdge(NodeIds.DELEGATION, NodeIds.EXECUTOR) { true },
+                    ),
+            )
+        val graph = BertBotGraphRunner(definition, stateStore)
+
+        val state =
+            graph.run(
+                BertBotState(
+                    lastUserMessage = "Hello there",
+                ),
+            )
+
+        assertTrue(state.delegationPlan.isEmpty())
+        assertEquals(null, state.selectedSubAgent)
+        assertTrue(state.executionSummary.any { it.contains("Skipped delegation", ignoreCase = true) })
+        assertTrue(state.executionSummary.none { it.contains("Executed delegated workflow", ignoreCase = true) })
     }
 
     @Test

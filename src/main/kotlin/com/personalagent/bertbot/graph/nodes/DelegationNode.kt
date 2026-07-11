@@ -16,18 +16,29 @@ class DelegationNode(
         tracingContext: TracingContext,
     ): BertBotState {
         if (state.pendingTasks.isNotEmpty()) {
-            val taskSummary = state.pendingTasks.joinToString(separator = "; ")
+            val taskSummary = (state.pendingTasks + state.lastUserMessage).joinToString(separator = "; ")
             TraceLogger.skillInvoked(tracingContext, "skill=sub_agent_matcher task_length=${taskSummary.length}")
             val match = registry.findBestMatch(taskSummary)
             if (match != null) {
-                state.selectedSubAgent = match.name
-                state.delegationPlan.add("Delegate to ${match.name} (${match.description})")
-                state.executionSummary.add("Prepared delegation to ${match.name}")
-                TraceLogger.subAgentSelected(tracingContext, "sub_agent=${match.name}")
+                val selectedSubAgent = match.id
+                TraceLogger.info(
+                    tracingContext,
+                    "delegation_requested",
+                    "from=bertbot to=$selectedSubAgent task_length=${taskSummary.length}",
+                )
+                state.selectedSubAgent = selectedSubAgent
+                state.delegationPlan.add("Delegate to ${match.name} (id=${match.id}; ${match.description})")
+                state.executionSummary.add("Prepared delegation to ${match.id}")
+                TraceLogger.subAgentSelected(tracingContext, "sub_agent=${match.id}")
             } else {
-                state.delegationPlan.add("Delegate to a specialized sub-agent based on task fit")
-                state.executionSummary.add("Prepared delegation with no exact match")
-                TraceLogger.subAgentSelected(tracingContext, "sub_agent=none")
+                state.selectedSubAgent = null
+                state.executionSummary.add("No matching sub-agent found")
+                TraceLogger.subAgentSelected(tracingContext, "sub_agent=unassigned")
+                TraceLogger.info(
+                    tracingContext,
+                    "delegation_skipped",
+                    "reason=no_sub_agent_match task_length=${taskSummary.length}",
+                )
             }
             TraceLogger.skillCompleted(tracingContext, "skill=sub_agent_matcher")
         }

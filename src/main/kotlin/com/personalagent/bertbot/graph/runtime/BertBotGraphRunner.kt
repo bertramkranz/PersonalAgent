@@ -19,14 +19,16 @@ class BertBotGraphRunner(
             }
 
         var state =
-            persistedState.apply {
-                traceId = effectiveTracingContext.traceId
-                lastUserMessage = initialState.lastUserMessage.ifBlank { lastUserMessage }
-                pendingTasks = (pendingTasks + initialState.pendingTasks).toMutableList()
-                delegationPlan = (delegationPlan + initialState.delegationPlan).toMutableList()
-                memorySummary = (memorySummary + initialState.memorySummary).toMutableList()
-                executionSummary = (executionSummary + initialState.executionSummary).toMutableList()
-            }
+            BertBotState(
+                traceId = effectiveTracingContext.traceId,
+                lastUserMessage = initialState.lastUserMessage.ifBlank { persistedState.lastUserMessage },
+                pendingTasks = initialState.pendingTasks.toMutableList(),
+                delegationPlan = initialState.delegationPlan.toMutableList(),
+                memorySummary = initialState.memorySummary.toMutableList(),
+                profileSummary = initialState.profileSummary.toMutableList(),
+                executionSummary = initialState.executionSummary.toMutableList(),
+                selectedSubAgent = initialState.selectedSubAgent,
+            )
 
         TraceLogger.intentParsed(effectiveTracingContext, "initial_message_length=${state.lastUserMessage.length}")
 
@@ -61,6 +63,12 @@ class BertBotGraphRunner(
                     .firstOrNull { it.fromNodeId == currentNodeId && it.condition(state) }
 
             if (nextEdge != null) {
+                TraceLogger.transition(
+                    effectiveTracingContext,
+                    fromNodeId = currentNodeId,
+                    toNodeId = nextEdge.toNodeId,
+                    details = "state_pending_tasks=${state.pendingTasks.size}",
+                )
                 validateHandoff(currentNodeId, nextEdge.toNodeId, state, effectiveTracingContext)
             }
 

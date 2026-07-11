@@ -6,12 +6,14 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import java.time.Instant
 import kotlin.system.exitProcess
 
 private const val MCP_SERVER_NAME = "bertbot"
 private const val MCP_SERVER_VERSION = "1.0.0"
 private const val MCP_PROTOCOL_VERSION = "2024-11-05"
 private const val ASK_BERTBOT_TOOL_NAME = "ask_bertbot"
+private const val BERTBOT_STATUS_TOOL_NAME = "bertbot_status"
 
 private val gson = GsonBuilder().disableHtmlEscaping().create()
 
@@ -22,7 +24,30 @@ fun main() {
         exitProcess(1)
     }
 
-    val dispatcher = McpRequestDispatcher { prompt -> runtime.respondTo(prompt, emitFallbackMessage = false) }
+    val dispatcher =
+        McpRequestDispatcher(
+            respondToPrompt = { prompt -> runtime.respondTo(prompt, emitFallbackMessage = false) },
+            statusProvider = {
+                """
+                Connected to $MCP_SERVER_NAME MCP server.
+                Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME
+                Runtime provider: ${runtime.aiRuntimeConfiguration.provider}
+                Runtime model: ${runtime.aiRuntimeConfiguration.model}
+                Session check timestamp: ${Instant.now()}
+                """.trimIndent()
+            },
+        )
+
+    // Use stderr for startup diagnostics so stdout remains clean JSON-RPC for MCP transport.
+    System.err.println(
+        """
+        BertBot MCP server started.
+        Server: $MCP_SERVER_NAME v$MCP_SERVER_VERSION
+        Tools: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME
+        Provider: ${runtime.aiRuntimeConfiguration.provider}
+        Model: ${runtime.aiRuntimeConfiguration.model}
+        """.trimIndent(),
+    )
 
     try {
         runMcpSession(
@@ -53,6 +78,9 @@ internal fun runMcpSession(
 
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String) -> String?,
+    private val statusProvider: () -> String = {
+        "Connected to $MCP_SERVER_NAME MCP server. Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME"
+    },
 ) {
     fun handle(rawMessage: String): String? {
         val request = parseRequest(rawMessage) ?: return errorResponse(null, -32700, "Invalid JSON")
@@ -77,10 +105,17 @@ internal class McpRequestDispatcher(
         params: JsonObject,
     ): String {
         val toolName = params.stringValue("name") ?: params.stringValue("toolName")
-        if (toolName != ASK_BERTBOT_TOOL_NAME) {
-            return errorResponse(requestId, -32601, "Unknown tool: ${toolName ?: "<missing>"}")
+        return when (toolName) {
+            ASK_BERTBOT_TOOL_NAME -> handleAskBertBot(requestId, params)
+            BERTBOT_STATUS_TOOL_NAME -> toolResultResponse(requestId, false, statusProvider())
+            else -> errorResponse(requestId, -32601, "Unknown tool: ${toolName ?: "<missing>"}")
         }
+    }
 
+    private fun handleAskBertBot(
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String {
         val arguments = params.objectValue("arguments") ?: params
         val prompt =
             arguments.stringValue("prompt")
@@ -126,26 +161,37 @@ internal class McpRequestDispatcher(
         val result = JsonObject()
         val tools = JsonArray()
 
-        val tool = JsonObject()
-        tool.addProperty("name", ASK_BERTBOT_TOOL_NAME)
-        tool.addProperty("description", "Pass a prompt to BertBot and return the orchestration response.")
+        val askTool = JsonObject()
+        askTool.addProperty("name", ASK_BERTBOT_TOOL_NAME)
+        askTool.addProperty("description", "Pass a prompt to BertBot and return the orchestration response.")
 
-        val inputSchema = JsonObject()
-        inputSchema.addProperty("type", "object")
-        val properties = JsonObject()
+        val askInputSchema = JsonObject()
+        askInputSchema.addProperty("type", "object")
+        val askProperties = JsonObject()
 
         val promptSchema = JsonObject()
         promptSchema.addProperty("type", "string")
         promptSchema.addProperty("description", "Prompt to send to BertBot.")
-        properties.add("prompt", promptSchema)
+        askProperties.add("prompt", promptSchema)
 
-        inputSchema.add("properties", properties)
-        val required = JsonArray()
-        required.add("prompt")
-        inputSchema.add("required", required)
-        tool.add("inputSchema", inputSchema)
+        askInputSchema.add("properties", askProperties)
+        val askRequired = JsonArray()
+        askRequired.add("prompt")
+        askInputSchema.add("required", askRequired)
+        askTool.add("inputSchema", askInputSchema)
 
-        tools.add(tool)
+        val statusTool = JsonObject()
+        statusTool.addProperty("name", BERTBOT_STATUS_TOOL_NAME)
+        statusTool.addProperty("description", "Return BertBot MCP backend status for this session.")
+
+        val statusInputSchema = JsonObject()
+        statusInputSchema.addProperty("type", "object")
+        statusInputSchema.add("properties", JsonObject())
+        statusInputSchema.add("required", JsonArray())
+        statusTool.add("inputSchema", statusInputSchema)
+
+        tools.add(askTool)
+        tools.add(statusTool)
         result.add("tools", tools)
         return result
     }

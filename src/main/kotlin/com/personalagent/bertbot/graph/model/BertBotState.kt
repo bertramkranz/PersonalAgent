@@ -6,6 +6,7 @@ data class BertBotState(
     var pendingTasks: MutableList<String> = mutableListOf(),
     var delegationPlan: MutableList<String> = mutableListOf(),
     var memorySummary: MutableList<String> = mutableListOf(),
+    var profileSummary: MutableList<String> = mutableListOf(),
     var executionSummary: MutableList<String> = mutableListOf(),
     var selectedSubAgent: String? = null,
 )

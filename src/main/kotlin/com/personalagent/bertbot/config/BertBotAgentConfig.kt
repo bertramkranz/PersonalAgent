@@ -52,6 +52,11 @@ data class BertBotAgentConfig(
         *   **Mode 3: The Async Update:** When sub-agents are running long background tasks, provide low-noise updates: [Status], [Action Taken], [Next Milestone].
 
         If a task clearly fits a specialized sub-agent, use your agent tools to delegate it. If you are deeply uncertain about the underlying intent, ask a crisp, clarifying question rather than executing blindly.
+
+        ## 4. TOOLING HONESTY
+        - Never claim concrete tool availability unless that tool access is explicitly available in your current runtime.
+        - If direct execution tools are unavailable, still provide the best possible reasoning answer without inventing actions you did not perform.
+        - Do not list generic platform tools or chat-environment capabilities unless the user explicitly asks for a capability summary.
         """.trimIndent(),
     val tools: List<ToolDefinition> =
         listOf(
@@ -119,49 +124,49 @@ data class BertBotAgentConfig(
         listOf(
             SubAgentConfigDefinition(
                 id = "coder",
-                name = "Coder",
+                name = "Coder Agent",
                 description = "Handles implementation, debugging, and refactoring tasks",
                 skills = setOf("implementation", "coding", "kotlin", "debugging", "refactoring"),
             ),
             SubAgentConfigDefinition(
                 id = "planner",
-                name = "Planner",
+                name = "Planner Agent",
                 description = "Handles prioritization, scheduling, and task organization",
                 skills = setOf("planning", "prioritization", "scheduling", "organization", "workflow"),
             ),
             SubAgentConfigDefinition(
                 id = "architect",
-                name = "Architect",
+                name = "Architect Agent",
                 description = "Reviews plans and system designs for structural soundness",
                 skills = setOf("architecture", "design", "system", "structure", "dependencies"),
             ),
             SubAgentConfigDefinition(
                 id = "analyst",
-                name = "Analyst",
+                name = "Analyst Agent",
                 description = "Performs analysis, triage, and evidence-driven recommendations",
                 skills = setOf("analysis", "triage", "metrics", "evaluation", "summary"),
             ),
             SubAgentConfigDefinition(
                 id = "copywriter",
-                name = "Copywriter",
+                name = "Copywriter Agent",
                 description = "Produces polished user-facing messaging and rewritten drafts",
                 skills = setOf("copy", "writing", "rewrite", "message", "tone"),
             ),
             SubAgentConfigDefinition(
                 id = "red_teamer",
-                name = "Red Teamer",
+                name = "Red Team Agent",
                 description = "Stress-tests outputs, hunts edge cases, and surfaces hidden risks",
                 skills = setOf("adversarial", "edge", "risk", "failure", "security"),
             ),
             SubAgentConfigDefinition(
                 id = "philosopher",
-                name = "Philosopher",
+                name = "Philosopher Agent",
                 description = "Explores meaning, ethics, values, and first-principles reasoning",
                 skills = setOf("philosophy", "ethics", "meaning", "values", "first principles"),
             ),
             SubAgentConfigDefinition(
                 id = "psychologist",
-                name = "Psychologist",
+                name = "Psychologist Agent",
                 description = "Supports behavior insight, emotional framing, and communication dynamics",
                 skills = setOf("psychology", "behavior", "emotion", "mindset", "communication"),
             ),

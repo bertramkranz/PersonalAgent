@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class McpRequestDispatcherTest {
     @Test
     fun `initialize returns protocol metadata`() {
-        val dispatcher = McpRequestDispatcher { "unused" }
+        val dispatcher = McpRequestDispatcher(respondToPrompt = { "unused" })
 
         val response =
             dispatcher.handle(
@@ -25,7 +25,7 @@ class McpRequestDispatcherTest {
 
     @Test
     fun `tools list exposes ask bertbot tool`() {
-        val dispatcher = McpRequestDispatcher { "unused" }
+        val dispatcher = McpRequestDispatcher(respondToPrompt = { "unused" })
 
         val response =
             dispatcher.handle(
@@ -37,11 +37,12 @@ class McpRequestDispatcherTest {
         val json = JsonParser.parseString(response).asJsonObject
         val tools = json.getAsJsonObject("result").getAsJsonArray("tools")
         assertEquals("ask_bertbot", tools[0].asJsonObject.get("name").asString)
+        assertEquals("bertbot_status", tools[1].asJsonObject.get("name").asString)
     }
 
     @Test
     fun `tools call routes prompt to bertbot`() {
-        val dispatcher = McpRequestDispatcher { prompt -> "handled: $prompt" }
+        val dispatcher = McpRequestDispatcher(respondToPrompt = { prompt -> "handled: $prompt" })
 
         val response =
             dispatcher.handle(
@@ -57,8 +58,29 @@ class McpRequestDispatcherTest {
     }
 
     @Test
+    fun `tools call returns backend status`() {
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { "unused" },
+                statusProvider = { "Connected to bertbot MCP server" },
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"bertbot_status","arguments":{}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val content = json.getAsJsonObject("result").getAsJsonArray("content")
+        assertTrue(content[0].asJsonObject.get("text").asString.contains("Connected to bertbot MCP server"))
+        assertEquals(false, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
     fun `session loop emits responses for incoming requests`() {
-        val dispatcher = McpRequestDispatcher { prompt -> "handled: $prompt" }
+        val dispatcher = McpRequestDispatcher(respondToPrompt = { prompt -> "handled: $prompt" })
         val inputs =
             mutableListOf(
                 """

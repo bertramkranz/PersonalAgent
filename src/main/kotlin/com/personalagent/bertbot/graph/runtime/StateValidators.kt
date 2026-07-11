@@ -29,13 +29,19 @@ class RequiredFieldsStateValidator<T>(
 }
 
 class DelegationToExecutorStateValidator : StateValidator<BertBotState> {
-    private val delegate =
-        RequiredFieldsStateValidator<BertBotState>(
-            requiredFields =
-                mapOf(
-                    "delegationPlan" to { state -> state.delegationPlan },
-                ),
-        )
+    override fun validate(value: BertBotState): ValidationResult {
+        if (value.delegationPlan.isEmpty()) {
+            return ValidationResult(isValid = true)
+        }
 
-    override fun validate(value: BertBotState): ValidationResult = delegate.validate(value)
+        val selectedSubAgent = value.selectedSubAgent
+        if (selectedSubAgent.isNullOrBlank()) {
+            return ValidationResult(
+                isValid = false,
+                errors = listOf("Missing required field: selectedSubAgent"),
+            )
+        }
+
+        return ValidationResult(isValid = true)
+    }
 }
