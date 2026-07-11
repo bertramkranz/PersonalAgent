@@ -17,6 +17,7 @@ import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
 import java.io.File
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -155,5 +156,19 @@ class BertBotGraphTest {
         assertFailsWith<InvalidStateHandoffException> {
             graph.run(BertBotState(lastUserMessage = "trigger invalid handoff"))
         }
+    }
+
+    @Test
+    fun `state store preserves unreadable json before resetting state`() {
+        val tempDirectory = createTempDirectory(prefix = "bertbot-state-store").toFile()
+        tempDirectory.deleteOnExit()
+        val stateFile = File(tempDirectory, "bertbot-state.json")
+        stateFile.writeText("{not-valid-json")
+
+        val state = FileBertBotStateStore(stateFile).load()
+
+        assertEquals("", state.lastUserMessage)
+        val backups = tempDirectory.listFiles { _, name -> name.startsWith("bertbot-state.corrupt-") }
+        assertTrue(backups?.isNotEmpty() == true)
     }
 }

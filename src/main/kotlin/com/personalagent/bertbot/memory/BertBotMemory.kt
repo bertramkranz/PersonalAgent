@@ -3,6 +3,8 @@ package com.personalagent.bertbot.memory
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 
@@ -43,6 +45,11 @@ class BertBotMemory(
         if (parsedEntries != null) {
             entries.addAll(parsedEntries)
             return entries.toList()
+        }
+
+        if (looksLikeStructuredJson(content)) {
+            preserveUnreadableStorageFile(storageFile)
+            return emptyList()
         }
 
         content.lineSequence()
@@ -89,6 +96,28 @@ class BertBotMemory(
     fun count(): Int = entries.size
 
     private fun persist() {
-        storageFile.writeText(gson.toJson(entries))
+        writeTextAtomically(storageFile, gson.toJson(entries))
     }
+}
+
+private fun looksLikeStructuredJson(content: String): Boolean =
+    content.startsWith("[") || content.startsWith("{")
+
+private fun preserveUnreadableStorageFile(storageFile: File) {
+    val extension = storageFile.extension.takeIf { it.isNotBlank() } ?: "txt"
+    val backupFile = File(storageFile.parentFile ?: File("."), "${storageFile.nameWithoutExtension}.corrupt-${System.currentTimeMillis()}.$extension")
+    runCatching {
+        Files.copy(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+    println("Warning: failed to parse memory file '${storageFile.path}'. A backup was preserved at '${backupFile.path}'.")
+}
+
+private fun writeTextAtomically(
+    target: File,
+    content: String,
+) {
+    target.parentFile?.mkdirs()
+    val tempFile = File(target.parentFile ?: File("."), "${target.name}.tmp")
+    tempFile.writeText(content)
+    Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
 }

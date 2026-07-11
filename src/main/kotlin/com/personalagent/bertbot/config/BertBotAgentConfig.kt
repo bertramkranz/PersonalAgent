@@ -20,7 +20,7 @@ data class SubAgentConfigDefinition(
     val enabled: Boolean = true,
 )
 
-data class KoogAgentConfig(
+data class BertBotAgentConfig(
     val name: String = "BertBot",
     val maxSemanticContextEntries: Int = 5,
     val maxEpisodicContextEntries: Int = 10,
@@ -55,7 +55,6 @@ data class KoogAgentConfig(
         """.trimIndent(),
     val tools: List<ToolDefinition> =
         listOf(
-            // --- Core Memory Tools ---
             ToolDefinition(
                 name = "memory.read",
                 description = "Read remembered personal context, project histories, and user preferences",
@@ -64,7 +63,6 @@ data class KoogAgentConfig(
                 name = "memory.write",
                 description = "Store important personal context, learned preferences, and newly discovered constraints",
             ),
-            // --- Filesystem & Environment Tools ---
             ToolDefinition(
                 name = "workspace.search",
                 description = "Search files and content in the current project workspace",
@@ -77,7 +75,6 @@ data class KoogAgentConfig(
                 name = "terminal.run",
                 description = "Execute shell commands, build tasks, or gradle targets in the workspace",
             ),
-            // --- Dynamic Sub-Agent Orchestration Tools ---
             ToolDefinition(
                 name = "agent.delegate",
                 description = "Call a specialized sub-agent (e.g., 'coder', 'planner', 'architect', 'analyst', 'copywriter', 'red_teamer', 'philosopher', 'psychologist') with a specific context and task payload",
@@ -89,7 +86,6 @@ data class KoogAgentConfig(
         ),
     val skills: List<SkillDefinition> =
         listOf(
-            // --- Management & Personalization Skills ---
             SkillDefinition(
                 name = "personalization",
                 description = "Dynamically analyze, map, and adapt to my tone, communication style, and lifestyle context",
@@ -106,10 +102,9 @@ data class KoogAgentConfig(
                 name = "memory_management",
                 description = "Maintain structural graphs of past interactions, preferences, and environment configurations",
             ),
-            // --- Tech Stack & Technical Rigor Skills ---
             SkillDefinition(
                 name = "kotlin_ecosystem",
-                description = "Deep expertise working with Kotlin source files, Koog frameworks, and Gradle multi-module projects",
+                description = "Deep expertise working with Kotlin source files, graph orchestration, and Gradle JVM projects",
             ),
             SkillDefinition(
                 name = "software_architecture",

@@ -43,7 +43,7 @@ To add a new capability:
 - Add a new graph node in `com.personalagent.bertbot.graph.nodes`.
 - Register the node in the graph definition in `com.personalagent.bertbot.app.BertBotApplication`.
 - Add or update sub-agent definitions in `com.personalagent.bertbot.agents.SubAgentRegistry`.
-- Refine the persona, tools, or skills in `com.personalagent.bertbot.config.KoogAgentConfig`.
+- Refine the persona, tools, or skills in `com.personalagent.bertbot.config.BertBotAgentConfig`.
 
 Default sub-agent roles currently include: Coder, Planner, Architect, Analyst, Copywriter, Red Teamer, Philosopher, and Psychologist.
 
@@ -58,7 +58,7 @@ The runtime is provider-aware at the LLM adapter boundary. The repository curren
 The current configuration variables are:
 
 - `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. The shipped value is `openai`.
-- `BERTBOT_AI_MODEL` - surfaces a model preference for the active provider adapter. The shipped OpenAI adapter still uses its built-in default model.
+- `BERTBOT_AI_MODEL` - selects the chat model for the active provider adapter.
 - `BERTBOT_AI_API_KEY` - provider-specific API key for the active adapter.
 
 Example local `.env` entry:
@@ -71,7 +71,7 @@ BERTBOT_AI_API_KEY=your-api-key-here
 
 If you are running the repo-local Copilot agent or the MCP server from VS Code, make sure the command is launched from the repository root so `bertbot-state.json`, `bertbot-memory.txt`, and `.env` resolve correctly.
 
-The model field is kept in the config surface so the runtime can be pointed at different provider adapters without changing the command-line or manifest shape. The current OpenAI adapter still uses its built-in default model selection.
+The model field is kept in the config surface so the runtime can be pointed at different provider adapters without changing the command-line or manifest shape.
 
 ## Run Modes
 

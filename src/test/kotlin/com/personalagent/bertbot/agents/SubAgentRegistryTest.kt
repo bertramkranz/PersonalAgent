@@ -1,6 +1,6 @@
 package com.personalagent.bertbot.agents
 
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.SubAgentConfigDefinition
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,9 +44,9 @@ class SubAgentRegistryTest {
     }
 
     @Test
-    fun `registry derives enabled agents from koog config`() {
+    fun `registry derives enabled agents from agent config`() {
         val config =
-            KoogAgentConfig(
+            BertBotAgentConfig(
                 subAgents =
                     listOf(
                         SubAgentConfigDefinition(

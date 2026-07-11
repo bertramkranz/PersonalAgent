@@ -1,6 +1,6 @@
 package com.personalagent.bertbot.agents
 
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 
 data class SubAgentDefinition(
     val id: String,
@@ -11,7 +11,7 @@ data class SubAgentDefinition(
 )
 
 class SubAgentRegistry(
-    config: KoogAgentConfig = KoogAgentConfig(),
+    config: BertBotAgentConfig = BertBotAgentConfig(),
     private val definitions: List<SubAgentDefinition> =
         config.enabledSubAgents().map { definition ->
             SubAgentDefinition(

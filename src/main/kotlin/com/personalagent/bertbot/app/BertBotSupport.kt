@@ -3,8 +3,9 @@ package com.personalagent.bertbot.app
 import com.google.gson.JsonParser
 import com.openai.client.OpenAIClient
 import com.openai.client.okhttp.OpenAIOkHttpClient
+import com.openai.models.ChatModel
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.llm.OpenAiLlmGateway
@@ -40,7 +41,12 @@ internal fun createOpenAiLlmGateway(
             .apiKey(apiKey)
             .timeout(Duration.ofSeconds(30))
             .build()
-    return OpenAiLlmGateway(service)
+    return OpenAiLlmGateway(service, resolveOpenAiChatModel(modelName))
+}
+
+internal fun resolveOpenAiChatModel(modelName: String): ChatModel {
+    require(modelName.isNotBlank()) { "modelName must not be blank" }
+    return ChatModel.of(modelName)
 }
 
 internal fun resolveAiRuntimeConfiguration(): AiRuntimeConfiguration =
@@ -124,7 +130,7 @@ internal fun printRuntimeError(e: Exception) {
 }
 
 internal fun printRuntimeStartupInfo(
-    config: KoogAgentConfig,
+    config: BertBotAgentConfig,
     aiRuntimeConfiguration: AiRuntimeConfiguration,
 ) {
     println("✅ AI provider loaded")
@@ -132,14 +138,13 @@ internal fun printRuntimeStartupInfo(
     println("Agent: ${config.name}")
     println("Provider: ${aiRuntimeConfiguration.provider}")
     println("Model: ${aiRuntimeConfiguration.model}")
-    println("Selected model preference is currently surfaced for configuration, while the shipped OpenAI adapter uses its built-in default model.")
     println("Enabled tools: ${config.enabledTools().joinToString { it.name }}")
     println("Enabled skills: ${config.enabledSkills().joinToString { it.name }}")
     println("")
 }
 
 internal fun buildSystemPrompt(
-    config: KoogAgentConfig,
+    config: BertBotAgentConfig,
     state: BertBotState,
 ): String =
     """

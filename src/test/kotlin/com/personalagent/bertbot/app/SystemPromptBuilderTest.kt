@@ -1,6 +1,6 @@
 package com.personalagent.bertbot.app
 
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class SystemPromptBuilderTest {
     @Test
     fun `buildSystemPrompt includes configured prompt and graph state`() {
-        val config = KoogAgentConfig(systemPrompt = "You are a precise assistant.")
+        val config = BertBotAgentConfig(systemPrompt = "You are a precise assistant.")
         val state =
             BertBotState(
                 pendingTasks = mutableListOf("task-a", "task-b"),
@@ -29,7 +29,7 @@ class SystemPromptBuilderTest {
 
     @Test
     fun `buildSystemPrompt escapes untrusted values in graph state`() {
-        val config = KoogAgentConfig(systemPrompt = "System")
+        val config = BertBotAgentConfig(systemPrompt = "System")
         val state =
             BertBotState(
                 pendingTasks = mutableListOf("task with \"quote\"", "line1\nline2"),
@@ -48,7 +48,7 @@ class SystemPromptBuilderTest {
 
     @Test
     fun `buildSystemPrompt does not leak template artifacts`() {
-        val config = KoogAgentConfig(systemPrompt = "System prompt")
+        val config = BertBotAgentConfig(systemPrompt = "System prompt")
         val state = BertBotState()
 
         val prompt = buildSystemPrompt(config, state)
