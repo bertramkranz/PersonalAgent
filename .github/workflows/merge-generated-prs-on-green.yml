@@ -21,8 +21,10 @@ on:
 
 permissions:
   actions: write
+  checks: read
   contents: write
   pull-requests: write
+  statuses: read
 
 concurrency:
   group: merge-generated-prs
@@ -44,6 +46,16 @@ jobs:
             const defaultBranch = context.payload.repository.default_branch;
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
             const autoMergeLabel = 'auto-merge';
+
+            function isTrustedSameRepoPr(pr) {
+              return (
+                pr.state === 'open' &&
+                !pr.draft &&
+                pr.base.ref === defaultBranch &&
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                trustedAuthors.has(pr.user?.login || '')
+              );
+            }
 
             async function resolveCandidatePullNumbers() {
               if (context.eventName === 'pull_request_target') {
@@ -90,11 +102,7 @@ jobs:
 
             function isTrustedGeneratedPr(pr) {
               return (
-                pr.state === 'open' &&
-                !pr.draft &&
-                pr.base.ref === defaultBranch &&
-                pr.head.repo?.full_name === `${owner}/${repo}` &&
-                trustedAuthors.has(pr.user?.login || '') &&
+                isTrustedSameRepoPr(pr) &&
                 pr.title.startsWith('chore: merge ') &&
                 (pr.body || '').includes('Automated pull request created after a branch push.')
               );
@@ -105,25 +113,26 @@ jobs:
             }
 
             function isLabelEligiblePr(pr) {
-              return (
-                pr.state === 'open' &&
-                !pr.draft &&
-                pr.base.ref === defaultBranch &&
-                pr.head.repo?.full_name === `${owner}/${repo}` &&
-                hasAutoMergeLabel(pr)
+              return isTrustedSameRepoPr(pr) && hasAutoMergeLabel(pr);
+            }
+
+            async function listAllCheckRunsForRef(ref) {
+              return github.paginate(
+                github.rest.checks.listForRef,
+                {
+                  owner,
+                  repo,
+                  ref,
+                  per_page: 100,
+                },
+                (response) => response.data.check_runs
               );
             }
 
             async function rerunActionRequiredChecks(pr) {
-              const { data: checks } = await github.rest.checks.listForRef({
-                owner,
-                repo,
-                ref: pr.head.sha,
-                per_page: 100,
-              });
-
               const rerunRunIds = new Set();
-              for (const checkRun of checks.check_runs) {
+              const checks = await listAllCheckRunsForRef(pr.head.sha);
+              for (const checkRun of checks) {
                 if (checkRun.conclusion !== 'action_required') {
                   continue;
                 }
@@ -190,14 +199,8 @@ jobs:
                 return false;
               }
 
-              const { data: checks } = await github.rest.checks.listForRef({
-                owner,
-                repo,
-                ref: pr.head.sha,
-                per_page: 100,
-              });
-
-              const blockingChecks = checks.check_runs.filter(
+              const checks = await listAllCheckRunsForRef(pr.head.sha);
+              const blockingChecks = checks.filter(
                 (checkRun) =>
                   checkRun.status !== 'completed' ||
                   !acceptedCheckConclusions.has(checkRun.conclusion || '')
