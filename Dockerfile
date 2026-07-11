@@ -9,8 +9,9 @@ COPY build.gradle.kts build.gradle.kts
 COPY gradle.properties gradle.properties
 COPY src src
 
-RUN chmod +x ./gradlew
-RUN ./gradlew --no-daemon clean installDist
+RUN sed -i 's/\r$//' ./gradlew \
+ && chmod +x ./gradlew \
+ && ./gradlew --no-daemon clean installDist
 
 FROM eclipse-temurin:17-jre
 WORKDIR /opt/bertbot
@@ -18,7 +19,8 @@ WORKDIR /opt/bertbot
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib
 COPY docker/entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh \
+ && chmod +x /entrypoint.sh
 
 EXPOSE 8088
 
