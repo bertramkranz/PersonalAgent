@@ -25,6 +25,9 @@ private const val BERTBOT_STATUS_TOOL_NAME = "bertbot_status"
 private const val WORKSPACE_LIST_DIR_TOOL_NAME = "workspace_list_dir"
 private const val WORKSPACE_READ_FILE_TOOL_NAME = "workspace_read_file"
 private const val WORKSPACE_SEARCH_TOOL_NAME = "workspace_search"
+private const val POLYMARKET_GAMMA_TOOL_NAME = "polymarket_gamma_query"
+private const val POLYMARKET_CLOB_TOOL_NAME = "polymarket_clob_query"
+private const val POLYMARKET_DATA_TOOL_NAME = "polymarket_data_query"
 private const val INGESTION_SET_APPROVAL_TOOL_NAME = "ingestion_set_approval"
 private const val INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME = "ingestion_list_approved_sources"
 private const val INGESTION_INGEST_MANUAL_TOOL_NAME = "ingestion_ingest_manual"
@@ -88,6 +91,7 @@ fun main() {
                 )
             },
             workspaceRoot = workspaceRoot,
+            polymarketApiClient = PolymarketApiClient.fromEnvironment(),
             ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
             externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
             statusProvider = {
@@ -98,6 +102,9 @@ fun main() {
                         WORKSPACE_LIST_DIR_TOOL_NAME,
                         WORKSPACE_READ_FILE_TOOL_NAME,
                         WORKSPACE_SEARCH_TOOL_NAME,
+                        POLYMARKET_GAMMA_TOOL_NAME,
+                        POLYMARKET_CLOB_TOOL_NAME,
+                        POLYMARKET_DATA_TOOL_NAME,
                     )
                 if (startup.runtime?.ingestionControlPlane() != null) {
                     baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
@@ -123,7 +130,7 @@ fun main() {
         """
         BertBot MCP server started.
         Server: $MCP_SERVER_NAME v$MCP_SERVER_VERSION
-        Tools: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME
+        Tools: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME, $POLYMARKET_GAMMA_TOOL_NAME, $POLYMARKET_CLOB_TOOL_NAME, $POLYMARKET_DATA_TOOL_NAME
         Workspace root: ${workspaceRoot.absolutePath}
         Provider: ${aiRuntimeConfiguration.provider}
         Model: ${aiRuntimeConfiguration.model}
@@ -161,14 +168,16 @@ internal fun runMcpSession(
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
+    private val polymarketApiClient: PolymarketApiClient = PolymarketApiClient.fromEnvironment(),
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val statusProvider: () -> String = {
-        "Connected to $MCP_SERVER_NAME MCP server. Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME"
+        "Connected to $MCP_SERVER_NAME MCP server. Active tool surface: $ASK_BERTBOT_TOOL_NAME, $BERTBOT_STATUS_TOOL_NAME, $WORKSPACE_LIST_DIR_TOOL_NAME, $WORKSPACE_READ_FILE_TOOL_NAME, $WORKSPACE_SEARCH_TOOL_NAME, $POLYMARKET_GAMMA_TOOL_NAME, $POLYMARKET_CLOB_TOOL_NAME, $POLYMARKET_DATA_TOOL_NAME"
     },
 ) {
     private val workspaceRootFile = workspaceRoot.canonicalFile
     private val workspaceInspector = WorkspaceInspector(workspaceRootFile)
+    private val polymarketToolRouter = PolymarketToolRouter(polymarketApiClient)
 
     fun handle(rawMessage: String): String? {
         val request = parseRequest(rawMessage) ?: return errorResponse(null, -32700, "Invalid JSON")
@@ -199,6 +208,10 @@ internal class McpRequestDispatcher(
             WORKSPACE_LIST_DIR_TOOL_NAME -> handleWorkspaceListDir(requestId, params)
             WORKSPACE_READ_FILE_TOOL_NAME -> handleWorkspaceReadFile(requestId, params)
             WORKSPACE_SEARCH_TOOL_NAME -> handleWorkspaceSearch(requestId, params)
+            POLYMARKET_GAMMA_TOOL_NAME,
+            POLYMARKET_CLOB_TOOL_NAME,
+            POLYMARKET_DATA_TOOL_NAME,
+            -> handlePolymarketToolCall(requestId, params)
             INGESTION_SET_APPROVAL_TOOL_NAME -> handleIngestionSetApproval(requestId, params)
             INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME -> handleIngestionListApprovedSources(requestId)
             INGESTION_INGEST_MANUAL_TOOL_NAME -> handleIngestionManualIngest(requestId, params)
@@ -430,6 +443,15 @@ internal class McpRequestDispatcher(
 
         val body = if (matches.isEmpty()) "No matches found." else matches.joinToString(separator = "\n")
         return toolResultResponse(requestId, false, body)
+    }
+
+    private fun handlePolymarketToolCall(
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String {
+        val toolName = params.stringValue("name") ?: params.stringValue("toolName") ?: return toolResultResponse(requestId, true, "Missing tool name")
+        val outcome = polymarketToolRouter.handle(toolName, params) ?: return toolResultResponse(requestId, true, "Unsupported Polymarket tool: $toolName")
+        return toolResultResponse(requestId, outcome.first, outcome.second)
     }
 
     private fun handleAskBertBot(
@@ -748,6 +770,42 @@ private fun baseToolDefinitions(): List<JsonObject> =
             property("maxResults", "number", "Maximum number of matches to return (default 20).")
             required("query")
         },
+        buildToolDefinition(
+            POLYMARKET_GAMMA_TOOL_NAME,
+            "Query Polymarket Gamma API public endpoints (markets, events, search).",
+        ) {
+            property("operation", "string", "Operation: list_markets, list_events, get_market_by_slug, get_event_by_slug, search, list_markets_keyset, list_events_keyset")
+            property("slug", "string", "Required for get_market_by_slug and get_event_by_slug.")
+            property("q", "string", "Search query for operation=search.")
+            property("limit", "number", "Optional result limit.")
+            property("offset", "number", "Optional offset for non-keyset endpoints.")
+            property("after_cursor", "string", "Optional cursor for keyset operations.")
+            required("operation")
+        },
+        buildToolDefinition(
+            POLYMARKET_CLOB_TOOL_NAME,
+            "Query Polymarket public CLOB market-data endpoints (book, prices, spreads, history).",
+        ) {
+            property("operation", "string", "Operation: get_book, get_price, get_midpoint, get_spread, get_last_trade_price, get_prices_history")
+            property("token_id", "string", "Token ID used by get_book/get_price/get_midpoint/get_spread/get_last_trade_price.")
+            property("side", "string", "BUY or SELL for get_price.")
+            property("market", "string", "Market asset ID for get_prices_history.")
+            property("startTs", "number", "Optional unix-seconds lower bound for get_prices_history.")
+            property("endTs", "number", "Optional unix-seconds upper bound for get_prices_history.")
+            property("interval", "string", "Optional interval for get_prices_history: max, all, 1m, 1w, 1d, 6h, 1h.")
+            required("operation")
+        },
+        buildToolDefinition(
+            POLYMARKET_DATA_TOOL_NAME,
+            "Query Polymarket Data API public analytics endpoints (trades, activity, positions, value, holders, OI, leaderboards).",
+        ) {
+            property("operation", "string", "Operation: get_trades, get_activity, get_positions, get_value, get_holders, get_open_interest, get_trader_leaderboard, get_builder_leaderboard")
+            property("user", "string", "Wallet address for user-scoped operations.")
+            property("market", "string", "Condition ID filter; comma-separated values supported by upstream API.")
+            property("limit", "number", "Optional limit for paginated endpoints.")
+            property("offset", "number", "Optional offset for paginated endpoints.")
+            required("operation")
+        },
     )
 
 private fun ingestionToolDefinitions(): List<JsonObject> =
@@ -857,16 +915,6 @@ private data class JsonRpcRequest(
     val method: String?,
     val params: JsonObject,
 )
-
-private fun JsonObject.stringValue(name: String): String? =
-    get(name)
-        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
-        ?.asString
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun JsonObject.objectValue(name: String): JsonObject? =
-    get(name)?.takeIf { it.isJsonObject }?.asJsonObject
 
 private fun JsonObject.intValue(name: String): Int? {
     val element = get(name) ?: return null

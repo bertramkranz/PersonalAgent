@@ -14,7 +14,7 @@ class SubAgentRegistryTest {
         val ids = registry.enabledAgents().map { it.id }.toSet()
 
         assertEquals(
-            setOf("coder", "planner", "architect", "analyst", "copywriter", "red_teamer", "philosopher", "psychologist"),
+            setOf("coder", "planner", "architect", "analyst", "polymarket_analyst", "copywriter", "red_teamer", "philosopher", "psychologist"),
             ids,
         )
     }
@@ -41,6 +41,16 @@ class SubAgentRegistryTest {
         assertTrue(redTeamMatches.contains("Red Team Agent"))
         assertTrue(philosopherMatches.contains("Philosopher Agent"))
         assertTrue(psychologistMatches.contains("Psychologist Agent"))
+    }
+
+    @Test
+    fun `registry routes polymarket market analysis requests to polymarket analyst`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Analyze Polymarket odds, open interest, and order book liquidity")
+
+        assertNotNull(match)
+        assertEquals("polymarket_analyst", match.id)
     }
 
     @Test

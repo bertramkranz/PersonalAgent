@@ -195,6 +195,12 @@ data class BertBotAgentConfig(
                 skills = setOf("analysis", "triage", "metrics", "evaluation", "summary"),
             ),
             SubAgentConfigDefinition(
+                id = "polymarket_analyst",
+                name = "Polymarket Analyst",
+                description = "Analyzes prediction markets, liquidity, and probability signals from Polymarket public data",
+                skills = setOf("polymarket", "prediction market", "odds", "liquidity", "order book", "open interest"),
+            ),
+            SubAgentConfigDefinition(
                 id = "copywriter",
                 name = "Copywriter Agent",
                 description = "Produces polished user-facing messaging and rewritten drafts",

@@ -80,4 +80,36 @@ class DelegationNodeTest {
         assertEquals("no_sub_agent_match", updated.delegationDecision?.reason)
         assertTrue(updated.executionSummary.contains("No matching sub-agent found"))
     }
+
+    @Test
+    fun `delegation node selects polymarket analyst for market analytics intent`() {
+        val registry =
+            SubAgentRegistry(
+                definitions =
+                    listOf(
+                        SubAgentDefinition(
+                            id = "polymarket_analyst",
+                            name = "Polymarket Analyst",
+                            description = "Analyzes Polymarket prices and liquidity",
+                            skills = setOf("polymarket", "odds", "open interest", "order book"),
+                        ),
+                    ),
+            )
+        val node = DelegationNode(registry)
+        val state =
+            BertBotState(
+                lastUserMessage = "check polymarket open interest and order book depth",
+                currentIntent =
+                    BertBotIntent(
+                        summary = "Polymarket probability analysis",
+                        actionable = true,
+                        priority = BertBotPriority.ROUTINE,
+                    ),
+            )
+
+        val updated = node.execute(state, TracingContext(traceId = "test-poly"))
+
+        assertEquals("polymarket_analyst", updated.selectedSubAgent)
+        assertEquals("matched_sub_agent", updated.delegationDecision?.reason)
+    }
 }
