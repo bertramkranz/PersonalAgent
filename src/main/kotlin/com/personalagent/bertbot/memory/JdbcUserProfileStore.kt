@@ -185,7 +185,10 @@ internal class JdbcUserProfileStore(
                             insertScopedPayload(connection, scopeKey, payload)
                         } catch (_: SQLException) {
                             // Concurrent writer inserted the row first; retry as an update.
-                            updateScopedPayload(connection, scopeKey, payload)
+                            val retried = updateScopedPayload(connection, scopeKey, payload)
+                            if (retried == 0) {
+                                throw SQLException("Failed to upsert scoped user profile payload for scope_key='$scopeKey'.")
+                            }
                         }
                     }
                 } catch (_: SQLException) {

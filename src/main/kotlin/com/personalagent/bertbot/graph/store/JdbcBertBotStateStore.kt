@@ -59,7 +59,10 @@ class JdbcBertBotStateStore(
                                 insertScopedSnapshot(connection, scopeKey, payload)
                             } catch (_: SQLException) {
                                 // Concurrent writer inserted the row first; retry as an update.
-                                updateScopedSnapshot(connection, scopeKey, payload)
+                                val retried = updateScopedSnapshot(connection, scopeKey, payload)
+                                if (retried == 0) {
+                                    throw SQLException("Failed to upsert scoped snapshot for scope_key='$scopeKey'.")
+                                }
                             }
                         }
                     } catch (_: SQLException) {
