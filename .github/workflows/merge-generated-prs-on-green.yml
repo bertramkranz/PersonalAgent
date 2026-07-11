@@ -57,9 +57,16 @@ jobs:
             const autoMergeLabel = 'auto-merge';
             const ignoredStatusContexts = new Set(['merge-generated-pr', 'open-pr']);
             const ignoredCheckNames = new Set(['merge-generated-pr', 'open-pr']);
+            const baseRequiredStatusContexts = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
+            const checkPollIntervalMs = 30_000;
+            const checkWaitTimeoutMs = 20 * 60 * 1000;
 
             function isAcceptedCheckConclusion(conclusion) {
               return acceptedCheckConclusions.has(conclusion || '');
+            }
+
+            function sleep(milliseconds) {
+              return new Promise((resolve) => setTimeout(resolve, milliseconds));
             }
 
             function isSameRepoEligiblePr(pr) {
@@ -129,6 +136,26 @@ jobs:
 
             function isLabelEligiblePr(pr) {
               return isSameRepoEligiblePr(pr) && hasAutoMergeLabel(pr);
+            }
+
+            async function listChangedFiles(pr) {
+              return github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pr.number,
+                per_page: 100,
+              });
+            }
+
+            async function requiredStatusContextsForPr(pr) {
+              const changedFiles = await listChangedFiles(pr);
+              const requiredContexts = new Set(baseRequiredStatusContexts);
+
+              if (changedFiles.some((file) => (file.filename || '').startsWith('.github/workflows/'))) {
+                requiredContexts.add('lint-workflows');
+              }
+
+              return [...requiredContexts];
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -218,7 +245,18 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
+              const requiredContexts = await requiredStatusContextsForPr(pr);
               const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
+              const observedContexts = new Set(statuses.map((status) => status.context || '').filter(Boolean));
+              const missingContexts = requiredContexts.filter((contextName) => !observedContexts.has(contextName));
+
+              if (missingContexts.length > 0) {
+                core.info(
+                  `PR #${pr.number} is still waiting for statuses: ${missingContexts.join(', ')}`
+                );
+                return false;
+              }
+
               const blockingStatuses = statuses.filter((status) => status.state !== 'success');
 
               if (blockingStatuses.length > 0) {
@@ -250,6 +288,28 @@ jobs:
               return true;
             }
 
+            async function waitForGreenChecks(pr) {
+              const deadline = Date.now() + checkWaitTimeoutMs;
+
+              while (Date.now() <= deadline) {
+                if (await checksAreGreen(pr)) {
+                  return true;
+                }
+
+                if (Date.now() + checkPollIntervalMs > deadline) {
+                  break;
+                }
+
+                core.info(
+                  `Waiting ${Math.floor(checkPollIntervalMs / 1000)}s for PR #${pr.number} checks to complete.`
+                );
+                await sleep(checkPollIntervalMs);
+              }
+
+              core.info(`Timed out waiting for PR #${pr.number} checks to complete.`);
+              return false;
+            }
+
             const candidatePullNumbers = await resolveCandidatePullNumbers();
             if (candidatePullNumbers.length === 0) {
               core.info('No candidate pull requests found for this event.');
@@ -277,7 +337,7 @@ jobs:
               await rerunActionRequiredChecks(pr);
               await rerunActionRequiredWorkflowRuns(pr);
 
-              if (!(await checksAreGreen(pr))) {
+              if (!(await waitForGreenChecks(pr))) {
                 continue;
               }
 
