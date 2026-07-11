@@ -98,8 +98,8 @@ fun main() {
                 )
             },
             workspaceRoot = workspaceRoot,
-<<<<<<< HEAD
             macrofactorToolRouter = macrofactorToolRouter,
+            polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
             ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
             externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
             statusProvider =
@@ -109,40 +109,6 @@ fun main() {
                     aiRuntimeConfiguration = aiRuntimeConfiguration,
                     macrofactorToolRouter = macrofactorToolRouter,
                 ),
-=======
-            polymarketApiClient = PolymarketApiClient.fromEnvironment(),
-            ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
-            externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
-            statusProvider = {
-                val baseTools =
-                    mutableListOf(
-                        ASK_BERTBOT_TOOL_NAME,
-                        BERTBOT_STATUS_TOOL_NAME,
-                        WORKSPACE_LIST_DIR_TOOL_NAME,
-                        WORKSPACE_READ_FILE_TOOL_NAME,
-                        WORKSPACE_SEARCH_TOOL_NAME,
-                        POLYMARKET_GAMMA_TOOL_NAME,
-                        POLYMARKET_CLOB_TOOL_NAME,
-                        POLYMARKET_DATA_TOOL_NAME,
-                    )
-                if (startup.runtime?.ingestionControlPlane() != null) {
-                    baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
-                    baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
-                    baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
-                    baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
-                }
-                """
-                Connected to $MCP_SERVER_NAME MCP server.
-                Active tool surface: ${baseTools.joinToString()}
-                Workspace root: ${workspaceRoot.absolutePath}
-                Runtime ready: ${startup.runtime != null}
-                Runtime provider: ${aiRuntimeConfiguration.provider}
-                Runtime model: ${aiRuntimeConfiguration.model}
-                Runtime error: ${startup.errorMessage ?: "none"}
-                Session check timestamp: ${Instant.now()}
-                """.trimIndent()
-            },
->>>>>>> origin/main
         )
 
     // Use stderr for startup diagnostics so stdout remains clean JSON-RPC for MCP transport.
@@ -194,6 +160,9 @@ private fun createStatusProvider(
                 WORKSPACE_LIST_DIR_TOOL_NAME,
                 WORKSPACE_READ_FILE_TOOL_NAME,
                 WORKSPACE_SEARCH_TOOL_NAME,
+                POLYMARKET_GAMMA_TOOL_NAME,
+                POLYMARKET_CLOB_TOOL_NAME,
+                POLYMARKET_DATA_TOOL_NAME,
             )
         if (startup.runtime?.ingestionControlPlane() != null) {
             baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
@@ -227,14 +196,12 @@ internal fun runMcpSession(
     }
 }
 
+@Suppress("LongParameterList")
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
-<<<<<<< HEAD
     private val macrofactorToolRouter: MacrofactorToolRouter? = null,
-=======
-    private val polymarketApiClient: PolymarketApiClient = PolymarketApiClient.fromEnvironment(),
->>>>>>> origin/main
+    private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val statusProvider: () -> String = {
@@ -243,7 +210,6 @@ internal class McpRequestDispatcher(
 ) {
     private val workspaceRootFile = workspaceRoot.canonicalFile
     private val workspaceInspector = WorkspaceInspector(workspaceRootFile)
-    private val polymarketToolRouter = PolymarketToolRouter(polymarketApiClient)
 
     fun handle(rawMessage: String): String? {
         val request = parseRequest(rawMessage) ?: return errorResponse(null, -32700, "Invalid JSON")
@@ -270,6 +236,7 @@ internal class McpRequestDispatcher(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun handleToolCall(
         requestId: JsonElement,
         params: JsonObject,

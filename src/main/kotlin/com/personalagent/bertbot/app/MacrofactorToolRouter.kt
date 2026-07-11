@@ -241,16 +241,6 @@ private class StdioMacrofactorMcpTransport(
     }
 }
 
-private fun JsonObject.stringValue(name: String): String? =
-    get(name)
-        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
-        ?.asString
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-
-private fun JsonObject.objectValue(name: String): JsonObject? =
-    get(name)?.asJsonObjectOrNull()
-
 private fun JsonObject.arrayValue(name: String): JsonArray? =
     get(name)?.takeIf { it.isJsonArray }?.asJsonArray
 

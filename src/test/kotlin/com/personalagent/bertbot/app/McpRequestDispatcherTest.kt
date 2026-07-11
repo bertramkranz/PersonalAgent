@@ -82,7 +82,7 @@ class McpRequestDispatcherTest {
             val dispatcher =
                 McpRequestDispatcher(
                     respondToPrompt = { _, _ -> "unused" },
-                    polymarketApiClient = client,
+                    polymarketToolRouter = PolymarketToolRouter(client),
                 )
 
             val response =
@@ -124,7 +124,7 @@ class McpRequestDispatcherTest {
             val dispatcher =
                 McpRequestDispatcher(
                     respondToPrompt = { _, _ -> "unused" },
-                    polymarketApiClient = client,
+                    polymarketToolRouter = PolymarketToolRouter(client),
                 )
 
             val response =
