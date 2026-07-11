@@ -126,7 +126,7 @@ jobs:
                   ref,
                   per_page: 100,
                 },
-                (response) => response.data.check_runs
+                (response) => response.data.check_runs || []
               );
             }
 
