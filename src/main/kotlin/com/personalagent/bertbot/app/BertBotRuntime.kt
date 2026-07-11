@@ -24,12 +24,7 @@ import com.personalagent.bertbot.memory.UserProfileStore
 internal class BertBotRuntime(
     val config: BertBotAgentConfig,
     val aiRuntimeConfiguration: AiRuntimeConfiguration,
-    private val stateStore: com.personalagent.bertbot.graph.runtime.BertBotStateStore =
-        object : com.personalagent.bertbot.graph.runtime.BertBotStateStore {
-            override fun load(): com.personalagent.bertbot.graph.model.BertBotState = com.personalagent.bertbot.graph.model.BertBotState()
-
-            override fun save(state: com.personalagent.bertbot.graph.model.BertBotState) = Unit
-        },
+    private val stateStore: com.personalagent.bertbot.graph.runtime.BertBotStateStore,
     private val graph: BertBotGraphRunner,
     private val assistantResponseSkill: SelfCorrectingSkill<AssistantResponseEnvelope>,
     private val memoryRuntime: BertBotMemoryRuntime,

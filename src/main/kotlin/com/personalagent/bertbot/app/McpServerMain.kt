@@ -142,37 +142,39 @@ private fun createStatusProvider(
     workspaceRoot: File,
     aiRuntimeConfiguration: AiRuntimeConfiguration,
     macrofactorToolRouter: MacrofactorToolRouter?,
-): () -> String = {
-    val baseTools =
-        mutableListOf(
-            ASK_BERTBOT_TOOL_NAME,
-            BERTBOT_STATUS_TOOL_NAME,
-            WORKSPACE_LIST_DIR_TOOL_NAME,
-            WORKSPACE_READ_FILE_TOOL_NAME,
-            WORKSPACE_SEARCH_TOOL_NAME,
-        )
-    if (startup.runtime?.ingestionControlPlane() != null) {
-        baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
-        baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
-        baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
-        baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
-    }
-    macrofactorToolRouter?.toolDefinitions()?.forEach { tool ->
-        val name = tool.get("name")?.asString
-        if (!name.isNullOrBlank()) {
-            baseTools += name
+): () -> String {
+    val macrofactorToolNames =
+        macrofactorToolRouter
+            ?.toolDefinitions()
+            ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+            ?: emptyList()
+    return {
+        val baseTools =
+            mutableListOf(
+                ASK_BERTBOT_TOOL_NAME,
+                BERTBOT_STATUS_TOOL_NAME,
+                WORKSPACE_LIST_DIR_TOOL_NAME,
+                WORKSPACE_READ_FILE_TOOL_NAME,
+                WORKSPACE_SEARCH_TOOL_NAME,
+            )
+        if (startup.runtime?.ingestionControlPlane() != null) {
+            baseTools += INGESTION_SET_APPROVAL_TOOL_NAME
+            baseTools += INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME
+            baseTools += INGESTION_INGEST_MANUAL_TOOL_NAME
+            baseTools += INGESTION_CHAT_MANUAL_TOOL_NAME
         }
+        macrofactorToolNames.forEach { name -> baseTools += name }
+        """
+        Connected to $MCP_SERVER_NAME MCP server.
+        Active tool surface: ${baseTools.joinToString()}
+        Workspace root: ${workspaceRoot.absolutePath}
+        Runtime ready: ${startup.runtime != null}
+        Runtime provider: ${aiRuntimeConfiguration.provider}
+        Runtime model: ${aiRuntimeConfiguration.model}
+        Runtime error: ${startup.errorMessage ?: "none"}
+        Session check timestamp: ${Instant.now()}
+        """.trimIndent()
     }
-    """
-    Connected to $MCP_SERVER_NAME MCP server.
-    Active tool surface: ${baseTools.joinToString()}
-    Workspace root: ${workspaceRoot.absolutePath}
-    Runtime ready: ${startup.runtime != null}
-    Runtime provider: ${aiRuntimeConfiguration.provider}
-    Runtime model: ${aiRuntimeConfiguration.model}
-    Runtime error: ${startup.errorMessage ?: "none"}
-    Session check timestamp: ${Instant.now()}
-    """.trimIndent()
 }
 
 internal fun runMcpSession(

@@ -70,6 +70,7 @@ class BertBotRuntimeHelpersTest {
             BertBotRuntime(
                 config = BertBotAgentConfig(),
                 aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+                stateStore = TestNoopStateStore(),
                 graph = BertBotGraphRunner(definition = BertBotGraphDefinition(entryNodeId = "none", nodes = emptyList(), edges = emptyList()), stateStore = TestNoopStateStore()),
                 assistantResponseSkill = createAssistantResponseSkill(gateway),
                 memoryRuntime = memoryRuntime,
@@ -131,6 +132,7 @@ class BertBotRuntimeHelpersTest {
             BertBotRuntime(
                 config = BertBotAgentConfig(),
                 aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+                stateStore = TestNoopStateStore(),
                 graph = BertBotGraphRunner(definition = BertBotGraphDefinition(entryNodeId = "none", nodes = emptyList(), edges = emptyList()), stateStore = TestNoopStateStore()),
                 assistantResponseSkill = createAssistantResponseSkill(gateway),
                 memoryRuntime = memoryRuntime,

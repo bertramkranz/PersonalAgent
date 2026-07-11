@@ -66,6 +66,8 @@ class BertBotMemory(
 ) : BertBotMemoryStore {
     private val lock = Any()
     private val entries = mutableListOf<MemoryEntry>()
+    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private var loadedScopeKey: String? = null
 
     init {
         load()
@@ -73,44 +75,14 @@ class BertBotMemory(
 
     override fun load(): List<MemoryEntry> {
         synchronized(lock) {
-            entries.clear()
-            if (!storageFile.exists()) {
-                return entries.toList()
-            }
-
-            val content = storageFile.readText().trim()
-            if (content.isBlank()) {
-                return entries.toList()
-            }
-
-            // Prefer structured JSON state but gracefully fall back to legacy line-based format.
-            val parsedEntries =
-                try {
-                    gson.fromJson(content, Array<MemoryEntry>::class.java)?.toList()
-                } catch (_: JsonSyntaxException) {
-                    null
-                }
-
-            if (parsedEntries != null) {
-                entries.addAll(parsedEntries.map { it.normalized() })
-                return entries.toList()
-            }
-
-            if (looksLikeStructuredJson(content)) {
-                preserveUnreadableStorageFile(storageFile)
-                return entries.toList()
-            }
-
-            content.lineSequence()
-                .filter { it.isNotBlank() }
-                .forEach { line -> entries.add(MemoryEntry(text = line.trim())) }
-
+            forceReloadForCurrentScope()
             return entries.toList()
         }
     }
 
     override fun remember(text: String) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             if (text.isBlank()) {
                 return
             }
@@ -122,6 +94,7 @@ class BertBotMemory(
 
     override fun remember(entry: MemoryEntry) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             if (entry.text.isBlank()) {
                 return
             }
@@ -131,10 +104,15 @@ class BertBotMemory(
         }
     }
 
-    override fun entries(): List<MemoryEntry> = synchronized(lock) { entries.toList() }
+    override fun entries(): List<MemoryEntry> =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            entries.toList()
+        }
 
     override fun replaceAll(newEntries: List<MemoryEntry>) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             entries.clear()
             entries.addAll(newEntries.filter { it.text.isNotBlank() }.map { entry -> entry.normalized() })
             persist()
@@ -143,17 +121,97 @@ class BertBotMemory(
 
     override fun snapshot(): String =
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             if (entries.isEmpty()) {
-                return@synchronized "No remembered context yet."
+                return "No remembered context yet."
             }
-
             entries.joinToString(separator = System.lineSeparator()) { "- ${it.text}" }
         }
 
-    override fun count(): Int = synchronized(lock) { entries.size }
+    override fun count(): Int =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            entries.size
+        }
+
+    override fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T {
+        val previous = currentScope.get()
+        currentScope.set(normalizeScope(scopeKey))
+        return try {
+            action()
+        } finally {
+            currentScope.set(previous)
+        }
+    }
+
+    private fun ensureLoadedForCurrentScope() {
+        val scopeKey = currentScope.get()
+        if (loadedScopeKey == scopeKey) {
+            return
+        }
+        forceReloadForCurrentScope()
+    }
+
+    private fun forceReloadForCurrentScope() {
+        entries.clear()
+        loadedScopeKey = currentScope.get()
+        val file = scopedStorageFile()
+
+        if (!file.exists()) {
+            return
+        }
+
+        val content = file.readText().trim()
+        if (content.isBlank()) {
+            return
+        }
+
+        // Prefer structured JSON state but gracefully fall back to legacy line-based format.
+        val parsedEntries =
+            try {
+                gson.fromJson(content, Array<MemoryEntry>::class.java)?.toList()
+            } catch (_: JsonSyntaxException) {
+                null
+            }
+
+        if (parsedEntries != null) {
+            entries.addAll(parsedEntries.map { it.normalized() })
+            return
+        }
+
+        if (looksLikeStructuredJson(content)) {
+            preserveUnreadableStorageFile(file)
+            return
+        }
+
+        content.lineSequence()
+            .filter { it.isNotBlank() }
+            .forEach { line -> entries.add(MemoryEntry(text = line.trim())) }
+    }
 
     private fun persist() {
-        writeTextAtomically(storageFile, gson.toJson(entries))
+        writeTextAtomically(scopedStorageFile(), gson.toJson(entries))
+    }
+
+    private fun scopedStorageFile(): File {
+        val scope = currentScope.get()
+        if (scope == DEFAULT_SCOPE_KEY) {
+            return storageFile
+        }
+        val parent = storageFile.parentFile ?: File(".")
+        val stem = storageFile.nameWithoutExtension
+        val ext = storageFile.extension.takeIf { it.isNotBlank() } ?: "txt"
+        return File(parent, "$stem-$scope.$ext")
+    }
+
+    private companion object {
+        private const val DEFAULT_SCOPE_KEY = "global"
+
+        private fun normalizeScope(scopeKey: String): String =
+            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
     }
 }
 

@@ -46,6 +46,8 @@ private class FileUserProfileStore(
 ) : UserProfilePersistence {
     private val lock = Any()
     private var cached: UserProfile = UserProfile()
+    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private var loadedScopeKey: String? = null
 
     init {
         cached = load()
@@ -53,12 +55,15 @@ private class FileUserProfileStore(
 
     override fun load(): UserProfile {
         synchronized(lock) {
-            if (!storageFile.exists()) {
+            loadedScopeKey = currentScope.get()
+            val file = scopedStorageFile()
+
+            if (!file.exists()) {
                 cached = UserProfile()
                 return cached
             }
 
-            val content = storageFile.readText().trim()
+            val content = file.readText().trim()
             if (content.isBlank()) {
                 cached = UserProfile()
                 return cached
@@ -68,17 +73,35 @@ private class FileUserProfileStore(
                 cached = gson.fromJson(content, UserProfile::class.java) ?: UserProfile()
                 cached
             } catch (_: JsonSyntaxException) {
-                preserveUnreadableStorageFile(storageFile)
+                preserveUnreadableStorageFile(file)
                 cached = UserProfile()
                 cached
             }
         }
     }
 
-    override fun current(): UserProfile = synchronized(lock) { cached }
+    override fun current(): UserProfile =
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            cached
+        }
+
+    override fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T {
+        val previous = currentScope.get()
+        currentScope.set(normalizeScope(scopeKey))
+        return try {
+            action()
+        } finally {
+            currentScope.set(previous)
+        }
+    }
 
     override fun updateDisplayName(displayName: String) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             val normalized = normalizeDisplayName(displayName)
             if (normalized.isBlank() || cached.displayName == normalized) {
                 return
@@ -91,6 +114,7 @@ private class FileUserProfileStore(
 
     override fun addRecurringPreference(preference: String) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             val normalized = normalizeLabel(preference)
             if (normalized.isBlank() || cached.recurringPreferences.contains(normalized)) {
                 return
@@ -103,6 +127,7 @@ private class FileUserProfileStore(
 
     override fun addCommunicationStyleHint(hint: String) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             val normalized = normalizeLabel(hint)
             if (normalized.isBlank() || cached.communicationStyleHints.contains(normalized)) {
                 return
@@ -115,6 +140,7 @@ private class FileUserProfileStore(
 
     override fun addStableInterest(interest: String) {
         synchronized(lock) {
+            ensureLoadedForCurrentScope()
             val normalized = normalizeLabel(interest)
             if (normalized.isBlank() || cached.stableInterests.contains(normalized)) {
                 return
@@ -125,8 +151,35 @@ private class FileUserProfileStore(
         }
     }
 
+    private fun ensureLoadedForCurrentScope() {
+        val scopeKey = currentScope.get()
+        if (loadedScopeKey == scopeKey) {
+            return
+        }
+        cached = load()
+    }
+
     private fun persist() {
-        writeTextAtomically(storageFile, gson.toJson(cached))
+        writeTextAtomically(scopedStorageFile(), gson.toJson(cached))
+        loadedScopeKey = currentScope.get()
+    }
+
+    private fun scopedStorageFile(): File {
+        val scope = currentScope.get()
+        if (scope == DEFAULT_SCOPE_KEY) {
+            return storageFile
+        }
+        val parent = storageFile.parentFile ?: File(".")
+        val stem = storageFile.nameWithoutExtension
+        val ext = storageFile.extension.takeIf { it.isNotBlank() } ?: "json"
+        return File(parent, "$stem-$scope.$ext")
+    }
+
+    private companion object {
+        private const val DEFAULT_SCOPE_KEY = "global"
+
+        private fun normalizeScope(scopeKey: String): String =
+            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
     }
 }
 
