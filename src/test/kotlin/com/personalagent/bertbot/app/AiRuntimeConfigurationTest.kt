@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.app
 
+import com.openai.models.ChatModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -57,5 +58,13 @@ class AiRuntimeConfigurationTest {
         assertEquals(DEFAULT_AI_PROVIDER, configuration.provider)
         assertEquals(DEFAULT_AI_MODEL, configuration.model)
         assertNull(configuration.apiKey)
+    }
+
+    @Test
+    fun `openai model resolution preserves configured model name`() {
+        val model = resolveOpenAiChatModel("gpt-4o")
+
+        assertEquals(ChatModel.GPT_4O, model)
+        assertEquals("gpt-4o", model.asString())
     }
 }

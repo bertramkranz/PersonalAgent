@@ -2,7 +2,7 @@ package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
@@ -17,7 +17,7 @@ import com.personalagent.bertbot.memory.SemanticMemory
 import java.io.File
 
 internal class BertBotRuntime(
-    val config: KoogAgentConfig,
+    val config: BertBotAgentConfig,
     val aiRuntimeConfiguration: AiRuntimeConfiguration,
     private val graph: BertBotGraphRunner,
     private val assistantResponseSkill: SelfCorrectingSkill<AssistantResponseEnvelope>,
@@ -83,7 +83,7 @@ internal data class BertBotMemoryRuntime(
 
 internal object BertBotRuntimeFactory {
     fun create(
-        config: KoogAgentConfig = KoogAgentConfig(),
+        config: BertBotAgentConfig = BertBotAgentConfig(),
         aiRuntimeConfiguration: AiRuntimeConfiguration = resolveAiRuntimeConfiguration(),
     ): BertBotRuntime? {
         require(aiRuntimeConfiguration.provider.equals(DEFAULT_AI_PROVIDER, ignoreCase = true)) {

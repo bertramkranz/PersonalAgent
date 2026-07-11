@@ -3,6 +3,7 @@ package com.personalagent.bertbot.memory
 import com.personalagent.bertbot.llm.LlmGateway
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -100,6 +101,20 @@ class MemoryArchitectureTest {
 
         assertTrue(summary.contains("first"))
         assertTrue(summary.contains("second"))
+    }
+
+    @Test
+    fun `memory loader preserves unreadable structured json before resetting entries`() {
+        val tempDirectory = createTempDirectory(prefix = "bertbot-memory").toFile()
+        tempDirectory.deleteOnExit()
+        val storageFile = File(tempDirectory, "bertbot-memory.txt")
+        storageFile.writeText("[not-valid-json")
+
+        val memory = BertBotMemory(storageFile)
+
+        assertTrue(memory.entries().isEmpty())
+        val backups = tempDirectory.listFiles { _, name -> name.startsWith("bertbot-memory.corrupt-") }
+        assertTrue(backups?.isNotEmpty() == true)
     }
 }
 

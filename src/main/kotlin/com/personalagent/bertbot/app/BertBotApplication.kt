@@ -1,7 +1,7 @@
 package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.agents.SubAgentRegistry
-import com.personalagent.bertbot.config.KoogAgentConfig
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.nodes.DelegationNode
 import com.personalagent.bertbot.graph.nodes.ExecutorNode
 import com.personalagent.bertbot.graph.nodes.MessageCaptureNode
@@ -17,7 +17,7 @@ import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
 object BertBotApplication {
     fun createGraph(
         stateStore: BertBotStateStore,
-        config: KoogAgentConfig = KoogAgentConfig(),
+        config: BertBotAgentConfig = BertBotAgentConfig(),
     ): BertBotGraphRunner {
         val registry = SubAgentRegistry(config)
 
