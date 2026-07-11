@@ -106,13 +106,13 @@ internal class PolymarketToolRouter(
 
     private fun executeGammaGetMarketBySlug(arguments: JsonObject): PolymarketHttpResponse =
         apiClient.gammaGet(
-            path = "/markets/slug/${requiredString(arguments, "slug")}",
+            path = "/markets/slug/${java.net.URLEncoder.encode(requiredString(arguments, "slug"), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20")}",
             queryParameters = collectQueryParameters(arguments, "include_tag"),
         )
 
     private fun executeGammaGetEventBySlug(arguments: JsonObject): PolymarketHttpResponse =
         apiClient.gammaGet(
-            path = "/events/slug/${requiredString(arguments, "slug")}",
+            path = "/events/slug/${java.net.URLEncoder.encode(requiredString(arguments, "slug"), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20")}",
             queryParameters = collectQueryParameters(arguments, "include_chat", "include_template"),
         )
 
