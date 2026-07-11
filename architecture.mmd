@@ -50,6 +50,14 @@ flowchart TD
         WhatsApp[WhatsApp Adapter]
     end
 
+    subgraph PolymarketBridge
+        PolymarketToolRouter[PolymarketToolRouter]
+        PolymarketApiClient[PolymarketApiClient]
+        PolymarketGamma[(Polymarket Gamma API)]
+        PolymarketCLOB[(Polymarket CLOB API)]
+        PolymarketData[(Polymarket Data API)]
+    end
+
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
@@ -89,4 +97,10 @@ flowchart TD
     Control --> Consent
     Control --> SourceState
     Control --> Episodic
+
+    MCP --> PolymarketToolRouter
+    PolymarketToolRouter --> PolymarketApiClient
+    PolymarketApiClient --> PolymarketGamma
+    PolymarketApiClient --> PolymarketCLOB
+    PolymarketApiClient --> PolymarketData
 ```
