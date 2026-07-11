@@ -118,16 +118,12 @@ jobs:
             }
 
             async function listAllCheckRunsForRef(ref) {
-              return github.paginate(
-                github.rest.checks.listForRef,
-                {
-                  owner,
-                  repo,
-                  ref,
-                  per_page: 100,
-                },
-                (response) => response.data.check_runs
-              );
+              return github.paginate(github.rest.checks.listForRef, {
+                owner,
+                repo,
+                ref,
+                per_page: 100,
+              });
             }
 
             async function rerunActionRequiredChecks(pr) {
