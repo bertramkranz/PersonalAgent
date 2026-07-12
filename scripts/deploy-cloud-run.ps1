@@ -18,6 +18,7 @@ param(
     [string]$ServiceName = "bertbot-webhook",
     [string]$DatabaseName = "bertbot",
     [string]$DatabaseUser = "bertbot",
+    [string]$DatabasePasswordSecret,
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
     [string]$TelegramSecretTokenSecret,
@@ -82,6 +83,10 @@ if ($ServiceAccount) {
 
 $secretMappings = @()
 $secretMappings += "BERTBOT_AI_API_KEY=$AiApiKeySecret:latest"
+
+if ($DatabasePasswordSecret) {
+    $secretMappings += "BERTBOT_STATE_JDBC_PASSWORD=$DatabasePasswordSecret:latest"
+}
 
 if ($TelegramSecretTokenSecret) {
     $secretMappings += "BERTBOT_TELEGRAM_SECRET_TOKEN=$TelegramSecretTokenSecret:latest"
