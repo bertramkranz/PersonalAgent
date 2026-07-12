@@ -93,10 +93,13 @@ internal fun matchesWebhookIpRule(
     }
 
     val network = rule.substringBefore('/').trim()
+    val ipLiteralRegex = Regex("^[0-9a-fA-F:.]+$")
+    if (!ipLiteralRegex.matches(clientIp.trim()) || !ipLiteralRegex.matches(network)) {
+        return false
+    }
     val prefixLength = rule.substringAfter('/').trim().toIntOrNull() ?: return false
     val clientAddress = runCatching { InetAddress.getByName(clientIp).address }.getOrNull() ?: return false
     val networkAddress = runCatching { InetAddress.getByName(network).address }.getOrNull() ?: return false
-
     if (clientAddress.size != networkAddress.size) {
         return false
     }

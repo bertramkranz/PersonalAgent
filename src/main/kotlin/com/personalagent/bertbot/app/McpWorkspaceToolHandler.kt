@@ -58,10 +58,18 @@ internal class McpWorkspaceToolHandler(
         }
 
         val maxChars = 50_000
-        val content = file.readText()
-        val truncated = if (content.length > maxChars) content.take(maxChars) else content
+        val builder = StringBuilder()
+        file.reader().use { reader ->
+            val buffer = CharArray(4096)
+            while (builder.length < maxChars) {
+                val read = reader.read(buffer, 0, minOf(buffer.size, maxChars - builder.length))
+                if (read <= 0) break
+                builder.append(buffer, 0, read)
+            }
+        }
+        val truncated = builder.toString()
         val output =
-            if (content.length > maxChars) {
+            if (file.length() > maxChars) {
                 "$truncated\n\n[truncated: showing first $maxChars characters]"
             } else {
                 truncated
@@ -89,18 +97,15 @@ internal class McpWorkspaceToolHandler(
                 return@forEach
             }
 
-            var lineNumber = 0
-            var matched = false
             runCatching {
-                file.bufferedReader().use { reader ->
-                    reader.forEachLine { line ->
-                        lineNumber++
-                        if (!matched && line.contains(query, ignoreCase = true)) {
-                            matched = true
+                file.bufferedReader().useLines { lines ->
+                    lines.withIndex()
+                        .firstOrNull { (_, line) -> line.contains(query, ignoreCase = true) }
+                        ?.let { (index, line) ->
+                            val lineNumber = index + 1
                             val snippet = line.trim().take(200)
                             matches.add("${inspector.toWorkspaceRelativePath(file)}:$lineNumber: $snippet")
                         }
-                    }
                 }
             }
         }
