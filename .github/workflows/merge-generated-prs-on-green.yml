@@ -130,7 +130,22 @@ jobs:
             }
 
             async function requiredCheckNamesForPr(pr) {
-              return [...new Set(baseRequiredCheckNames)];
+              const names = [...baseRequiredCheckNames];
+
+              // Include lint-workflows when the PR touches workflow files
+              const changedFiles = await github.paginate(
+                github.rest.pulls.listFiles,
+                { owner, repo, pull_number: pr.number, per_page: 100 },
+                (response) => response.data
+              );
+              const touchesWorkflows = changedFiles.some((f) =>
+                f.filename?.startsWith('.github/workflows/')
+              );
+              if (touchesWorkflows) {
+                names.push('lint-workflows');
+              }
+
+              return names;
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -251,10 +266,7 @@ jobs:
                 const alreadyApproved = reviews.some(
                   (review) =>
                     review.state === 'APPROVED' &&
-                    (
-                      trustedAuthors.has(review.user?.login || '') ||
-                      review.user?.login === 'github-actions[bot]'
-                    )
+                    trustedAuthors.has(review.user?.login || '')
                 );
 
                 if (!alreadyApproved) {
