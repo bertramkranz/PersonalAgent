@@ -22,8 +22,8 @@ param(
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
     [string]$TelegramSecretTokenSecret,
-    [string]$SlackSigningSecret,
-    [string]$WhatsAppAppSecret,
+    [string]$SlackSigningSecretSecret,
+    [string]$WhatsAppAppSecretSecret,
     [string]$WhatsAppVerifyToken,
     [switch]$AllowUnauthenticated
 )
@@ -92,12 +92,12 @@ if ($TelegramSecretTokenSecret) {
     $secretMappings += "BERTBOT_TELEGRAM_SECRET_TOKEN=$TelegramSecretTokenSecret:latest"
 }
 
-if ($SlackSigningSecret) {
-    $secretMappings += "BERTBOT_SLACK_SIGNING_SECRET=$SlackSigningSecret:latest"
+if ($SlackSigningSecretSecret) {
+    $secretMappings += "BERTBOT_SLACK_SIGNING_SECRET=$SlackSigningSecretSecret:latest"
 }
 
-if ($WhatsAppAppSecret) {
-    $secretMappings += "BERTBOT_WHATSAPP_APP_SECRET=$WhatsAppAppSecret:latest"
+if ($WhatsAppAppSecretSecret) {
+    $secretMappings += "BERTBOT_WHATSAPP_APP_SECRET=$WhatsAppAppSecretSecret:latest"
 }
 
 if ($WhatsAppVerifyToken) {
