@@ -57,6 +57,10 @@ jobs:
               return acceptedCheckConclusions.has(conclusion || '');
             }
 
+            function normalizeCheckName(name) {
+              return String(name || '').trim().toLowerCase();
+            }
+
             function isSameRepoEligiblePr(pr) {
               return (
                 pr.state === 'open' &&
@@ -167,9 +171,25 @@ jobs:
             async function checksAreGreen(pr) {
               const required = await requiredCheckNamesForPr(pr);
               const allRuns = await listAllCheckRunsForRef(pr.head.sha);
+              const availableCheckNames = [...new Set(allRuns.map((run) => run?.name).filter(Boolean))];
+              core.info(
+                `PR #${pr.number}: available checks on ${pr.head.sha}: ${availableCheckNames.join(', ')}`
+              );
+
+              const checksByNormalizedName = new Map();
+              for (const run of allRuns) {
+                const normalizedName = normalizeCheckName(run?.name);
+                if (!normalizedName) {
+                  continue;
+                }
+                const existing = checksByNormalizedName.get(normalizedName) || [];
+                existing.push(run);
+                checksByNormalizedName.set(normalizedName, existing);
+              }
 
               for (const name of required) {
-                const matching = allRuns.filter((r) => r?.name === name);
+                const normalizedRequiredName = normalizeCheckName(name);
+                const matching = checksByNormalizedName.get(normalizedRequiredName) || [];
 
                 if (matching.length === 0) {
                   core.info(`PR #${pr.number}: waiting for check '${name}' to appear.`);
