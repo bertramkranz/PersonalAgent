@@ -130,8 +130,23 @@ jobs:
               return branchProtectionRequiredCheckNames;
             }
 
-            async function requiredCheckNamesForPr() {
-              return getBranchProtectionRequiredCheckNames();
+            async function requiredCheckNamesForPr(pr) {
+              const names = [...(await getBranchProtectionRequiredCheckNames())];
+
+              // Include lint-workflows when the PR touches workflow files
+              const changedFiles = await github.paginate(
+                github.rest.pulls.listFiles,
+                { owner, repo, pull_number: pr.number, per_page: 100 },
+                (response) => response.data
+              );
+              const touchesWorkflows = changedFiles.some((f) =>
+                f.filename?.startsWith('.github/workflows/')
+              );
+              if (touchesWorkflows) {
+                names.push('lint-workflows');
+              }
+
+              return names;
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -150,7 +165,7 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
-              const required = await requiredCheckNamesForPr();
+              const required = await requiredCheckNamesForPr(pr);
               const allRuns = await listAllCheckRunsForRef(pr.head.sha);
 
               for (const name of required) {
