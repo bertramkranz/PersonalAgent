@@ -153,7 +153,7 @@ internal class ContinuousImprovementResearchService(
     private val store: ImprovementRecommendationStore,
     private val llmGateway: LlmGateway? = null,
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
-) {
+) : AutoCloseable {
     private val lock = Any()
     private val workspaceInspector = ResearchWorkspaceInspector(workspaceRoot)
     private var activeRun: Boolean = false
@@ -161,6 +161,10 @@ internal class ContinuousImprovementResearchService(
     private var lastFailureAtMillis: Long = 0
     private var consecutiveFailures: Int = 0
     private var lastReport: ResearchCycleReport? = null
+    private val eventExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "bertbot-research-event").apply { isDaemon = true }
+        }
 
     fun listRecommendations(
         limit: Int,
@@ -181,9 +185,18 @@ internal class ContinuousImprovementResearchService(
 
     fun maybeRunEvent(reason: String): ResearchCycleReport = runCycle(ResearchTrigger.EVENT, reason, bypassMinInterval = false)
 
+    fun submitEventAsync(reason: String) {
+        eventExecutor.submit { runCatching { maybeRunEvent(reason) } }
+    }
+
     fun maybeRunPeriodic(reason: String): ResearchCycleReport = runCycle(ResearchTrigger.PERIODIC, reason, bypassMinInterval = false)
 
     fun runNow(reason: String): ResearchCycleReport = runCycle(ResearchTrigger.MANUAL, reason, bypassMinInterval = true)
+
+    override fun close() {
+        eventExecutor.shutdownNow()
+        runCatching { eventExecutor.awaitTermination(1, TimeUnit.SECONDS) }
+    }
 
     private fun runCycle(
         trigger: ResearchTrigger,

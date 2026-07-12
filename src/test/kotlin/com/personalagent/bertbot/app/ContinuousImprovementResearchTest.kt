@@ -141,4 +141,23 @@ class ContinuousImprovementResearchTest {
         val recommendations = service.listRecommendations(limit = 20)
         assertTrue(recommendations.any { recommendation -> recommendation.key == "ai.llm.plan" })
     }
+
+    @Test
+    fun `submitEventAsync dispatches research cycle without blocking`() {
+        val workspace = createTempDirectory(prefix = "research-async").toFile()
+        workspace.deleteOnExit()
+
+        val service =
+            ContinuousImprovementResearchService(
+                config = BertBotAgentConfig(),
+                workspaceRoot = workspace,
+                store = FileImprovementRecommendationStore(File(workspace, "recommendations.json")),
+            )
+
+        service.use {
+            it.submitEventAsync("async_test")
+            Thread.sleep(2_000)
+            assertTrue(it.listRecommendations(limit = 1).isNotEmpty())
+        }
+    }
 }

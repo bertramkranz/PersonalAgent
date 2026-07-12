@@ -90,7 +90,7 @@ internal class BertBotRuntime(
             memoryRuntime.episodicMemory.append("ASSISTANT: $response")
             memoryRuntime.memoryWorker.scheduleIfNeeded()
             runCatching {
-                researchRuntime?.service?.maybeRunEvent(reason = "respond_to")
+                researchRuntime?.service?.submitEventAsync(reason = "respond_to")
             }
             response
         }
@@ -171,6 +171,7 @@ internal class BertBotRuntime(
         memoryRuntime.memoryWorker.close()
         ingestionRuntime?.scheduler?.close()
         researchRuntime?.scheduler?.close()
+        researchRuntime?.service?.close()
     }
 
     private fun <T> withPersistenceScope(
