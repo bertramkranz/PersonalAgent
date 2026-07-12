@@ -31,6 +31,7 @@ jobs:
         uses: github/codeql-action/init@641a925cfafe92d0fdf8b239ba4053e3f8d99d6d # v3
         with:
           languages: java-kotlin
+          dependency-caching: true
 
       - name: Set up JDK 17
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
@@ -45,7 +46,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build project for analysis
-        run: ./gradlew --no-daemon classes
+        run: ./gradlew --no-daemon --build-cache classes
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@641a925cfafe92d0fdf8b239ba4053e3f8d99d6d # v3

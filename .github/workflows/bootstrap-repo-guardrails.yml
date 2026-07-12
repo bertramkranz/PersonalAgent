@@ -45,8 +45,9 @@ jobs:
             }
 
             // Configure branch protection.
-            // Keep these check names in sync with baseRequiredCheckNames in
-            // .github/workflows/merge-generated-prs-on-green.yml.
+            // These contexts are consumed directly by
+            // .github/workflows/merge-generated-prs-on-green.yml when deciding
+            // which checks must be green before merge.
             await github.rest.repos.updateBranchProtection({
               owner,
               repo,

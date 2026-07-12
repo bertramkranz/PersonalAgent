@@ -468,12 +468,29 @@ This repository includes GitHub Actions workflows:
 
 - Merge generated PRs workflow: `.github/workflows/merge-generated-prs-on-green.yml`
 	- Triggers every 5 minutes on a schedule and via manual dispatch.
-	- Applies guardrails for trusted generated PRs and `auto-merge`-labeled PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
+	- Applies guardrails for trusted generated PRs and `auto-merge`-labeled PRs, re-runs action-required checks, auto-approves when possible, and merges once required checks pass.
+	- Resolves required checks from branch protection for the default branch, with a safe fallback list when branch protection cannot be read.
+	- Supports a manual `verify_token_identity` dispatch input that logs the authenticated automation actor for diagnostics.
 	- Uses `AUTOMATION_PAT` when configured, with fallback to `github.token`.
 
 - Secret scan workflow: `.github/workflows/secret-scan.yml`
 	- Triggers on pushes, pull requests into `main`, and manual dispatch.
 	- Scans commits for leaked secrets and uploads SARIF findings to GitHub code scanning.
+
+### Automation PAT Verification Runbook
+
+- `github-actions[bot]` cannot own a Personal Access Token (PAT). Use a dedicated machine user PAT (or GitHub App token) for `AUTOMATION_PAT`.
+- Confirm secret presence:
+	- `gh secret list --repo bertramkranz/PersonalAgent`
+- Confirm branch protection required checks and review policy:
+	- `gh api repos/bertramkranz/PersonalAgent/branches/main/protection`
+- Confirm token identity from workflow logs:
+	- Manually run `Merge Generated PRs On Green` with `verify_token_identity=true`.
+	- Check logs for `Automation token authenticates as '<login>'`.
+- Validate approval and merge capability on a disposable PR:
+	- Open a non-draft test PR into `main` from the same repository.
+	- Ensure required checks are green.
+	- Trigger the merge workflow manually and confirm the PR gets approved and merged by the automation identity.
 
 ## GitHub Copilot Automation
 
