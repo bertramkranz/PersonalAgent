@@ -26,13 +26,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Generate personal-merge-bot token
-        id: get_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: 4277645
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
       - name: Evaluate auto-merge conditions
         id: evaluate
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
@@ -71,10 +64,9 @@ jobs:
             core.info(`PR #${pr.number}: enabling approval and GitHub native auto-merge.`);
             core.setOutput('should_merge', 'true');
 
-      - name: Approve and merge PR
+      - name: Enable GitHub auto-merge
         if: ${{ steps.evaluate.outputs.should_merge == 'true' }}
         run: |
-          gh pr review ${{ github.event.number }} --approve
           gh pr merge ${{ github.event.number }} --auto --squash
         env:
-          GH_TOKEN: ${{ steps.get_token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}

@@ -18,7 +18,7 @@ flowchart TD
     end
 
     %% ── Merge ─────────────────────────────────────────────────────────────────
-    MERGE["merge-generated-prs-on-green.yml\nApproves + enables squash auto-merge\n\nTrigger:\n  • pull_request_target\n    (opened, reopened, synchronize,\n     ready_for_review, labeled, unlabeled)\n\nRequires to arm auto-merge:\n  • PR open and not draft\n  • 'auto-merge' label present\n\nGitHub completes merge later when\nrequired branch-protection checks pass"]
+    MERGE["merge-generated-prs-on-green.yml\nEnables squash auto-merge\n\nTrigger:\n  • pull_request_target\n    (opened, reopened, synchronize,\n     ready_for_review, labeled, unlabeled)\n\nRequires to arm auto-merge:\n  • PR open and not draft\n  • 'auto-merge' label present\n\nGitHub completes merge later when\nrequired branch-protection checks pass"]
 
     %% ── CD ────────────────────────────────────────────────────────────────────
     MAIN([main branch])
