@@ -585,6 +585,10 @@ private fun preserveUnreadableFile(storageFile: File) {
     val extension = storageFile.extension.takeIf { it.isNotBlank() } ?: "json"
     val backupFile = File(storageFile.parentFile ?: File("."), "${storageFile.nameWithoutExtension}.corrupt-${System.currentTimeMillis()}.$extension")
     runCatching {
-        Files.copy(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        try {
+            Files.move(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(storageFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 }
