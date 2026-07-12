@@ -14,9 +14,11 @@ internal fun resolveWebhookServerConfig(
     dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): WebhookServerConfig {
     fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
+
+    fun portOrNull(key: String) = env(key)?.toIntOrNull()?.coerceIn(1, 65535)
     return WebhookServerConfig(
         host = env("BERTBOT_WEBHOOK_HOST").takeUnless { it.isNullOrBlank() } ?: "0.0.0.0",
-        port = env("BERTBOT_WEBHOOK_PORT")?.toIntOrNull()?.coerceIn(1, 65535) ?: 8088,
+        port = portOrNull("BERTBOT_WEBHOOK_PORT") ?: portOrNull("PORT") ?: 8088,
         telegramPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_TELEGRAM_PATH"), "/webhook/telegram"),
         slackPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_SLACK_PATH"), "/webhook/slack"),
         whatsAppPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_WHATSAPP_PATH"), "/webhook/whatsapp"),

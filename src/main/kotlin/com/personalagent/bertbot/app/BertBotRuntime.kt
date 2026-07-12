@@ -15,24 +15,19 @@ import com.personalagent.bertbot.graph.runtime.BertBotRollbackService
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
 import com.personalagent.bertbot.graph.runtime.StateEvent
 import com.personalagent.bertbot.graph.runtime.StateEventStore
-import com.personalagent.bertbot.graph.runtime.StateEventType
 import com.personalagent.bertbot.graph.runtime.StateReplayService
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
-import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.ingestion.ExternalChatOutcome
 import com.personalagent.bertbot.ingestion.IngestionControlPlane
-import com.personalagent.bertbot.ingestion.IngestionDecision
 import com.personalagent.bertbot.ingestion.IngestionOutcome
 import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
-import com.personalagent.bertbot.ingestion.NormalizedOutboundMessage
 import com.personalagent.bertbot.ingestion.connectors.BertBotExternalConnectors
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatPayloadDispatcher
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
 import com.personalagent.bertbot.memory.UserProfileStore
-import java.util.UUID
 
 @Suppress("LongParameterList")
 internal class BertBotRuntime(
@@ -54,6 +49,21 @@ internal class BertBotRuntime(
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
     private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
+    private val externalChatHandler =
+        BertBotExternalChatHandler(
+            controlPlane = ingestionRuntime?.controlPlane,
+            stateStore = stateStore,
+            stateEventStore = stateEventStore,
+            withPersistenceScope = { scopeKey, action -> withPersistenceScope(scopeKey, action) },
+            respondInScope = { scopeKey, userMessage, traceCorrelationId ->
+                respondTo(
+                    userMessage = userMessage,
+                    emitFallbackMessage = false,
+                    traceCorrelationId = traceCorrelationId,
+                    persistenceScopeKey = scopeKey,
+                )
+            },
+        )
     private var connectorRuntime: BertBotConnectorRuntime = BertBotConnectorRuntime()
 
     @Suppress("LongMethod")
@@ -168,50 +178,7 @@ internal class BertBotRuntime(
     fun chatFromExternalMessage(
         message: NormalizedIngestionMessage,
         dryRun: Boolean = false,
-    ): ExternalChatOutcome {
-        val control = ingestionRuntime?.controlPlane
-        if (control == null) {
-            val skipped = IngestionOutcome(message = message, decision = IngestionDecision.SKIPPED_UNAPPROVED, dryRun = dryRun)
-            return ExternalChatOutcome(inbound = message, ingestion = skipped, outbound = null, dryRun = dryRun)
-        }
-
-        val scopeKey = buildExternalScopeKey(message)
-        return withPersistenceScope(scopeKey) {
-            val ingestionOutcome = control.ingestManual(messages = listOf(message), dryRun = dryRun).first()
-            if (ingestionOutcome.decision != IngestionDecision.APPROVED || message.text.isNullOrBlank()) {
-                return@withPersistenceScope ExternalChatOutcome(inbound = message, ingestion = ingestionOutcome, outbound = null, dryRun = dryRun)
-            }
-
-            val response =
-                respondTo(
-                    userMessage = "[external:${message.source.platform.name.lowercase()}:${message.source.sourceId}] ${message.text}",
-                    emitFallbackMessage = false,
-                    traceCorrelationId = "ext-${message.messageId}",
-                    persistenceScopeKey = scopeKey,
-                ) ?: return@withPersistenceScope ExternalChatOutcome(inbound = message, ingestion = ingestionOutcome, outbound = null, dryRun = dryRun)
-
-            ExternalChatOutcome(
-                inbound = message,
-                ingestion = ingestionOutcome,
-                outbound =
-                    NormalizedOutboundMessage(
-                        source = message.source,
-                        text = response,
-                        replyToMessageId = message.messageId,
-                        threadId = message.threadId,
-                    ),
-                dryRun = dryRun,
-            )
-                .also {
-                    emitExternalChatEvent(
-                        message = message,
-                        response = response,
-                        replyToMessageId = message.messageId,
-                        threadId = message.threadId,
-                    )
-                }
-        }
-    }
+    ): ExternalChatOutcome = externalChatHandler.chatFromExternalMessage(message, dryRun)
 
     fun ingestionControlPlane(): IngestionControlPlane? = ingestionRuntime?.controlPlane
 
@@ -310,51 +277,9 @@ internal class BertBotRuntime(
         }
     }
 
-    private fun buildExternalScopeKey(message: NormalizedIngestionMessage): String {
-        val workspace = message.source.workspaceId ?: "none"
-        val thread = message.threadId ?: "root"
-        return listOf(
-            "external",
-            message.source.platform.name.lowercase(),
-            message.source.sourceKind.name.lowercase(),
-            workspace,
-            message.source.sourceId,
-            thread,
-        ).joinToString("|")
-    }
-
     private fun normalizeScopeKey(scopeKey: String): String {
         val normalized = scopeKey.trim().ifBlank { DEFAULT_PERSISTENCE_SCOPE_KEY }
         return normalized.replace("|", "_")
-    }
-
-    private fun emitExternalChatEvent(
-        message: NormalizedIngestionMessage,
-        response: String,
-        replyToMessageId: String?,
-        threadId: String?,
-    ) {
-        val eventStore = stateEventStore ?: return
-        eventStore.append(
-            StateEvent(
-                eventId = UUID.randomUUID().toString(),
-                scopeKey = buildExternalScopeKey(message),
-                traceId = message.messageId,
-                nodeId = "external_chat",
-                eventType = StateEventType.NODE_EXECUTED,
-                state = stateStore.load().copyForPersistence(),
-                metadata =
-                    mapOf(
-                        "surface" to "external_chat",
-                        "platform" to message.source.platform.name.lowercase(),
-                        "messageId" to message.messageId,
-                        "replyToMessageId" to (replyToMessageId ?: ""),
-                        "threadId" to (threadId ?: ""),
-                        "responseLength" to response.length.toString(),
-                    ),
-                createdAtEpochMillis = System.currentTimeMillis(),
-            ),
-        )
     }
 
     private companion object {

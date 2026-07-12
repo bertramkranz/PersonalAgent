@@ -45,6 +45,20 @@ class WebhookMainTest {
     }
 
     @Test
+    fun `resolve webhook server config falls back to cloud run port`() {
+        val config =
+            resolveWebhookServerConfig(
+                environment =
+                    mapOf(
+                        "PORT" to "9090",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(9090, config.port)
+    }
+
+    @Test
     fun `resolve webhook agent config enables all connectors by default`() {
         val config = resolveWebhookAgentConfig(environment = emptyMap(), dotEnvValues = emptyMap())
 

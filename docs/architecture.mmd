@@ -11,6 +11,7 @@ flowchart TD
     subgraph RuntimeComposition
         RuntimeFactory[BertBotRuntimeFactory]
         RuntimeCore[BertBotRuntime]
+        ExternalChatHandler[BertBotExternalChatHandler]
         GraphFactory[BertBotGraphFactory]
         ConnectorFactory[BertBotConnectorRuntimeFactory]
         ResearchFactory[BertBotRuntimeDependenciesFactory]
@@ -102,7 +103,8 @@ flowchart TD
     RuntimeFactory --> ConnectorFactory
     RuntimeFactory --> ResearchFactory
     ConnectorFactory --> PayloadDispatcher
-    PayloadDispatcher --> RuntimeCore
+    PayloadDispatcher --> ExternalChatHandler
+    ExternalChatHandler --> RuntimeCore
 
     RuntimeFactory --> RuntimeCore
     RuntimeFactory --> GraphFactory

@@ -48,6 +48,7 @@ dependencies {
 
     // JDBC driver for optional PostgreSQL-backed state persistence.
     runtimeOnly("org.postgresql:postgresql:42.7.4")
+    runtimeOnly("com.google.cloud.sql:postgres-socket-factory:1.21.0")
 
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

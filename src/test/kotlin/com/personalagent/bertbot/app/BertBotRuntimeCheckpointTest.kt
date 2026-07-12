@@ -3,13 +3,15 @@ package com.personalagent.bertbot.app
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.nodes.MessageCaptureNode
 import com.personalagent.bertbot.graph.nodes.NodeIds
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
 import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
+import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.graph.runtime.StateEvent
+import com.personalagent.bertbot.graph.runtime.StateEventStore
 import com.personalagent.bertbot.graph.runtime.StateOnlyRollbackService
 import com.personalagent.bertbot.graph.runtime.StateReplayService
-import com.personalagent.bertbot.graph.store.FileBertBotCheckpointStore
-import com.personalagent.bertbot.graph.store.FileBertBotStateStore
-import com.personalagent.bertbot.graph.store.FileStateEventStore
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.memory.BertBotMemory
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
@@ -27,28 +29,19 @@ class BertBotRuntimeCheckpointTest {
     @Test
     @Suppress("LongMethod")
     fun `runtime lists and rolls back checkpoints per normalized external scope`() {
-        val stateFile = File.createTempFile("bertbot-state", ".json")
-        val checkpointFile = File.createTempFile("bertbot-checkpoints", ".json")
         val episodicFile = File.createTempFile("bertbot-episodic", ".json")
         val semanticFile = File.createTempFile("bertbot-semantic", ".json")
         val profileFile = File.createTempFile("bertbot-profile", ".json")
-        stateFile.delete()
-        checkpointFile.delete()
         episodicFile.delete()
         semanticFile.delete()
         profileFile.delete()
-        stateFile.deleteOnExit()
-        checkpointFile.deleteOnExit()
         episodicFile.deleteOnExit()
         semanticFile.deleteOnExit()
         profileFile.deleteOnExit()
 
-        val stateStore = FileBertBotStateStore(stateFile)
-        val checkpointStore = FileBertBotCheckpointStore(checkpointFile)
-        val stateEventFile = File.createTempFile("bertbot-state-events", ".json")
-        stateEventFile.delete()
-        stateEventFile.deleteOnExit()
-        val stateEventStore = FileStateEventStore(stateEventFile)
+        val stateStore = ScopedInMemoryBertBotStateStore()
+        val checkpointStore = InMemoryCheckpointStore()
+        val stateEventStore = InMemoryStateEventStore()
         val graph =
             BertBotGraphRunner(
                 definition =
@@ -135,4 +128,71 @@ private class StaticGateway : LlmGateway {
         systemPrompt: String,
         userPrompt: String,
     ): String = "{\"response\":\"ok\"}"
+}
+
+private class InMemoryCheckpointStore : BertBotCheckpointStore {
+    private val checkpoints = mutableListOf<BertBotCheckpoint>()
+
+    override fun save(checkpoint: BertBotCheckpoint) {
+        checkpoints.removeIf { it.scopeKey == checkpoint.scopeKey && it.checkpointId == checkpoint.checkpointId }
+        checkpoints.add(checkpoint)
+    }
+
+    override fun loadLatest(scopeKey: String): BertBotCheckpoint? =
+        checkpoints
+            .filter { it.scopeKey == scopeKey }
+            .maxByOrNull { it.createdAtEpochMillis }
+
+    override fun loadById(
+        scopeKey: String,
+        checkpointId: String,
+    ): BertBotCheckpoint? =
+        checkpoints.firstOrNull { it.scopeKey == scopeKey && it.checkpointId == checkpointId }
+
+    override fun list(scopeKey: String): List<BertBotCheckpoint> =
+        checkpoints
+            .filter { it.scopeKey == scopeKey }
+            .sortedBy { it.createdAtEpochMillis }
+}
+
+private class InMemoryStateEventStore : StateEventStore {
+    private val events = mutableListOf<StateEvent>()
+
+    override fun append(event: StateEvent) {
+        events.add(event)
+    }
+
+    override fun list(scopeKey: String): List<StateEvent> =
+        events
+            .filter { it.scopeKey == scopeKey }
+            .sortedBy { it.createdAtEpochMillis }
+}
+
+private class ScopedInMemoryBertBotStateStore : BertBotStateStore {
+    private val statesByScope = mutableMapOf<String, com.personalagent.bertbot.graph.model.BertBotState>()
+    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE }
+
+    override fun load(): com.personalagent.bertbot.graph.model.BertBotState =
+        statesByScope[currentScope.get()]?.copy() ?: com.personalagent.bertbot.graph.model.BertBotState()
+
+    override fun save(state: com.personalagent.bertbot.graph.model.BertBotState) {
+        statesByScope[currentScope.get()] = state.copy()
+    }
+
+    override fun <T> withScope(
+        scopeKey: String,
+        action: () -> T,
+    ): T {
+        val previous = currentScope.get()
+        currentScope.set(scopeKey)
+        return try {
+            action()
+        } finally {
+            currentScope.set(previous)
+        }
+    }
+
+    private companion object {
+        private const val DEFAULT_SCOPE = "global"
+    }
 }
