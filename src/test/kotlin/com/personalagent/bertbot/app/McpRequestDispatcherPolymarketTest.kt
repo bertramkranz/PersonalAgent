@@ -13,7 +13,7 @@ class McpRequestDispatcherPolymarketTest {
     fun `polymarket gamma query routes to configured gamma endpoint`() {
         val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         server.createContext("/markets") { exchange ->
-            val body = """[{\"slug\":\"btc-above-100k\",\"active\":true}]"""
+            val body = """[{"slug":"btc-above-100k","active":true}]"""
             val bytes = body.toByteArray(StandardCharsets.UTF_8)
             exchange.responseHeaders.add("Content-Type", "application/json")
             exchange.sendResponseHeaders(200, bytes.size.toLong())
