@@ -14,10 +14,9 @@ internal class ResearchWorkspaceInspector(
         val normalizedToken = token.lowercase()
         return walkWorkspaceFiles().any { file ->
             val containsTokenInContent =
-                runCatching {
-                    file.readText().lowercase().contains(normalizedToken)
-                }.getOrDefault(false)
-            file.name.lowercase().contains(normalizedToken) || containsTokenInContent
+                runCatching { file.useLines { lines -> lines.any { line -> line.contains(normalizedToken, ignoreCase = true) } } }
+                    .getOrDefault(false)
+            file.name.contains(normalizedToken, ignoreCase = true) || containsTokenInContent
         }
     }
 
