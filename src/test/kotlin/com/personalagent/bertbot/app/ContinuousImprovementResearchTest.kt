@@ -156,9 +156,10 @@ class ContinuousImprovementResearchTest {
 
         service.use {
             it.submitEventAsync("async_test")
-            val completed = awaitAtMost(timeoutMillis = 1_000, pollMillis = 25) {
-                it.listRecommendations(limit = 1).isNotEmpty()
-            }
+            val completed =
+                awaitAtMost(timeoutMillis = 1_000, pollMillis = 25) {
+                    it.listRecommendations(limit = 1).isNotEmpty()
+                }
             assertTrue(completed)
         }
     }
