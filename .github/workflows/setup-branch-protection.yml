@@ -1,0 +1,73 @@
+name: Setup Branch Protection
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to protect
+        default: main
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Apply branch protection rules
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_PAT }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branch = '${{ inputs.branch }}';
+
+            // Ensure the auto-merge label exists
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: 'auto-merge' });
+              core.info('Label "auto-merge" already exists.');
+            } catch (err) {
+              if (err.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: 'auto-merge',
+                  color: '0075ca',
+                  description: 'Eligible for automated merge when CI passes',
+                });
+                core.info('Created label "auto-merge".');
+              } else {
+                throw err;
+              }
+            }
+
+            // Configure branch protection
+            await github.rest.repos.updateBranchProtection({
+              owner,
+              repo,
+              branch,
+              required_status_checks: {
+                strict: true,
+                contexts: [
+                  'quality-and-test',
+                  'analyze',
+                  'dependency-review',
+                  'gitleaks',
+                ],
+              },
+              enforce_admins: false,
+              required_pull_request_reviews: {
+                required_approving_review_count: 1,
+                dismiss_stale_reviews: true,
+                require_code_owner_reviews: false,
+              },
+              restrictions: null,
+              allow_force_pushes: false,
+              allow_deletions: false,
+              required_conversation_resolution: true,
+            });
+
+            core.info(`Branch protection applied to '${branch}'.`);
