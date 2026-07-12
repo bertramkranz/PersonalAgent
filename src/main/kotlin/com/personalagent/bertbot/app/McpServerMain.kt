@@ -2,6 +2,8 @@ package com.personalagent.bertbot.app
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.personalagent.bertbot.graph.model.BertBotState
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
 import com.personalagent.bertbot.ingestion.ExternalChatOutcome
 import com.personalagent.bertbot.ingestion.IngestionControlPlane
 import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
@@ -77,6 +79,11 @@ internal class McpRequestDispatcher(
     private val continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
+    private val listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
+    private val latestCheckpoint: ((scopeKey: String?) -> BertBotCheckpoint?)? = null,
+    private val checkpointById: ((checkpointId: String, scopeKey: String?) -> BertBotCheckpoint?)? = null,
+    private val rollbackToCheckpoint: ((checkpointId: String, scopeKey: String?) -> BertBotState)? = null,
+    private val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration = CheckpointRollbackPolicyConfiguration(),
     private val statusProvider: () -> String = {
         "Connected to ${McpConstants.SERVER_NAME} MCP server. Active tool surface: ${McpConstants.defaultStatusToolSurface.joinToString()}"
     },
@@ -84,6 +91,18 @@ internal class McpRequestDispatcher(
     private val workspaceRootFile = workspaceRoot.canonicalFile
     private val workspaceToolHandler = McpWorkspaceToolHandler(workspaceRootFile)
     private val ingestionToolHandler = McpIngestionToolHandler(ingestionControlPlane, externalChatResponder)
+    private val checkpointToolHandler =
+        if (hasCheckpointToolFunctions()) {
+            McpCheckpointToolHandler(
+                listCheckpoints = requireNotNull(listCheckpoints),
+                latestCheckpoint = requireNotNull(latestCheckpoint),
+                checkpointById = requireNotNull(checkpointById),
+                rollbackToCheckpoint = requireNotNull(rollbackToCheckpoint),
+                rollbackPolicy = checkpointRollbackPolicy,
+            )
+        } else {
+            null
+        }
     private val askBertBotToolHandler =
         McpAskBertBotToolHandler(
             workspaceRoot = workspaceRootFile,
@@ -136,19 +155,37 @@ internal class McpRequestDispatcher(
         params: JsonObject,
     ): String {
         val toolName = params.stringValue("name") ?: params.stringValue("toolName")
-        val macrofactorResult = macrofactorToolRouter?.handle(toolName, params)
-        if (macrofactorResult != null) {
-            return toolResultResponse(requestId, macrofactorResult.first, macrofactorResult.second)
-        }
-        val googleWorkspaceResult = googleWorkspaceToolRouter?.handle(toolName, params)
-        if (googleWorkspaceResult != null) {
-            return toolResultResponse(requestId, googleWorkspaceResult.first, googleWorkspaceResult.second)
-        }
-        val continuousResearchResult = continuousResearchToolRouter?.handle(toolName, params)
-        if (continuousResearchResult != null) {
-            return toolResultResponse(requestId, continuousResearchResult.first, continuousResearchResult.second)
+        val routed = routeOptionalRouters(toolName, params)
+        if (routed != null) {
+            return toolResultResponse(requestId, routed.first, routed.second)
         }
 
+        return handleBuiltInToolCall(toolName, requestId, params)
+            ?: McpProtocolCodec.errorResponse(requestId, -32601, "Unknown tool: ${toolName ?: "<missing>"}")
+    }
+
+    private fun routeOptionalRouters(
+        toolName: String?,
+        params: JsonObject,
+    ): Pair<Boolean, String>? {
+        val macrofactorResult = macrofactorToolRouter?.handle(toolName, params)
+        if (macrofactorResult != null) {
+            return macrofactorResult
+        }
+
+        val googleWorkspaceResult = googleWorkspaceToolRouter?.handle(toolName, params)
+        if (googleWorkspaceResult != null) {
+            return googleWorkspaceResult
+        }
+
+        return continuousResearchToolRouter?.handle(toolName, params)
+    }
+
+    private fun handleBuiltInToolCall(
+        toolName: String?,
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String? {
         return when (toolName) {
             McpConstants.ASK_BERTBOT_TOOL_NAME ->
                 toolResultResponseFromOutcome(
@@ -167,8 +204,28 @@ internal class McpRequestDispatcher(
             McpConstants.INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.listApprovedSources())
             McpConstants.INGESTION_INGEST_MANUAL_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.manualIngest(params))
             McpConstants.INGESTION_CHAT_MANUAL_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.manualChat(params))
-            else -> McpProtocolCodec.errorResponse(requestId, -32601, "Unknown tool: ${toolName ?: "<missing>"}")
+            McpConstants.CHECKPOINT_LIST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.list(params) }
+            McpConstants.CHECKPOINT_LATEST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.latest(params) }
+            McpConstants.CHECKPOINT_GET_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.get(params) }
+            McpConstants.CHECKPOINT_ROLLBACK_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.rollback(params) }
+            McpConstants.CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.rollbackLatest(params) }
+            McpConstants.CHECKPOINT_POLICY_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.policy() }
+            else -> null
         }
+    }
+
+    private fun hasCheckpointToolFunctions(): Boolean =
+        listCheckpoints != null &&
+            latestCheckpoint != null &&
+            checkpointById != null &&
+            rollbackToCheckpoint != null
+
+    private fun checkpointToolResult(
+        requestId: JsonElement,
+        action: (McpCheckpointToolHandler) -> Pair<Boolean, String>,
+    ): String {
+        val handler = checkpointToolHandler ?: return toolResultResponse(requestId, true, "Checkpoint tools are unavailable.")
+        return toolResultResponseFromOutcome(requestId, action(handler))
     }
 
     private fun toolResultResponseFromOutcome(

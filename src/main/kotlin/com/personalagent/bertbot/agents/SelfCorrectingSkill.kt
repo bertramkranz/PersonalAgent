@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.agents
 
+import com.google.gson.JsonElement
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.llm.LlmGateway
@@ -13,8 +14,9 @@ class SelfCorrectingSkill<O>(
     private val name: String,
     private val llmGateway: LlmGateway,
     private val outputFormatInstructions: String,
-    private val parser: (String) -> O,
+    private val parser: (JsonElement) -> O,
     private val maxAttempts: Int = 3,
+    private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
 ) : Skill<SelfCorrectingSkillRequest, O> {
     init {
         require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
@@ -39,7 +41,7 @@ class SelfCorrectingSkill<O>(
                 )
 
             try {
-                val parsed = parser(rawOutput)
+                val parsed = parser(parseStructuredOutput(rawOutput))
                 TraceLogger.skillCompleted(tracingContext, "skill=$name attempt=$attempt")
                 return parsed
             } catch (e: Exception) {
@@ -64,6 +66,10 @@ class SelfCorrectingSkill<O>(
             lastOutput = rawOutput,
             cause = lastError,
         )
+    }
+
+    private fun parseStructuredOutput(rawOutput: String): JsonElement {
+        return structuredOutputGateway.parse(rawOutput)
     }
 
     private fun buildSystemPrompt(baseSystemPrompt: String): String =

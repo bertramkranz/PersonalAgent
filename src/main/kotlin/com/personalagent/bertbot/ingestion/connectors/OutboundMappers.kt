@@ -20,6 +20,12 @@ data class WhatsAppReplyPayload(
     val text: String,
 )
 
+data class DiscordReplyPayload(
+    val channelId: String,
+    val content: String,
+    val messageReferenceId: String? = null,
+)
+
 object OutboundMappers {
     fun toTelegram(message: NormalizedOutboundMessage): TelegramReplyPayload =
         TelegramReplyPayload(
@@ -43,4 +49,11 @@ object OutboundMappers {
             text = message.text,
         )
     }
+
+    fun toDiscord(message: NormalizedOutboundMessage): DiscordReplyPayload =
+        DiscordReplyPayload(
+            channelId = message.source.sourceId,
+            content = message.text,
+            messageReferenceId = message.replyToMessageId,
+        )
 }

@@ -1,12 +1,13 @@
 package com.personalagent.bertbot.ingestion.connectors
 
-import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.personalagent.bertbot.serialization.AgentJsonCodec
+import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 
 class ExternalChatPayloadDispatcher(
     private val connectors: BertBotExternalConnectors,
-    private val gson: Gson = Gson(),
+    private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) {
     fun handleTelegramUpdateJson(
         rawJson: String,
@@ -25,7 +26,7 @@ class ExternalChatPayloadDispatcher(
         val adapter = connectors.slack ?: return null
         val event = parseSlackEnvelope(rawJson) ?: return null
         val reply = adapter.onEvent(event, dryRun) ?: return null
-        return gson.toJson(reply)
+        return codec.encode(reply)
     }
 
     fun handleWhatsAppConversationJson(
@@ -35,7 +36,17 @@ class ExternalChatPayloadDispatcher(
         val adapter = connectors.whatsapp ?: return null
         val event = parseWhatsAppConversation(rawJson) ?: return null
         val reply = adapter.onConversationEvent(event, dryRun) ?: return null
-        return gson.toJson(reply)
+        return codec.encode(reply)
+    }
+
+    fun handleDiscordMessageJson(
+        rawJson: String,
+        dryRun: Boolean = false,
+    ): String? {
+        val adapter = connectors.discord ?: return null
+        val event = parseDiscordMessage(rawJson) ?: return null
+        val reply = adapter.onMessage(event, dryRun) ?: return null
+        return codec.encode(reply)
     }
 }
 
@@ -43,6 +54,7 @@ data class BertBotExternalConnectors(
     val telegram: TelegramConnectorAdapter? = null,
     val slack: SlackConnectorAdapter? = null,
     val whatsapp: WhatsAppConnectorAdapter? = null,
+    val discord: DiscordConnectorAdapter? = null,
 )
 
 private fun buildTelegramInlineReply(reply: TelegramReplyPayload): String {
@@ -155,6 +167,20 @@ private fun parseWhatsAppConversation(rawJson: String): WhatsAppConversationPayl
                         )
                     },
             ),
+    )
+}
+
+private fun parseDiscordMessage(rawJson: String): DiscordMessagePayload? {
+    val root = rawJson.toJsonObjectOrNull() ?: return null
+    return DiscordMessagePayload(
+        messageId = root.stringValue("message_id") ?: return null,
+        channelId = root.stringValue("channel_id") ?: return null,
+        guildId = root.stringValue("guild_id"),
+        authorId = root.stringValue("author_id"),
+        authorDisplayName = root.stringValue("author_display_name"),
+        content = root.stringValue("content"),
+        threadId = root.stringValue("thread_id"),
+        timestampIso = root.stringValue("timestamp_iso"),
     )
 }
 

@@ -7,6 +7,7 @@ enum class IngestionPlatform {
     TELEGRAM,
     SLACK,
     WHATSAPP,
+    DISCORD,
     MANUAL,
 }
 

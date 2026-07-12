@@ -16,6 +16,12 @@ internal data class McpToolNames(
     val ingestionListApprovedSources: String,
     val ingestionIngestManual: String,
     val ingestionChatManual: String,
+    val checkpointList: String,
+    val checkpointLatest: String,
+    val checkpointGet: String,
+    val checkpointRollback: String,
+    val checkpointRollbackLatest: String,
+    val checkpointPolicy: String,
 )
 
 internal fun buildInitializeResultPayload(
@@ -62,6 +68,7 @@ internal fun buildToolsListResultPayload(
     return result
 }
 
+@Suppress("LongMethod")
 private fun baseToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
     listOf(
         buildToolDefinition(
@@ -132,6 +139,48 @@ private fun baseToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
             property("offset", "number", "Optional offset for paginated endpoints.")
             required("operation")
         },
+        buildToolDefinition(
+            toolNames.checkpointList,
+            "List checkpoints for a persistence scope.",
+        ) {
+            property("scopeKey", "string", "Optional persistence scope key. Defaults to global scope.")
+        },
+        buildToolDefinition(
+            toolNames.checkpointLatest,
+            "Get the latest checkpoint for a persistence scope.",
+        ) {
+            property("scopeKey", "string", "Optional persistence scope key. Defaults to global scope.")
+        },
+        buildToolDefinition(
+            toolNames.checkpointGet,
+            "Get one checkpoint by id for a persistence scope.",
+        ) {
+            property("checkpointId", "string", "Checkpoint id to fetch.")
+            property("scopeKey", "string", "Optional persistence scope key. Defaults to global scope.")
+            required("checkpointId")
+        },
+        buildToolDefinition(
+            toolNames.checkpointRollback,
+            "Rollback runtime state to a checkpoint id in a persistence scope.",
+        ) {
+            property("checkpointId", "string", "Checkpoint id to rollback to.")
+            property("scopeKey", "string", "Optional persistence scope key. Defaults to global scope.")
+            property("confirm", "boolean", "Must be true to execute rollback.")
+            required("checkpointId")
+            required("confirm")
+        },
+        buildToolDefinition(
+            toolNames.checkpointRollbackLatest,
+            "Rollback runtime state to the latest checkpoint in a persistence scope.",
+        ) {
+            property("scopeKey", "string", "Optional persistence scope key. Defaults to global scope.")
+            property("confirm", "boolean", "Must be true to execute rollback.")
+            required("confirm")
+        },
+        buildToolDefinition(
+            toolNames.checkpointPolicy,
+            "Show active checkpoint rollback policy and environment guardrails.",
+        ),
     )
 
 private fun ingestionToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
@@ -140,7 +189,7 @@ private fun ingestionToolDefinitions(toolNames: McpToolNames): List<JsonObject> 
             toolNames.ingestionSetApproval,
             "Set or revoke approval for a specific external source.",
         ) {
-            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, discord, manual).")
             property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
             property("sourceId", "string", "External source id (chat/channel/conversation).")
             property("workspaceId", "string", "Optional workspace/team/phone-number id.")
@@ -159,7 +208,7 @@ private fun ingestionToolDefinitions(toolNames: McpToolNames): List<JsonObject> 
             toolNames.ingestionIngestManual,
             "Manually ingest or dry-run one normalized message payload.",
         ) {
-            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, discord, manual).")
             property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
             property("sourceId", "string", "External source id (chat/channel/conversation).")
             property("workspaceId", "string", "Optional workspace/team/phone-number id.")
@@ -178,7 +227,7 @@ private fun ingestionToolDefinitions(toolNames: McpToolNames): List<JsonObject> 
             toolNames.ingestionChatManual,
             "Route one approved external message through BertBot and return the reply payload.",
         ) {
-            property("platform", "string", "Source platform (telegram, slack, whatsapp, manual).")
+            property("platform", "string", "Source platform (telegram, slack, whatsapp, discord, manual).")
             property("sourceKind", "string", "Source kind (chat, channel, direct_message, business_conversation).")
             property("sourceId", "string", "External source id (chat/channel/conversation).")
             property("workspaceId", "string", "Optional workspace/team/phone-number id.")

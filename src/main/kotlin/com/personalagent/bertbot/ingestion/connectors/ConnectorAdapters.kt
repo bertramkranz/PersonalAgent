@@ -45,3 +45,12 @@ class WhatsAppConnectorAdapter(
         dryRun: Boolean = false,
     ): WhatsAppReplyPayload? = bridge.handleConversation(payload, dryRun)
 }
+
+class DiscordConnectorAdapter(
+    private val bridge: DiscordChatBridge,
+) {
+    fun onMessage(
+        payload: DiscordMessagePayload,
+        dryRun: Boolean = false,
+    ): DiscordReplyPayload? = bridge.handleMessage(payload, dryRun)
+}

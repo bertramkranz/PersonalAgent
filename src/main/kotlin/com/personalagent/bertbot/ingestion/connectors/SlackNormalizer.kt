@@ -7,27 +7,35 @@ import com.personalagent.bertbot.ingestion.IngestionSource
 import com.personalagent.bertbot.ingestion.IngestionSourceKind
 import com.personalagent.bertbot.ingestion.NormalizedAttachment
 import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class SlackFilePayload(
     val id: String,
     val name: String? = null,
     val mimetype: String? = null,
+    @SerialName("url_private")
     @SerializedName("url_private")
     val urlPrivate: String? = null,
     val size: Long? = null,
 )
 
+@Serializable
 data class SlackMessageEventPayload(
     val ts: String,
     val channel: String,
     val user: String? = null,
     val text: String? = null,
+    @SerialName("thread_ts")
     @SerializedName("thread_ts")
     val threadTs: String? = null,
     val files: List<SlackFilePayload>? = null,
 )
 
+@Serializable
 data class SlackEnvelopePayload(
+    @SerialName("team_id")
     @SerializedName("team_id")
     val teamId: String,
     val event: SlackMessageEventPayload,

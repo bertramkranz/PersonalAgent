@@ -9,7 +9,8 @@ internal class PolymarketToolRouter(
         toolName: String,
         params: JsonObject,
     ): Pair<Boolean, String>? {
-        val arguments = params.objectValue("arguments") ?: params
+        val request = ToolInvocationRequestMapper.from(toolName, params, fallbackToSelfWhenMissingArguments = true)
+        val arguments = request.arguments
         val operation =
             arguments.stringValue("operation")
                 ?: return true to "Missing required field: operation"

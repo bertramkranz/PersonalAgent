@@ -16,9 +16,12 @@ case "$MODE" in
   interactive)
     MAIN_CLASS="com.personalagent.bertbot.app.MainKt"
     ;;
+  discord)
+    MAIN_CLASS="com.personalagent.bertbot.app.DiscordBotMainKt"
+    ;;
   *)
     echo "Unknown BERTBOT_RUN_MODE: $MODE"
-    echo "Supported values: webhook, mcp, headless, interactive"
+    echo "Supported values: webhook, mcp, headless, interactive, discord"
     exit 1
     ;;
 esac

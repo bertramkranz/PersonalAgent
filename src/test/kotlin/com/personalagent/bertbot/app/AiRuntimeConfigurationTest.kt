@@ -90,7 +90,12 @@ class AiRuntimeConfigurationTest {
             )
 
         assertEquals(DEFAULT_PERSISTENCE_BACKEND, configuration.backend)
+        assertEquals(DEFAULT_JSON_CODEC, configuration.jsonCodec)
         assertEquals(DEFAULT_STATE_FILE_PATH, configuration.stateFilePath)
+        assertEquals(DEFAULT_CHECKPOINT_FILE_PATH, configuration.checkpointFilePath)
+        assertEquals(DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED, configuration.checkpointAutoSaveEnabled)
+        assertEquals(DEFAULT_EVENT_SOURCING_ENABLED, configuration.eventSourcingEnabled)
+        assertEquals(DEFAULT_STATE_EVENT_FILE_PATH, configuration.stateEventFilePath)
         assertEquals(DEFAULT_EPISODIC_MEMORY_FILE_PATH, configuration.episodicMemoryFilePath)
         assertEquals(DEFAULT_SEMANTIC_MEMORY_FILE_PATH, configuration.semanticMemoryFilePath)
         assertEquals(DEFAULT_PROFILE_FILE_PATH, configuration.profileFilePath)
@@ -99,6 +104,7 @@ class AiRuntimeConfigurationTest {
         assertEquals(DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH, configuration.researchRecommendationsFilePath)
         assertEquals(DEFAULT_STATE_JDBC_TABLE, configuration.jdbcTable)
         assertEquals(DEFAULT_EPISODIC_MEMORY_JDBC_TABLE, configuration.episodicMemoryJdbcTable)
+        assertEquals(DEFAULT_STATE_EVENT_JDBC_TABLE, configuration.stateEventJdbcTable)
         assertEquals(DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE, configuration.semanticMemoryJdbcTable)
         assertEquals(DEFAULT_PROFILE_JDBC_TABLE, configuration.profileJdbcTable)
         assertEquals(DEFAULT_INGESTION_CONSENT_JDBC_TABLE, configuration.ingestionConsentJdbcTable)
@@ -113,10 +119,17 @@ class AiRuntimeConfigurationTest {
                 environment =
                     mapOf(
                         "BERTBOT_STATE_STORE" to "postgres",
+                        "BERTBOT_JSON_CODEC" to "kotlinx",
                         "BERTBOT_STATE_JDBC_URL" to "jdbc:postgresql://localhost:5432/bertbot",
                         "BERTBOT_STATE_JDBC_USER" to "env-user",
                         "BERTBOT_STATE_JDBC_PASSWORD" to "env-pass",
                         "BERTBOT_STATE_JDBC_TABLE" to "bertbot_state_table",
+                        "BERTBOT_CHECKPOINT_FILE_PATH" to "checkpoints-from-env.json",
+                        "BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED" to "true",
+                        "BERTBOT_EVENT_SOURCING_ENABLED" to "true",
+                        "BERTBOT_STATE_EVENT_FILE_PATH" to "events-from-env.json",
+                        "BERTBOT_CHECKPOINT_JDBC_TABLE" to "checkpoint_table",
+                        "BERTBOT_STATE_EVENT_JDBC_TABLE" to "state_event_table",
                         "BERTBOT_STATE_FILE_PATH" to "state-from-env.json",
                         "BERTBOT_MEMORY_EPISODIC_FILE_PATH" to "episodic-from-env.json",
                         "BERTBOT_MEMORY_SEMANTIC_FILE_PATH" to "semantic-from-env.json",
@@ -138,7 +151,12 @@ class AiRuntimeConfigurationTest {
             )
 
         assertEquals("postgres", configuration.backend)
+        assertEquals("kotlinx", configuration.jsonCodec)
         assertEquals("state-from-env.json", configuration.stateFilePath)
+        assertEquals("checkpoints-from-env.json", configuration.checkpointFilePath)
+        assertEquals(true, configuration.checkpointAutoSaveEnabled)
+        assertEquals(true, configuration.eventSourcingEnabled)
+        assertEquals("events-from-env.json", configuration.stateEventFilePath)
         assertEquals("episodic-from-env.json", configuration.episodicMemoryFilePath)
         assertEquals("semantic-from-env.json", configuration.semanticMemoryFilePath)
         assertEquals("profile-from-env.json", configuration.profileFilePath)
@@ -149,6 +167,8 @@ class AiRuntimeConfigurationTest {
         assertEquals("env-user", configuration.jdbcUser)
         assertEquals("env-pass", configuration.jdbcPassword)
         assertEquals("bertbot_state_table", configuration.jdbcTable)
+        assertEquals("checkpoint_table", configuration.checkpointJdbcTable)
+        assertEquals("state_event_table", configuration.stateEventJdbcTable)
         assertEquals("episodic_table", configuration.episodicMemoryJdbcTable)
         assertEquals("semantic_table", configuration.semanticMemoryJdbcTable)
         assertEquals("profile_table", configuration.profileJdbcTable)
@@ -256,5 +276,94 @@ class AiRuntimeConfigurationTest {
         assertEquals(base.research.periodicIntervalSeconds, config.research.periodicIntervalSeconds)
         assertEquals(base.research.minIntervalBetweenRunsSeconds, config.research.minIntervalBetweenRunsSeconds)
         assertEquals(base.research.maxRecommendationsPerCycle, config.research.maxRecommendationsPerCycle)
+    }
+
+    @Test
+    fun `checkpoint rollback policy defaults are applied`() {
+        val configuration =
+            resolveCheckpointRollbackPolicyConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_RUNTIME_ENVIRONMENT, configuration.environment)
+        assertEquals(DEFAULT_CHECKPOINT_ROLLBACK_ENABLED, configuration.rollbackEnabled)
+        assertEquals(DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM, configuration.requireConfirm)
+        assertEquals(DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED, configuration.allowInProtectedEnvironment)
+        assertEquals(false, configuration.isProtectedEnvironment)
+    }
+
+    @Test
+    fun `checkpoint rollback policy prefers environment over dotenv`() {
+        val configuration =
+            resolveCheckpointRollbackPolicyConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_RUNTIME_ENV" to "production",
+                        "BERTBOT_CHECKPOINT_ROLLBACK_ENABLED" to "true",
+                        "BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM" to "false",
+                        "BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED" to "true",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_RUNTIME_ENV" to "dev",
+                        "BERTBOT_CHECKPOINT_ROLLBACK_ENABLED" to "false",
+                    ),
+            )
+
+        assertEquals("production", configuration.environment)
+        assertEquals(true, configuration.rollbackEnabled)
+        assertEquals(false, configuration.requireConfirm)
+        assertEquals(true, configuration.allowInProtectedEnvironment)
+        assertEquals(true, configuration.isProtectedEnvironment)
+    }
+
+    @Test
+    fun `koog feature configuration defaults are applied`() {
+        val configuration =
+            resolveKoogFeatureRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_KOOG_CHAT_MEMORY_ENABLED, configuration.chatMemoryEnabled)
+        assertEquals(DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE, configuration.chatMemoryWindowSize)
+        assertEquals(DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED, configuration.longTermMemoryEnabled)
+        assertEquals(DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K, configuration.longTermMemoryTopK)
+        assertEquals(DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME, configuration.openTelemetryServiceName)
+        assertEquals(DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION, configuration.openTelemetryServiceVersion)
+        assertEquals(DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE, configuration.openTelemetryVerbose)
+        assertNull(configuration.openTelemetryOtlpEndpoint)
+    }
+
+    @Test
+    fun `koog feature configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveKoogFeatureRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_KOOG_CHAT_MEMORY_ENABLED" to "false",
+                        "BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE" to "120",
+                        "BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED" to "false",
+                        "BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K" to "9",
+                        "BERTBOT_KOOG_OTEL_SERVICE_NAME" to "bertbot-koog",
+                        "BERTBOT_KOOG_OTEL_SERVICE_VERSION" to "1.2.3",
+                        "BERTBOT_KOOG_OTEL_VERBOSE" to "true",
+                        "BERTBOT_KOOG_OTEL_OTLP_ENDPOINT" to "http://localhost:4317",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_KOOG_OTEL_SERVICE_NAME" to "ignored",
+                    ),
+            )
+
+        assertEquals(false, configuration.chatMemoryEnabled)
+        assertEquals(120, configuration.chatMemoryWindowSize)
+        assertEquals(false, configuration.longTermMemoryEnabled)
+        assertEquals(9, configuration.longTermMemoryTopK)
+        assertEquals("bertbot-koog", configuration.openTelemetryServiceName)
+        assertEquals("1.2.3", configuration.openTelemetryServiceVersion)
+        assertEquals(true, configuration.openTelemetryVerbose)
+        assertEquals("http://localhost:4317", configuration.openTelemetryOtlpEndpoint)
     }
 }

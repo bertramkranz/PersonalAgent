@@ -1,11 +1,12 @@
 package com.personalagent.bertbot.graph.store
 
-import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.model.BertBotDelegationDecision
 import com.personalagent.bertbot.graph.model.BertBotIntent
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.serialization.AgentJsonCodec
+import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.io.File
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
@@ -13,7 +14,7 @@ import java.nio.file.StandardCopyOption
 
 class FileBertBotStateStore(
     private val file: File,
-    private val gson: Gson = Gson(),
+    private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) : BertBotStateStore {
     private val lock = Any()
     private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
@@ -43,7 +44,7 @@ class FileBertBotStateStore(
         synchronized(lock) {
             val scopedFile = scopedFile()
             scopedFile.parentFile?.mkdirs()
-            writeTextAtomically(scopedFile, gson.toJson(PersistedBertBotStateSnapshot.fromState(state)))
+            writeTextAtomically(scopedFile, codec.encode(PersistedBertBotStateSnapshot.fromState(state)))
         }
     }
 
@@ -72,17 +73,17 @@ class FileBertBotStateStore(
     }
 
     private fun loadPersistedState(content: String): BertBotState {
-        val snapshot = gson.fromJson(content, PersistedBertBotStateSnapshot::class.java)
+        val snapshot = codec.decode(content, PersistedBertBotStateSnapshot::class.java)
         if (snapshot?.schemaVersion == CURRENT_SCHEMA_VERSION) {
             return snapshot.toState()
         }
 
-        val legacySnapshot = gson.fromJson(content, LegacyPersistedBertBotStateSnapshot::class.java)
+        val legacySnapshot = codec.decode(content, LegacyPersistedBertBotStateSnapshot::class.java)
         if (legacySnapshot?.schemaVersion == LEGACY_SCHEMA_VERSION && legacySnapshot.state != null) {
             return legacySnapshot.state
         }
 
-        return gson.fromJson(content, BertBotState::class.java) ?: BertBotState()
+        return codec.decode(content, BertBotState::class.java) ?: BertBotState()
     }
 
     private companion object {

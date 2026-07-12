@@ -126,6 +126,7 @@ private fun String.mcpIngestionPlatform(): IngestionPlatform? =
         "telegram" -> IngestionPlatform.TELEGRAM
         "slack" -> IngestionPlatform.SLACK
         "whatsapp" -> IngestionPlatform.WHATSAPP
+        "discord" -> IngestionPlatform.DISCORD
         "manual" -> IngestionPlatform.MANUAL
         else -> null
     }

@@ -1,9 +1,10 @@
 package com.personalagent.bertbot.graph.store
 
-import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.serialization.AgentJsonCodec
+import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -13,7 +14,7 @@ class JdbcBertBotStateStore(
     private val username: String? = null,
     private val password: String? = null,
     private val tableName: String = DEFAULT_TABLE_NAME,
-    private val gson: Gson = Gson(),
+    private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) : BertBotStateStore {
     private val lock = Any()
     private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
@@ -51,7 +52,7 @@ class JdbcBertBotStateStore(
             withConnection { connection ->
                 connection.autoCommit = false
                 try {
-                    val payload = gson.toJson(PersistedBertBotStateSnapshot.fromState(state))
+                    val payload = codec.encode(PersistedBertBotStateSnapshot.fromState(state))
                     try {
                         val updated = updateScopedSnapshot(connection, scopeKey, payload)
                         if (updated == 0) {
@@ -192,17 +193,17 @@ class JdbcBertBotStateStore(
 
     private fun parsePersistedState(payload: String): BertBotState {
         return try {
-            val snapshot = gson.fromJson(payload, PersistedBertBotStateSnapshot::class.java)
+            val snapshot = codec.decode(payload, PersistedBertBotStateSnapshot::class.java)
             if (snapshot?.schemaVersion == CURRENT_SCHEMA_VERSION) {
                 return snapshot.toState()
             }
 
-            val legacySnapshot = gson.fromJson(payload, LegacyPersistedBertBotStateSnapshot::class.java)
+            val legacySnapshot = codec.decode(payload, LegacyPersistedBertBotStateSnapshot::class.java)
             if (legacySnapshot?.schemaVersion == LEGACY_SCHEMA_VERSION && legacySnapshot.state != null) {
                 return legacySnapshot.state
             }
 
-            gson.fromJson(payload, BertBotState::class.java) ?: BertBotState()
+            codec.decode(payload, BertBotState::class.java) ?: BertBotState()
         } catch (_: JsonSyntaxException) {
             println("Warning: failed to parse persisted state row from table '$tableName'.")
             BertBotState()

@@ -156,8 +156,25 @@ class ContinuousImprovementResearchTest {
 
         service.use {
             it.submitEventAsync("async_test")
-            Thread.sleep(2_000)
-            assertTrue(it.listRecommendations(limit = 1).isNotEmpty())
+            val completed = awaitAtMost(timeoutMillis = 1_000, pollMillis = 25) {
+                it.listRecommendations(limit = 1).isNotEmpty()
+            }
+            assertTrue(completed)
         }
+    }
+
+    private fun awaitAtMost(
+        timeoutMillis: Long,
+        pollMillis: Long,
+        condition: () -> Boolean,
+    ): Boolean {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start <= timeoutMillis) {
+            if (condition()) {
+                return true
+            }
+            Thread.sleep(pollMillis)
+        }
+        return condition()
     }
 }

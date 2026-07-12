@@ -44,6 +44,13 @@ data class WhatsAppIntegrationConfig(
     val approvedConversationIds: Set<String> = emptySet(),
 )
 
+data class DiscordIntegrationConfig(
+    val connector: ConnectorConfig = ConnectorConfig(approvalScope = "channel"),
+    val guildId: String? = null,
+    val approvedChannelIds: Set<String> = emptySet(),
+    val approvedDirectMessageIds: Set<String> = emptySet(),
+)
+
 data class IngestionPolicyConfig(
     val enabled: Boolean = false,
     val storeImageReferencesOnly: Boolean = true,
@@ -55,6 +62,7 @@ data class IngestionConfig(
     val telegram: TelegramIntegrationConfig = TelegramIntegrationConfig(),
     val slack: SlackIntegrationConfig = SlackIntegrationConfig(),
     val whatsapp: WhatsAppIntegrationConfig = WhatsAppIntegrationConfig(),
+    val discord: DiscordIntegrationConfig = DiscordIntegrationConfig(),
 )
 
 data class ContinuousImprovementResearchConfig(
@@ -349,6 +357,7 @@ data class BertBotAgentConfig(
         requireConnectorScope("telegram", ingestion.telegram.connector.approvalScope, setOf("chat", "conversation"))
         requireConnectorScope("slack", ingestion.slack.connector.approvalScope, setOf("channel", "chat", "conversation"))
         requireConnectorScope("whatsapp", ingestion.whatsapp.connector.approvalScope, setOf("conversation", "chat"))
+        requireConnectorScope("discord", ingestion.discord.connector.approvalScope, setOf("channel", "chat", "conversation"))
     }
 
     fun enabledTools(): List<ToolDefinition> = tools.filter { it.enabled }

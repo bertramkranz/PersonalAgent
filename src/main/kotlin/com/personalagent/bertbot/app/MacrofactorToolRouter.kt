@@ -35,7 +35,9 @@ internal class MacrofactorToolRouter(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
-        if (toolName.isNullOrBlank() || !toolName.startsWith(runtimeConfiguration.toolNamePrefix)) {
+        val request = ToolInvocationRequestMapper.from(toolName, params)
+        val requestedToolName = request.toolName
+        if (requestedToolName.isNullOrBlank() || !requestedToolName.startsWith(runtimeConfiguration.toolNamePrefix)) {
             return null
         }
 
@@ -45,13 +47,12 @@ internal class MacrofactorToolRouter(
 
         val tools = discoverTools() ?: return true to "MacroFactor tool discovery failed. Check runtime configuration and process logs."
         val toolByProxyName = tools.associateBy { proxyToolName(it.name) }
-        val targetTool = toolByProxyName[toolName]
+        val targetTool = toolByProxyName[requestedToolName]
         if (targetTool == null) {
-            return true to "Unknown MacroFactor proxy tool: $toolName"
+            return true to "Unknown MacroFactor proxy tool: $requestedToolName"
         }
 
-        val arguments = params.objectValue("arguments") ?: JsonObject()
-        return transport.callTool(targetTool.name, arguments)
+        return transport.callTool(targetTool.name, request.arguments)
     }
 
     private fun discoverTools(): List<MacrofactorDiscoveredTool>? {

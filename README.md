@@ -77,7 +77,7 @@ The runtime is provider-aware at the LLM adapter boundary. The repository ships 
 
 The current configuration variables are:
 
-- `BERTBOT_RUN_MODE` - selects the container entrypoint run mode. Supported values: `webhook`, `mcp`, `headless`, `interactive`. Default: `webhook`. Only applies when running via Docker.
+- `BERTBOT_RUN_MODE` - selects the container entrypoint run mode. Supported values: `webhook`, `mcp`, `headless`, `interactive`, `discord`. Default: `webhook`. Only applies when running via Docker.
 - `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. Supported values: `openai`, `ollama`.
 - `BERTBOT_AI_MODEL` - selects the chat model for the active provider adapter.
 - `BERTBOT_AI_API_KEY` - OpenAI API key (required when `BERTBOT_AI_PROVIDER=openai`).
@@ -168,8 +168,13 @@ Connector enablement and platform metadata:
 - `BERTBOT_TELEGRAM_ENABLED` - enable Telegram adapter wiring. Default: `true` for webhook mode.
 - `BERTBOT_SLACK_ENABLED` - enable Slack adapter wiring. Default: `true` for webhook mode.
 - `BERTBOT_WHATSAPP_ENABLED` - enable WhatsApp adapter wiring. Default: `true` for webhook mode.
+- `BERTBOT_DISCORD_ENABLED` - enable Discord adapter wiring. Default: `false`.
 - `BERTBOT_SLACK_WORKSPACE_ID` - optional Slack workspace/team identifier used in normalized source metadata.
 - `BERTBOT_WHATSAPP_BUSINESS_PHONE_ID` - optional WhatsApp Business phone number ID used in normalized source metadata.
+- `BERTBOT_DISCORD_GUILD_ID` - optional Discord guild identifier to restrict inbound message handling.
+- `BERTBOT_DISCORD_APPROVED_CHANNEL_IDS` - comma-separated approved Discord channel IDs.
+- `BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS` - comma-separated approved Discord DM channel IDs.
+- `BERTBOT_DISCORD_BOT_TOKEN` - Discord bot token used by `runDiscordBot` runtime mode.
 - `BERTBOT_INGESTION_REQUIRE_APPROVAL` - require source approval before accepted message ingestion/chat state updates. Default: `true`.
 
 Provider verification variables (used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`):
@@ -319,6 +324,25 @@ Additional hardening controls:
 - Rate limiting: tune `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` and `BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS`.
 - Reverse-proxy header trust: only enable `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS=true` when requests arrive through a trusted proxy that sanitizes forwarded headers.
 
+### Discord Bot Mode
+
+Use this mode for two-way Discord communication (receive Discord messages and send BertBot replies):
+
+```bash
+.\gradlew.bat runDiscordBot --no-daemon
+```
+
+Required settings:
+
+- `BERTBOT_DISCORD_ENABLED=true`
+- `BERTBOT_DISCORD_BOT_TOKEN=<token>`
+
+Optional scope controls:
+
+- `BERTBOT_DISCORD_GUILD_ID`
+- `BERTBOT_DISCORD_APPROVED_CHANNEL_IDS`
+- `BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS`
+
 ### Tracing And Graph Visualization
 
 BertBot emits structured tracing for graph execution and delegation lifecycles, including events like node start/completion, edge transitions, delegation requested/started/completed, and skill invocation.
@@ -362,6 +386,7 @@ Quick self-check: call `bertbot-backend/bertbot_status` from chat tools. If the 
 - Use `runHeadless` for one-shot scripted requests.
 - Use `runMcpServer` for manual MCP backend startup outside VS Code server management, or rely on `.vscode/mcp.json` for workspace-managed startup.
 - Use `runWebhookServer` for direct Telegram/Slack/WhatsApp webhook ingress with optional provider signature verification.
+- Use `runDiscordBot` for Discord two-way bot messaging via gateway events.
 - Use the repo-local agent manifest when you want Copilot to route work to BertBot automatically.
 - Use `BERTBOT_AI_PROVIDER` and `BERTBOT_AI_MODEL` when you want to change the LLM adapter settings without changing code.
 
@@ -370,13 +395,14 @@ Quick self-check: call `bertbot-backend/bertbot_status` from chat tools. If the 
 This repository now includes a Day 1 self-hosted container baseline:
 
 - `Dockerfile` - multi-stage build and runtime image.
-- `docker-compose.yml` - app + PostgreSQL + optional Ollama services.
+- `docker-compose.yml` - webhook app + optional MCP app + PostgreSQL + optional Ollama services.
 - `docker/entrypoint.sh` - runtime mode switch (`webhook`, `mcp`, `headless`, `interactive`).
 - `.env.compose.example` - compose-specific runtime settings template.
 
 ### Quick Start
 
 1. Copy `.env.compose.example` to `.env.compose` and set your API key.
+	Service-level `environment` values in compose override `.env.compose` for mode selection (`BERTBOT_RUN_MODE`).
 2. Start the compose stack:
 
 ```bash
@@ -387,6 +413,12 @@ docker compose up --build -d
 
 ```bash
 docker compose logs -f bertbot
+```
+
+If you also run the MCP service profile, inspect MCP logs with:
+
+```bash
+docker compose logs -f bertbot-mcp
 ```
 
 4. Verify health endpoint:
@@ -416,9 +448,36 @@ When `BERTBOT_AI_PROVIDER=ollama`, set `BERTBOT_AI_MODEL` to a model present in 
 - App listens on `0.0.0.0:8088` inside the container.
 - Host port mapping: `8088:8088`.
 - Container startup mode defaults to `BERTBOT_RUN_MODE=webhook`.
+- Optional MCP service is available under the `mcp` profile and runs with `BERTBOT_RUN_MODE=mcp`.
 - Persistence backend is configured to PostgreSQL in compose:
 	- `BERTBOT_STATE_STORE=postgres`
 	- `BERTBOT_STATE_JDBC_URL=jdbc:postgresql://postgres:5432/bertbot`
+
+### Persistence Policy
+
+- Containerized runtimes should use PostgreSQL persistence (`BERTBOT_STATE_STORE=postgres`) for both webhook and MCP services.
+- Local Gradle and workspace MCP runs can continue using the default file backend for lightweight development and tests.
+- There is no automatic fallback from PostgreSQL to file persistence when `BERTBOT_STATE_STORE` is set to `postgres`.
+
+### Running Webhook and MCP in Compose
+
+Start webhook mode (default service):
+
+```bash
+docker compose up --build -d bertbot postgres
+```
+
+Start MCP mode as an optional compose profile service:
+
+```bash
+docker compose --profile mcp up --build -d bertbot-mcp postgres
+```
+
+Run MCP mode as an attached stdio session (recommended for interactive MCP clients):
+
+```bash
+docker compose --profile mcp run --rm bertbot-mcp
+```
 
 ### Switching Runtime Modes In Container
 
@@ -428,6 +487,7 @@ Use `BERTBOT_RUN_MODE` in compose env or overrides:
 - `mcp`
 - `headless`
 - `interactive`
+- `discord`
 
 ## Build And Test
 

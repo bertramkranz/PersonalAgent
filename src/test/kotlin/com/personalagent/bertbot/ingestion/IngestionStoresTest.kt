@@ -68,6 +68,38 @@ class IngestionStoresTest {
     }
 
     @Test
+    fun `stores round-trip discord source approvals and cursors`() {
+        val consentFile = File.createTempFile("bertbot-ingestion-consent", ".json")
+        val sourceFile = File.createTempFile("bertbot-ingestion-state", ".json")
+        consentFile.delete()
+        sourceFile.delete()
+        consentFile.deleteOnExit()
+        sourceFile.deleteOnExit()
+
+        val source =
+            IngestionSource(
+                platform = IngestionPlatform.DISCORD,
+                sourceKind = IngestionSourceKind.CHANNEL,
+                sourceId = "discord-channel-42",
+                workspaceId = "discord-guild-1",
+            )
+
+        val consentStore = FileConsentStore(consentFile)
+        val sourceStore = FileSourceStateStore(sourceFile)
+        consentStore.upsert(ApprovalRecord(source = source, scope = ApprovalScope.CHANNEL, approved = true))
+        sourceStore.upsert(SyncCursor(source = source, cursor = "discord-cursor-1"))
+
+        val reloadedConsent = FileConsentStore(consentFile)
+        val reloadedSource = FileSourceStateStore(sourceFile)
+
+        assertTrue(reloadedConsent.isApproved(source))
+        assertEquals(IngestionPlatform.DISCORD, reloadedConsent.listApproved().first().source.platform)
+        val cursor = reloadedSource.find(source)
+        assertNotNull(cursor)
+        assertEquals("discord-cursor-1", cursor.cursor)
+    }
+
+    @Test
     fun `consent and source state stores preserve all updates under concurrent writes`() {
         val consentFile = File.createTempFile("bertbot-ingestion-consent", ".json")
         val sourceFile = File.createTempFile("bertbot-ingestion-state", ".json")

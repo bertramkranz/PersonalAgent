@@ -10,10 +10,11 @@ import com.google.gson.JsonParser
 internal object McpProtocolCodec {
     private val gson = GsonBuilder().disableHtmlEscaping().create()
 
-    fun parseRequest(rawMessage: String): McpJsonRpcRequest? {
+    fun parseRequestDto(rawMessage: String): McpJsonRpcRequestDto? {
         return try {
             val json = JsonParser.parseString(rawMessage).asJsonObject
-            McpJsonRpcRequest(
+            McpJsonRpcRequestDto(
+                jsonrpc = json.get("jsonrpc")?.asString,
                 id = json.get("id"),
                 method = json.get("method")?.asString,
                 params = json.objectValue("params") ?: JsonObject(),
@@ -21,6 +22,15 @@ internal object McpProtocolCodec {
         } catch (_: Exception) {
             null
         }
+    }
+
+    fun parseRequest(rawMessage: String): McpJsonRpcRequest? {
+        val dto = parseRequestDto(rawMessage) ?: return null
+        return McpJsonRpcRequest(
+            id = dto.id,
+            method = dto.method,
+            params = dto.params,
+        )
     }
 
     fun successResponse(
@@ -55,14 +65,23 @@ internal object McpProtocolCodec {
         message: String,
         isError: Boolean,
     ): JsonObject {
+        return toolResult(
+            McpToolResultDto(
+                message = message,
+                isError = isError,
+            ),
+        )
+    }
+
+    fun toolResult(dto: McpToolResultDto): JsonObject {
         val result = JsonObject()
         val content = JsonArray()
         val textContent = JsonObject()
         textContent.addProperty("type", "text")
-        textContent.addProperty("text", message)
+        textContent.addProperty("text", dto.message)
         content.add(textContent)
         result.add("content", content)
-        result.addProperty("isError", isError)
+        result.addProperty("isError", dto.isError)
         return result
     }
 }

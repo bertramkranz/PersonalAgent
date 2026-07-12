@@ -31,5 +31,6 @@ if (-not (Test-Path $gradleWrapper)) {
     throw "Missing gradlew.bat at $gradleWrapper"
 }
 
-& $gradleWrapper $GradleTask "--no-daemon"
+# Keep Gradle lifecycle noise off stdout so MCP JSON-RPC framing is not polluted.
+& $gradleWrapper $GradleTask "--no-daemon" "--quiet" "--console=plain" "--warning-mode=none"
 exit $LASTEXITCODE

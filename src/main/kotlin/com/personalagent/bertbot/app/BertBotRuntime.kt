@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.personalagent.bertbot.app
 
 import com.google.gson.JsonObject
@@ -5,10 +7,19 @@ import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
 import com.personalagent.bertbot.agents.ToolCallingSkill
 import com.personalagent.bertbot.config.BertBotAgentConfig
+import com.personalagent.bertbot.graph.model.BertBotState
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
+import com.personalagent.bertbot.graph.runtime.BertBotRollbackService
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
+import com.personalagent.bertbot.graph.runtime.StateEvent
+import com.personalagent.bertbot.graph.runtime.StateEventStore
+import com.personalagent.bertbot.graph.runtime.StateEventType
+import com.personalagent.bertbot.graph.runtime.StateReplayService
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.ingestion.ExternalChatOutcome
 import com.personalagent.bertbot.ingestion.IngestionControlPlane
 import com.personalagent.bertbot.ingestion.IngestionDecision
@@ -21,6 +32,7 @@ import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
 import com.personalagent.bertbot.memory.UserProfileStore
+import java.util.UUID
 
 @Suppress("LongParameterList")
 internal class BertBotRuntime(
@@ -33,11 +45,18 @@ internal class BertBotRuntime(
     private val ingestionRuntime: BertBotIngestionRuntime? = null,
     private val researchRuntime: BertBotResearchRuntime? = null,
     private val toolCallingSkill: ToolCallingSkill? = null,
+    private val checkpointStore: BertBotCheckpointStore? = null,
+    private val rollbackService: BertBotRollbackService? = null,
+    private val stateEventStore: StateEventStore? = null,
+    private val stateReplayService: StateReplayService? = null,
+    private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
+    private val telemetry: RuntimeTelemetry = NoOpRuntimeTelemetry,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
     private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
     private var connectorRuntime: BertBotConnectorRuntime = BertBotConnectorRuntime()
 
+    @Suppress("LongMethod")
     fun respondTo(
         userMessage: String,
         emitFallbackMessage: Boolean = true,
@@ -45,59 +64,96 @@ internal class BertBotRuntime(
         persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
     ): String? {
         return withPersistenceScope(persistenceScopeKey) {
-            if (isLikelyPromptInjection(userMessage)) {
-                return@withPersistenceScope promptInjectionRefusalMessage()
-            }
-
-            val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
-
-            val state =
-                try {
-                    graph.run(requestContext.initialState)
-                } catch (e: MaxTurnsExceededException) {
-                    if (emitFallbackMessage) {
-                        println("Assistant: ${e.fallbackMessage}")
-                        println("")
-                    }
-                    return@withPersistenceScope null
-                }
-
-            val systemPrompt = buildSystemPrompt(config, state)
-            val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
-            val response =
-                if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
-                    TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
-                    "Your name is ${requestContext.knownProfile.displayName}."
-                } else if (toolCallingSkill != null) {
-                    toolCallingSkill.invoke(systemPrompt, userMessage, tracingContext)
-                } else {
-                    assistantResponseSkill
-                        .invoke(
-                            input =
-                                SelfCorrectingSkillRequest(
-                                    systemPrompt = systemPrompt,
-                                    userPrompt = userMessage,
-                                ),
-                            tracingContext = tracingContext,
-                        ).response
-                }
-
-            runCatching {
-                interactionGraphWriter.write(
-                    traceId = tracingContext.traceId,
-                    state = state,
-                    events = TraceLogger.snapshot(tracingContext.traceId),
+            val requestSpan =
+                telemetry.startSpan(
+                    name = "bertbot.respond",
+                    attributes =
+                        mapOf(
+                            "bertbot.scope" to persistenceScopeKey,
+                            "bertbot.provider" to aiRuntimeConfiguration.provider,
+                            "bertbot.model" to aiRuntimeConfiguration.model,
+                        ),
                 )
-            }.onFailure { e ->
-                TraceLogger.warn(tracingContext, "diagram-write-failed", "InteractionGraphWriter failed: ${e.message}")
-            }
+            var telemetryError: Throwable? = null
+            try {
+                if (isLikelyPromptInjection(userMessage)) {
+                    return@withPersistenceScope promptInjectionRefusalMessage()
+                }
 
-            memoryRuntime.episodicMemory.append("ASSISTANT: $response")
-            memoryRuntime.memoryWorker.scheduleIfNeeded()
-            runCatching {
-                researchRuntime?.service?.submitEventAsync(reason = "respond_to")
+                val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
+
+                val state =
+                    try {
+                        graph.run(
+                            initialState = requestContext.initialState,
+                            checkpointScopeKey = normalizeScopeKey(persistenceScopeKey),
+                        )
+                    } catch (e: MaxTurnsExceededException) {
+                        if (emitFallbackMessage) {
+                            println("Assistant: ${e.fallbackMessage}")
+                            println("")
+                        }
+                        return@withPersistenceScope null
+                    }
+
+                val koogPromptContext = koogMemory.buildPromptContext(persistenceScopeKey, userMessage)
+                val systemPrompt =
+                    buildSystemPrompt(config, state).let { base ->
+                        if (koogPromptContext.isBlank()) {
+                            base
+                        } else {
+                            "$base\n\nKoog memory context:\n$koogPromptContext"
+                        }
+                    }
+                val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
+                val response =
+                    if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
+                        TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
+                        "Your name is ${requestContext.knownProfile.displayName}."
+                    } else if (toolCallingSkill != null) {
+                        toolCallingSkill.invoke(systemPrompt, userMessage, tracingContext)
+                    } else {
+                        assistantResponseSkill
+                            .invoke(
+                                input =
+                                    SelfCorrectingSkillRequest(
+                                        systemPrompt = systemPrompt,
+                                        userPrompt = userMessage,
+                                    ),
+                                tracingContext = tracingContext,
+                            ).response
+                    }
+
+                runCatching {
+                    interactionGraphWriter.write(
+                        traceId = tracingContext.traceId,
+                        state = state,
+                        events = TraceLogger.snapshot(tracingContext.traceId),
+                    )
+                }.onFailure { e ->
+                    TraceLogger.warn(tracingContext, "diagram-write-failed", "InteractionGraphWriter failed: ${e.message}")
+                }
+
+                memoryRuntime.episodicMemory.append("ASSISTANT: $response")
+                runCatching {
+                    koogMemory.recordTurn(
+                        scopeKey = persistenceScopeKey,
+                        userMessage = userMessage,
+                        assistantResponse = response,
+                        traceId = tracingContext.traceId,
+                    )
+                }
+                memoryRuntime.memoryWorker.scheduleIfNeeded()
+                runCatching {
+                    researchRuntime?.service?.submitEventAsync(reason = "respond_to")
+                }
+                response
+            } catch (e: Throwable) {
+                telemetryError = e
+                throw e
+            } finally {
+                telemetry.endSpan(requestSpan, telemetryError)
             }
-            response
         }
     }
 
@@ -146,12 +202,71 @@ internal class BertBotRuntime(
                     ),
                 dryRun = dryRun,
             )
+                .also {
+                    emitExternalChatEvent(
+                        message = message,
+                        response = response,
+                        replyToMessageId = message.messageId,
+                        threadId = message.threadId,
+                    )
+                }
         }
     }
 
     fun ingestionControlPlane(): IngestionControlPlane? = ingestionRuntime?.controlPlane
 
     fun researchService(): ContinuousImprovementResearchService? = researchRuntime?.service
+
+    fun rollbackToCheckpoint(
+        checkpointId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): BertBotState {
+        val service = requireNotNull(rollbackService) { "Rollback service is not configured." }
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.rollbackToCheckpoint(normalizedScopeKey, checkpointId)
+    }
+
+    fun rollbackToLatest(persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY): BertBotState {
+        val service = requireNotNull(rollbackService) { "Rollback service is not configured." }
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.rollbackToLatest(normalizedScopeKey)
+    }
+
+    fun listCheckpoints(persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY): List<BertBotCheckpoint> {
+        val store = checkpointStore ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.list(normalizedScopeKey)
+    }
+
+    fun latestCheckpoint(persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY): BertBotCheckpoint? {
+        val store = checkpointStore ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.loadLatest(normalizedScopeKey)
+    }
+
+    fun checkpointById(
+        checkpointId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): BertBotCheckpoint? {
+        val store = checkpointStore ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.loadById(normalizedScopeKey, checkpointId)
+    }
+
+    fun listStateEvents(persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY): List<com.personalagent.bertbot.graph.runtime.StateEvent> {
+        val store = stateEventStore ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.list(normalizedScopeKey)
+    }
+
+    fun replayStateToCheckpoint(
+        checkpointId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): BertBotState {
+        val replayService = requireNotNull(stateReplayService) { "State replay service is not configured." }
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return replayService.replayEventsToCheckpoint(normalizedScopeKey, checkpointId)
+    }
 
     fun externalChatResponder(): (NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome =
         { message, dryRun -> chatFromExternalMessage(message, dryRun) }
@@ -169,6 +284,7 @@ internal class BertBotRuntime(
                     telegram = connectorRuntime.telegram,
                     slack = connectorRuntime.slack,
                     whatsapp = connectorRuntime.whatsapp,
+                    discord = connectorRuntime.discord,
                 ),
         )
 
@@ -177,6 +293,7 @@ internal class BertBotRuntime(
         ingestionRuntime?.scheduler?.close()
         researchRuntime?.scheduler?.close()
         researchRuntime?.service?.close()
+        telemetry.close()
     }
 
     private fun <T> withPersistenceScope(
@@ -211,6 +328,35 @@ internal class BertBotRuntime(
         return normalized.replace("|", "_")
     }
 
+    private fun emitExternalChatEvent(
+        message: NormalizedIngestionMessage,
+        response: String,
+        replyToMessageId: String?,
+        threadId: String?,
+    ) {
+        val eventStore = stateEventStore ?: return
+        eventStore.append(
+            StateEvent(
+                eventId = UUID.randomUUID().toString(),
+                scopeKey = buildExternalScopeKey(message),
+                traceId = message.messageId,
+                nodeId = "external_chat",
+                eventType = StateEventType.NODE_EXECUTED,
+                state = stateStore.load().copyForPersistence(),
+                metadata =
+                    mapOf(
+                        "surface" to "external_chat",
+                        "platform" to message.source.platform.name.lowercase(),
+                        "messageId" to message.messageId,
+                        "replyToMessageId" to (replyToMessageId ?: ""),
+                        "threadId" to (threadId ?: ""),
+                        "responseLength" to response.length.toString(),
+                    ),
+                createdAtEpochMillis = System.currentTimeMillis(),
+            ),
+        )
+    }
+
     private companion object {
         private const val DEFAULT_PERSISTENCE_SCOPE_KEY = "global"
     }
@@ -235,6 +381,7 @@ internal data class BertBotResearchRuntime(
 )
 
 internal object BertBotRuntimeFactory {
+    @Suppress("LongMethod")
     fun create(
         config: BertBotAgentConfig = BertBotAgentConfig(),
         aiRuntimeConfiguration: AiRuntimeConfiguration = resolveAiRuntimeConfiguration(),
@@ -252,7 +399,22 @@ internal object BertBotRuntimeFactory {
 
         val persistenceConfiguration = resolvePersistenceRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
-        val graph = BertBotApplication.createGraph(stateStore, runtimeConfig)
+        val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
+        val stateEventStore = BertBotRuntimeDependenciesFactory.createStateEventStore(persistenceConfiguration)
+        val rollbackService = BertBotRuntimeDependenciesFactory.createRollbackService(stateStore, checkpointStore, stateEventStore)
+        val stateReplayService = BertBotRuntimeDependenciesFactory.createStateReplayService(checkpointStore, stateEventStore)
+        val graph =
+            BertBotApplication.createGraph(
+                stateStore = stateStore,
+                config = runtimeConfig,
+                checkpointStore = checkpointStore,
+                enableAutomaticCheckpointing = persistenceConfiguration.checkpointAutoSaveEnabled,
+                eventSourcingConfiguration =
+                    BertBotGraphRunner.EventSourcingConfiguration(
+                        enabled = persistenceConfiguration.eventSourcingEnabled,
+                        store = stateEventStore,
+                    ),
+            )
         val llmGateway =
             when (normalizedProvider) {
                 "openai" -> {
@@ -286,6 +448,9 @@ internal object BertBotRuntimeFactory {
                 llmGateway = llmGateway,
             )
         val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, llmGateway)
+        val koogConfiguration = resolveKoogFeatureRuntimeConfiguration()
+        val koogMemory = KoogRuntimeIntegrationFactory.createMemory(koogConfiguration, memoryRuntime)
+        val telemetry = KoogRuntimeIntegrationFactory.createTelemetry(koogConfiguration)
 
         val runtime =
             BertBotRuntime(
@@ -298,6 +463,12 @@ internal object BertBotRuntimeFactory {
                 ingestionRuntime = ingestionRuntime,
                 researchRuntime = researchRuntime,
                 toolCallingSkill = toolCallingSkill,
+                checkpointStore = checkpointStore,
+                rollbackService = rollbackService,
+                stateEventStore = stateEventStore,
+                stateReplayService = stateReplayService,
+                koogMemory = koogMemory,
+                telemetry = telemetry,
             )
         val connectorRuntime = BertBotConnectorRuntimeFactory.create(runtimeConfig, runtime)
         runtime.attachConnectorRuntime(connectorRuntime)
