@@ -53,4 +53,20 @@ class OutboundMappersTest {
         assertEquals("conv-9", payload.conversationId)
         assertEquals("ack", payload.text)
     }
+
+    @Test
+    fun `discord mapper preserves channel and message reference context`() {
+        val outbound =
+            NormalizedOutboundMessage(
+                source = IngestionSource(IngestionPlatform.DISCORD, IngestionSourceKind.CHANNEL, "112233"),
+                text = "roger",
+                replyToMessageId = "998877",
+            )
+
+        val payload = OutboundMappers.toDiscord(outbound)
+
+        assertEquals("112233", payload.channelId)
+        assertEquals("roger", payload.content)
+        assertEquals("998877", payload.messageReferenceId)
+    }
 }

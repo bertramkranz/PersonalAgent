@@ -52,6 +52,7 @@ class WebhookMainTest {
         assertTrue(config.ingestion.telegram.connector.enabled)
         assertTrue(config.ingestion.slack.connector.enabled)
         assertTrue(config.ingestion.whatsapp.connector.enabled)
+        assertFalse(config.ingestion.discord.connector.enabled)
         assertTrue(config.ingestion.policy.requireApproval)
     }
 
@@ -85,6 +86,42 @@ class WebhookMainTest {
         assertEquals(250, config.rateLimitMaxRequests)
         assertEquals("wa-secret", config.whatsAppAppSecret)
         assertEquals("wa-verify", config.whatsAppVerifyToken)
+    }
+
+    @Test
+    fun `resolve webhook agent config honors discord connector metadata`() {
+        val config =
+            resolveWebhookAgentConfig(
+                environment =
+                    mapOf(
+                        "BERTBOT_DISCORD_ENABLED" to "true",
+                        "BERTBOT_DISCORD_GUILD_ID" to "guild-1",
+                        "BERTBOT_DISCORD_APPROVED_CHANNEL_IDS" to "ch-1,ch-2",
+                        "BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS" to "dm-7",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertTrue(config.ingestion.discord.connector.enabled)
+        assertEquals("guild-1", config.ingestion.discord.guildId)
+        assertEquals(setOf("ch-1", "ch-2"), config.ingestion.discord.approvedChannelIds)
+        assertEquals(setOf("dm-7"), config.ingestion.discord.approvedDirectMessageIds)
+    }
+
+    @Test
+    fun `resolve discord bot runtime config reads token and enabled flag`() {
+        val config =
+            resolveDiscordBotRuntimeConfig(
+                environment =
+                    mapOf(
+                        "BERTBOT_DISCORD_ENABLED" to "true",
+                        "BERTBOT_DISCORD_BOT_TOKEN" to "test-token",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertTrue(config.enabled)
+        assertEquals("test-token", config.token)
     }
 
     @Test

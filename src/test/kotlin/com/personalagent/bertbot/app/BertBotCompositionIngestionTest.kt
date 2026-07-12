@@ -4,7 +4,9 @@ import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.IngestionConfig
 import com.personalagent.bertbot.config.IngestionPolicyConfig
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
+import com.personalagent.bertbot.graph.store.FileStateEventStore
 import com.personalagent.bertbot.graph.store.JdbcBertBotStateStore
+import com.personalagent.bertbot.graph.store.JdbcStateEventStore
 import com.personalagent.bertbot.ingestion.ApprovalScope
 import com.personalagent.bertbot.ingestion.ApprovalUpdateRequest
 import com.personalagent.bertbot.ingestion.IngestionPlatform
@@ -61,6 +63,27 @@ class BertBotCompositionIngestionTest {
             )
 
         assertIs<JdbcBertBotStateStore>(store)
+    }
+
+    @Test
+    fun `state event store factory uses file backend by default`() {
+        val store = BertBotRuntimeDependenciesFactory.createStateEventStore(PersistenceRuntimeConfiguration())
+
+        assertIs<FileStateEventStore>(store)
+    }
+
+    @Test
+    fun `state event store factory supports jdbc backend`() {
+        val jdbcUrl = "jdbc:h2:mem:bertbot_event_factory_${UUID.randomUUID()};MODE=PostgreSQL;DB_CLOSE_DELAY=-1"
+        val store =
+            BertBotRuntimeDependenciesFactory.createStateEventStore(
+                PersistenceRuntimeConfiguration(
+                    backend = "jdbc",
+                    jdbcUrl = jdbcUrl,
+                ),
+            )
+
+        assertIs<JdbcStateEventStore>(store)
     }
 
     @Test

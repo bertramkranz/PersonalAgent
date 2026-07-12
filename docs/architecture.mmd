@@ -5,6 +5,7 @@ flowchart TD
         Headless[Headless Prompt]
         MCP[MCP Server]
         Webhook[Webhook Server]
+        Discord[Discord Bot]
     end
 
     subgraph RuntimeComposition
@@ -14,6 +15,7 @@ flowchart TD
         ConnectorFactory[BertBotConnectorRuntimeFactory]
         ResearchFactory[BertBotRuntimeDependenciesFactory]
         PayloadDispatcher[ExternalChatPayloadDispatcher]
+        KoogIntegration[KoogRuntimeIntegration]
     end
 
     subgraph GraphExecution
@@ -27,12 +29,21 @@ flowchart TD
         JdbcState[(JDBC State Store)]
         TraceFile[(logs/bertbot-trace.jsonl)]
         DiagramFile[(state/bertbot-interactions.mmd)]
+        CheckpointStore[(Checkpoints: File or JDBC)]
+        StateEventStore[(State Events: File or JDBC)]
+    end
+
+    subgraph RollbackAndReplay
+        CompensatingRollback[CompensatingRollbackService]
+        StateOnlyRollback[StateOnlyRollbackService]
+        StateReplay[StateReplayService]
     end
 
     subgraph PlanningAndLLM
         Config[BertBotAgentConfig]
         Registry[SubAgentRegistry]
         Skill[SelfCorrectingSkill]
+        StructuredOutput[StructuredOutputGateway]
         LLM[LlmGateway / OpenAiLlmGateway / OllamaLlmGateway]
     end
 
@@ -50,6 +61,12 @@ flowchart TD
         Telegram[Telegram Adapter]
         Slack[Slack Adapter]
         WhatsApp[WhatsApp Adapter]
+        DiscordBridge[DiscordChatBridge]
+    end
+
+    subgraph McpHandlers
+        CheckpointHandler[McpCheckpointToolHandler]
+        IngestionHandler[McpIngestionToolHandler]
     end
 
     subgraph PolymarketBridge
@@ -72,10 +89,16 @@ flowchart TD
         MacrofactorMcp[(MacroFactor MCP Server)]
     end
 
+    subgraph GoogleWorkspaceBridge
+        GoogleWorkspaceToolRouter[GoogleWorkspaceToolRouter]
+        GoogleWorkspaceMcp[(Google Workspace MCP Server)]
+    end
+
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
     Webhook --> RuntimeFactory
+    Discord --> RuntimeFactory
     RuntimeFactory --> ConnectorFactory
     RuntimeFactory --> ResearchFactory
     ConnectorFactory --> PayloadDispatcher
@@ -87,6 +110,8 @@ flowchart TD
     RuntimeFactory --> LLM
     RuntimeFactory --> Control
     RuntimeFactory --> Config
+    RuntimeCore --> KoogIntegration
+    KoogIntegration --> Episodic
     ResearchFactory --> ResearchService
     ResearchService --> ResearchStore
     ResearchScheduler --> ResearchService
@@ -98,11 +123,21 @@ flowchart TD
     Runner --> StateFile
     Runner --> JdbcState
     Runner --> TraceFile
+    Runner --> CheckpointStore
+    Runner --> StateEventStore
     RuntimeCore --> DiagramFile
+
+    CompensatingRollback --> StateOnlyRollback
+    CompensatingRollback --> CheckpointStore
+    CompensatingRollback --> StateEventStore
+    StateOnlyRollback --> CheckpointStore
+    StateReplay --> CheckpointStore
+    StateReplay --> StateEventStore
 
     Planner --> Registry
     Delegate --> Registry
     Skill --> LLM
+    Skill --> StructuredOutput
     RuntimeCore --> Skill
 
     RuntimeCore --> Episodic
@@ -116,9 +151,15 @@ flowchart TD
     Telegram --> Control
     Slack --> Control
     WhatsApp --> Control
+    DiscordBridge --> Control
     Control --> Consent
     Control --> SourceState
     Control --> Episodic
+
+    MCP --> CheckpointHandler
+    MCP --> IngestionHandler
+    CheckpointHandler --> CompensatingRollback
+    IngestionHandler --> Control
 
     MCP --> PolymarketToolRouter
     PolymarketToolRouter --> PolymarketApiClient
@@ -131,4 +172,7 @@ flowchart TD
 
     MCP --> MacrofactorToolRouter
     MacrofactorToolRouter --> MacrofactorMcp
+
+    MCP --> GoogleWorkspaceToolRouter
+    GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
 ```

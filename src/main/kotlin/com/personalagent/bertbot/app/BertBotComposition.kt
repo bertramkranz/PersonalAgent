@@ -8,20 +8,34 @@ import com.personalagent.bertbot.graph.nodes.ExecutorNode
 import com.personalagent.bertbot.graph.nodes.MessageCaptureNode
 import com.personalagent.bertbot.graph.nodes.NodeIds
 import com.personalagent.bertbot.graph.nodes.PlannerNode
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
 import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphEdge
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
+import com.personalagent.bertbot.graph.runtime.BertBotRollbackService
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.graph.runtime.CompensatingRollbackService
 import com.personalagent.bertbot.graph.runtime.DelegationToExecutorStateValidator
+import com.personalagent.bertbot.graph.runtime.ExternalChatReplyCompensator
+import com.personalagent.bertbot.graph.runtime.StateEventStore
 import com.personalagent.bertbot.graph.runtime.StateHandoffValidator
+import com.personalagent.bertbot.graph.runtime.StateOnlyRollbackService
+import com.personalagent.bertbot.graph.runtime.StateReplayService
+import com.personalagent.bertbot.graph.runtime.ToolCompensator
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.graph.store.FileBertBotCheckpointStore
 import com.personalagent.bertbot.graph.store.FileBertBotStateStore
+import com.personalagent.bertbot.graph.store.FileStateEventStore
+import com.personalagent.bertbot.graph.store.JdbcBertBotCheckpointStore
 import com.personalagent.bertbot.graph.store.JdbcBertBotStateStore
+import com.personalagent.bertbot.graph.store.JdbcStateEventStore
 import com.personalagent.bertbot.ingestion.FileConsentStore
 import com.personalagent.bertbot.ingestion.FileSourceStateStore
 import com.personalagent.bertbot.ingestion.IngestionService
 import com.personalagent.bertbot.ingestion.JdbcConsentStore
 import com.personalagent.bertbot.ingestion.JdbcSourceStateStore
+import com.personalagent.bertbot.ingestion.connectors.DiscordChatBridge
+import com.personalagent.bertbot.ingestion.connectors.DiscordConnectorAdapter
 import com.personalagent.bertbot.ingestion.connectors.SlackChatBridge
 import com.personalagent.bertbot.ingestion.connectors.SlackConnectorAdapter
 import com.personalagent.bertbot.ingestion.connectors.TelegramChatBridge
@@ -40,17 +54,26 @@ import com.personalagent.bertbot.memory.SafeMemorySummarizer
 import com.personalagent.bertbot.memory.SemanticMemory
 import com.personalagent.bertbot.memory.UserProfile
 import com.personalagent.bertbot.memory.UserProfileStore
+import com.personalagent.bertbot.serialization.AgentJsonCodec
+import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
+import com.personalagent.bertbot.serialization.KotlinxAgentJsonCodec
 import java.io.File
 
 internal object BertBotGraphFactory {
     fun create(
         stateStore: BertBotStateStore,
         config: BertBotAgentConfig,
+        checkpointStore: BertBotCheckpointStore? = null,
+        enableAutomaticCheckpointing: Boolean = false,
+        eventSourcingConfiguration: BertBotGraphRunner.EventSourcingConfiguration = BertBotGraphRunner.EventSourcingConfiguration(),
     ): BertBotGraphRunner =
         BertBotGraphRunner(
             definition = createDefinition(config),
             stateStore = stateStore,
             handoffValidators = createHandoffValidators(),
+            checkpointStore = checkpointStore,
+            enableAutomaticCheckpointing = enableAutomaticCheckpointing,
+            eventSourcing = eventSourcingConfiguration,
         )
 
     private fun createDefinition(config: BertBotAgentConfig): BertBotGraphDefinition {
@@ -89,6 +112,15 @@ internal object BertBotRuntimeDependenciesFactory {
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): BertBotStateStore = BertBotStateStoreFactory.create(persistenceConfiguration)
 
+    fun createJsonCodec(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): AgentJsonCodec {
+        return when (persistenceConfiguration.jsonCodec.lowercase()) {
+            "kotlinx", "kotlinx-serialization", "koog" -> KotlinxAgentJsonCodec()
+            else -> GsonAgentJsonCodec()
+        }
+    }
+
     fun createMemoryRuntime(
         config: BertBotAgentConfig,
         llmGateway: LlmGateway,
@@ -115,6 +147,68 @@ internal object BertBotRuntimeDependenciesFactory {
             enablePeriodicScheduler = enablePeriodicScheduler,
             llmGateway = llmGateway,
         )
+
+    fun createCheckpointStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): BertBotCheckpointStore {
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        val codec = createJsonCodec(persistenceConfiguration)
+        return when {
+            BertBotJdbcBackend.isJdbcBackend(normalizedBackend) ->
+                JdbcBertBotCheckpointStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.checkpointJdbcTable,
+                    codec = codec,
+                )
+            else -> FileBertBotCheckpointStore(File(persistenceConfiguration.checkpointFilePath), codec = codec)
+        }
+    }
+
+    fun createRollbackService(
+        stateStore: BertBotStateStore,
+        checkpointStore: BertBotCheckpointStore,
+        stateEventStore: StateEventStore? = null,
+        compensators: List<ToolCompensator> = createCompensators(),
+    ): BertBotRollbackService =
+        CompensatingRollbackService(
+            stateRollbackService = StateOnlyRollbackService(stateStore = stateStore, checkpointStore = checkpointStore),
+            checkpointStore = checkpointStore,
+            stateEventStore = stateEventStore,
+            compensators = compensators,
+        )
+
+    fun createStateEventStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): StateEventStore {
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        val codec = createJsonCodec(persistenceConfiguration)
+        return when {
+            BertBotJdbcBackend.isJdbcBackend(normalizedBackend) ->
+                JdbcStateEventStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.stateEventJdbcTable,
+                    codec = codec,
+                )
+            else -> FileStateEventStore(File(persistenceConfiguration.stateEventFilePath), codec = codec)
+        }
+    }
+
+    fun createCompensators(): List<ToolCompensator> =
+        listOf(
+            ExternalChatReplyCompensator("telegram"),
+            ExternalChatReplyCompensator("slack"),
+            ExternalChatReplyCompensator("whatsapp"),
+            ExternalChatReplyCompensator("discord"),
+        )
+
+    fun createStateReplayService(
+        checkpointStore: BertBotCheckpointStore,
+        stateEventStore: StateEventStore,
+    ): StateReplayService = StateReplayService(checkpointStore = checkpointStore, eventStore = stateEventStore)
 }
 
 private object BertBotJdbcBackend {
@@ -134,16 +228,18 @@ private object BertBotJdbcBackend {
 private object BertBotStateStoreFactory {
     fun create(persistenceConfiguration: PersistenceRuntimeConfiguration): BertBotStateStore {
         val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        val codec = BertBotRuntimeDependenciesFactory.createJsonCodec(persistenceConfiguration)
         return when (normalizedBackend) {
-            "file" -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+            "file" -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath), codec = codec)
             "jdbc", "postgres", "postgresql" ->
                 JdbcBertBotStateStore(
                     jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
                     username = persistenceConfiguration.jdbcUser,
                     password = persistenceConfiguration.jdbcPassword,
                     tableName = persistenceConfiguration.jdbcTable,
+                    codec = codec,
                 )
-            else -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+            else -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath), codec = codec)
         }
     }
 }
@@ -326,6 +422,7 @@ internal data class BertBotConnectorRuntime(
     val telegram: TelegramConnectorAdapter? = null,
     val slack: SlackConnectorAdapter? = null,
     val whatsapp: WhatsAppConnectorAdapter? = null,
+    val discord: DiscordConnectorAdapter? = null,
 )
 
 internal class BertBotRequestContextBuilder(
@@ -380,6 +477,7 @@ internal object BertBotConnectorRuntimeFactory {
         val telegram = if (config.ingestion.telegram.connector.enabled) TelegramConnectorAdapter(TelegramChatBridge(responder)) else null
         val slack = if (config.ingestion.slack.connector.enabled) SlackConnectorAdapter(SlackChatBridge(responder)) else null
         val whatsapp = if (config.ingestion.whatsapp.connector.enabled) WhatsAppConnectorAdapter(WhatsAppChatBridge(responder)) else null
-        return BertBotConnectorRuntime(telegram = telegram, slack = slack, whatsapp = whatsapp)
+        val discord = if (config.ingestion.discord.connector.enabled) DiscordConnectorAdapter(DiscordChatBridge(responder)) else null
+        return BertBotConnectorRuntime(telegram = telegram, slack = slack, whatsapp = whatsapp, discord = discord)
     }
 }

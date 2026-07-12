@@ -1,13 +1,18 @@
 package com.personalagent.bertbot.agents
 
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.llm.LlmGateway
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ToolCallingSkillTest {
+    private val gson = GsonBuilder().disableHtmlEscaping().create()
+
     @Test
     fun `responds directly when no tool call needed`() {
         val gateway = SequenceLlmGateway(listOf("""{"action":"respond","response":"Hello!"}"""))
@@ -100,11 +105,77 @@ class ToolCallingSkillTest {
         assertEquals("This is not valid JSON", response)
     }
 
+    @Test
+    fun `formats calendar events from mcp tool result envelope`() {
+        val gateway =
+            SequenceLlmGateway(
+                listOf(
+                    """{"action":"call_tool","tool":"google_workspace_calendar_listEvents","arguments":{}}""",
+                    """{"action":"respond","response":"Here are the events"}""",
+                ),
+            )
+        val skill =
+            ToolCallingSkill(
+                gateway,
+                listOf(toolDef("google_workspace_calendar_listEvents")),
+                { _, _ ->
+                    mcpToolResult(
+                        """{"events":[{"summary":"Team Sync","start":{"dateTime":"2026-07-12T10:00:00Z"},"end":{"dateTime":"2026-07-12T10:30:00Z"},"description":"Planning"}]}""",
+                    )
+                },
+            )
+
+        val response = skill.invoke("System", "User question", TracingContext())
+
+        assertContains(response, "Calendar Events")
+        assertContains(response, "Team Sync")
+        assertContains(response, "Start: 2026-07-12T10:00:00Z")
+    }
+
+    @Test
+    fun `formats calendar list from mcp tool result envelope`() {
+        val gateway =
+            SequenceLlmGateway(
+                listOf(
+                    """{"action":"call_tool","tool":"google_workspace_calendar_listCalendars","arguments":{}}""",
+                    """{"action":"respond","response":"Here are the calendars"}""",
+                ),
+            )
+        val skill =
+            ToolCallingSkill(
+                gateway,
+                listOf(toolDef("google_workspace_calendar_listCalendars")),
+                { _, _ ->
+                    mcpToolResult(
+                        """{"calendars":[{"id":"primary","summary":"Personal","primary":true}]}""",
+                    )
+                },
+            )
+
+        val response = skill.invoke("System", "User question", TracingContext())
+
+        assertContains(response, "Your Calendars")
+        assertContains(response, "Personal")
+        assertContains(response, "Primary")
+    }
+
     private fun toolDef(name: String): JsonObject {
         val obj = JsonObject()
         obj.addProperty("name", name)
         obj.addProperty("description", "Test tool")
         return obj
+    }
+
+    private fun mcpToolResult(text: String): String {
+        val result = JsonObject()
+        val content = JsonArray()
+        val textContent = JsonObject()
+        textContent.addProperty("type", "text")
+        textContent.addProperty("text", text)
+        content.add(textContent)
+        result.add("content", content)
+        result.addProperty("isError", false)
+        return gson.toJson(result)
     }
 
     private class SequenceLlmGateway(private val responses: List<String>) : LlmGateway {

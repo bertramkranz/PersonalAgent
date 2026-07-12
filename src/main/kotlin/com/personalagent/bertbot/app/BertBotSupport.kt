@@ -1,9 +1,12 @@
+@file:Suppress("TooManyFunctions")
+
 package com.personalagent.bertbot.app
 
-import com.google.gson.JsonParser
+import com.google.gson.JsonElement
 import com.openai.client.OpenAIClient
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import com.openai.models.ChatModel
+import com.personalagent.bertbot.agents.KoogStructuredOutputGateway
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
@@ -22,7 +25,12 @@ internal data class AiRuntimeConfiguration(
 
 internal data class PersistenceRuntimeConfiguration(
     val backend: String = DEFAULT_PERSISTENCE_BACKEND,
+    val jsonCodec: String = DEFAULT_JSON_CODEC,
     val stateFilePath: String = DEFAULT_STATE_FILE_PATH,
+    val checkpointFilePath: String = DEFAULT_CHECKPOINT_FILE_PATH,
+    val checkpointAutoSaveEnabled: Boolean = DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED,
+    val eventSourcingEnabled: Boolean = DEFAULT_EVENT_SOURCING_ENABLED,
+    val stateEventFilePath: String = DEFAULT_STATE_EVENT_FILE_PATH,
     val episodicMemoryFilePath: String = DEFAULT_EPISODIC_MEMORY_FILE_PATH,
     val semanticMemoryFilePath: String = DEFAULT_SEMANTIC_MEMORY_FILE_PATH,
     val profileFilePath: String = DEFAULT_PROFILE_FILE_PATH,
@@ -33,6 +41,8 @@ internal data class PersistenceRuntimeConfiguration(
     val jdbcUser: String? = null,
     val jdbcPassword: String? = null,
     val jdbcTable: String = DEFAULT_STATE_JDBC_TABLE,
+    val checkpointJdbcTable: String = DEFAULT_CHECKPOINT_JDBC_TABLE,
+    val stateEventJdbcTable: String = DEFAULT_STATE_EVENT_JDBC_TABLE,
     val episodicMemoryJdbcTable: String = DEFAULT_EPISODIC_MEMORY_JDBC_TABLE,
     val semanticMemoryJdbcTable: String = DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE,
     val profileJdbcTable: String = DEFAULT_PROFILE_JDBC_TABLE,
@@ -61,14 +71,40 @@ internal data class GoogleWorkspaceRuntimeConfiguration(
     val toolNamePrefix: String = DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX,
 )
 
+internal data class KoogFeatureRuntimeConfiguration(
+    val chatMemoryEnabled: Boolean = DEFAULT_KOOG_CHAT_MEMORY_ENABLED,
+    val chatMemoryWindowSize: Int = DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE,
+    val longTermMemoryEnabled: Boolean = DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED,
+    val longTermMemoryTopK: Int = DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K,
+    val openTelemetryServiceName: String = DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME,
+    val openTelemetryServiceVersion: String = DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION,
+    val openTelemetryVerbose: Boolean = DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE,
+    val openTelemetryOtlpEndpoint: String? = null,
+)
+
+internal data class CheckpointRollbackPolicyConfiguration(
+    val environment: String = DEFAULT_RUNTIME_ENVIRONMENT,
+    val rollbackEnabled: Boolean = DEFAULT_CHECKPOINT_ROLLBACK_ENABLED,
+    val requireConfirm: Boolean = DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM,
+    val allowInProtectedEnvironment: Boolean = DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED,
+) {
+    val isProtectedEnvironment: Boolean
+        get() = environment.lowercase() in PROTECTED_RUNTIME_ENVIRONMENTS
+}
+
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
 internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 internal const val DEFAULT_OLLAMA_TIMEOUT_SECONDS: Long = 120
 internal const val DEFAULT_PERSISTENCE_BACKEND = "file"
+internal const val DEFAULT_JSON_CODEC = "gson"
 internal const val DEFAULT_STATE_FILES_DIRECTORY = "state"
 internal const val DEFAULT_LOGS_DIRECTORY = "logs"
 internal const val DEFAULT_STATE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-state.json"
+internal const val DEFAULT_CHECKPOINT_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-checkpoints.json"
+internal const val DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED = false
+internal const val DEFAULT_EVENT_SOURCING_ENABLED = false
+internal const val DEFAULT_STATE_EVENT_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-state-events.json"
 internal const val DEFAULT_EPISODIC_MEMORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-memory.txt"
 internal const val DEFAULT_SEMANTIC_MEMORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-semantic-memory.txt"
 internal const val DEFAULT_PROFILE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-profile.json"
@@ -78,6 +114,8 @@ internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "$DEFAULT_STATE_
 internal const val DEFAULT_TRACE_FILE_PATH = "$DEFAULT_LOGS_DIRECTORY/bertbot-trace.jsonl"
 internal const val DEFAULT_INTERACTIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-interactions.mmd"
 internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
+internal const val DEFAULT_CHECKPOINT_JDBC_TABLE = "bertbot_checkpoint_snapshot"
+internal const val DEFAULT_STATE_EVENT_JDBC_TABLE = "bertbot_state_event"
 internal const val DEFAULT_EPISODIC_MEMORY_JDBC_TABLE = "bertbot_memory_episodic_snapshot"
 internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic_snapshot"
 internal const val DEFAULT_PROFILE_JDBC_TABLE = "bertbot_profile_snapshot"
@@ -93,6 +131,18 @@ internal const val DEFAULT_GOOGLE_WORKSPACE_COMMAND = "npx"
 internal val DEFAULT_GOOGLE_WORKSPACE_ARGS = listOf("-y", "-p", "github:gemini-cli-extensions/workspace#v0.0.8", "gemini-workspace-server")
 internal const val DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS: Long = 60
 internal const val DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX = "google_workspace_"
+internal const val DEFAULT_KOOG_CHAT_MEMORY_ENABLED = true
+internal const val DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE = 50
+internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED = true
+internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K = 5
+internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME = "personalagent-bertbot"
+internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION = "0.1.0"
+internal const val DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE = false
+internal const val DEFAULT_RUNTIME_ENVIRONMENT = "dev"
+internal const val DEFAULT_CHECKPOINT_ROLLBACK_ENABLED = true
+internal const val DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM = true
+internal const val DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED = false
+internal val PROTECTED_RUNTIME_ENVIRONMENTS = setOf("prod", "production", "staging", "preprod")
 
 internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
@@ -100,6 +150,7 @@ internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectin
         llmGateway = llmGateway,
         outputFormatInstructions = "Return valid JSON object only: {\"response\": \"<assistant response>\"}",
         parser = ::parseAssistantResponseEnvelope,
+        structuredOutputGateway = KoogStructuredOutputGateway(),
     )
 }
 
@@ -164,6 +215,7 @@ internal fun resolvePersistenceRuntimeConfiguration(): PersistenceRuntimeConfigu
         dotEnvValues = loadDotEnvValues(),
     )
 
+@Suppress("LongMethod")
 internal fun resolvePersistenceRuntimeConfiguration(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
@@ -175,6 +227,33 @@ internal fun resolvePersistenceRuntimeConfiguration(
             ?: DEFAULT_PERSISTENCE_BACKEND
 
     val stateFilePath = resolvePersistencePathSetting("BERTBOT_STATE_FILE_PATH", environment, dotEnvValues, DEFAULT_STATE_FILE_PATH)
+    val jsonCodec =
+        resolveRuntimeSetting("BERTBOT_JSON_CODEC", environment, dotEnvValues)
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_JSON_CODEC
+    val checkpointFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_CHECKPOINT_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_CHECKPOINT_FILE_PATH,
+        )
+    val checkpointAutoSaveEnabled =
+        resolveRuntimeSetting("BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED
+    val eventSourcingEnabled =
+        resolveRuntimeSetting("BERTBOT_EVENT_SOURCING_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_EVENT_SOURCING_ENABLED
+    val stateEventFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_STATE_EVENT_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_STATE_EVENT_FILE_PATH,
+        )
     val episodicMemoryFilePath =
         resolvePersistencePathSetting(
             "BERTBOT_MEMORY_EPISODIC_FILE_PATH",
@@ -216,7 +295,12 @@ internal fun resolvePersistenceRuntimeConfiguration(
 
     return PersistenceRuntimeConfiguration(
         backend = backend,
+        jsonCodec = jsonCodec,
         stateFilePath = stateFilePath,
+        checkpointFilePath = checkpointFilePath,
+        checkpointAutoSaveEnabled = checkpointAutoSaveEnabled,
+        eventSourcingEnabled = eventSourcingEnabled,
+        stateEventFilePath = stateEventFilePath,
         episodicMemoryFilePath = episodicMemoryFilePath,
         semanticMemoryFilePath = semanticMemoryFilePath,
         profileFilePath = profileFilePath,
@@ -227,6 +311,8 @@ internal fun resolvePersistenceRuntimeConfiguration(
         jdbcUser = resolveRuntimeSetting("BERTBOT_STATE_JDBC_USER", environment, dotEnvValues),
         jdbcPassword = resolveRuntimeSetting("BERTBOT_STATE_JDBC_PASSWORD", environment, dotEnvValues),
         jdbcTable = tableNames.jdbcTable,
+        checkpointJdbcTable = tableNames.checkpointJdbcTable,
+        stateEventJdbcTable = tableNames.stateEventJdbcTable,
         episodicMemoryJdbcTable = tableNames.episodicMemoryJdbcTable,
         semanticMemoryJdbcTable = tableNames.semanticMemoryJdbcTable,
         profileJdbcTable = tableNames.profileJdbcTable,
@@ -242,6 +328,20 @@ private fun resolvePersistenceTableNames(
     PersistenceTableNames(
         jdbcTable =
             resolvePersistencePathSetting("BERTBOT_STATE_JDBC_TABLE", environment, dotEnvValues, DEFAULT_STATE_JDBC_TABLE),
+        checkpointJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_CHECKPOINT_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_CHECKPOINT_JDBC_TABLE,
+            ),
+        stateEventJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_STATE_EVENT_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_STATE_EVENT_JDBC_TABLE,
+            ),
         episodicMemoryJdbcTable =
             resolvePersistencePathSetting(
                 "BERTBOT_MEMORY_EPISODIC_JDBC_TABLE",
@@ -276,6 +376,8 @@ private fun resolvePersistenceTableNames(
 
 private data class PersistenceTableNames(
     val jdbcTable: String,
+    val checkpointJdbcTable: String,
+    val stateEventJdbcTable: String,
     val episodicMemoryJdbcTable: String,
     val semanticMemoryJdbcTable: String,
     val profileJdbcTable: String,
@@ -387,6 +489,98 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
     )
 }
 
+internal fun resolveKoogFeatureRuntimeConfiguration(): KoogFeatureRuntimeConfiguration =
+    resolveKoogFeatureRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveKoogFeatureRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): KoogFeatureRuntimeConfiguration {
+    val chatMemoryEnabled =
+        resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_KOOG_CHAT_MEMORY_ENABLED
+    val chatMemoryWindowSize =
+        resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceAtLeast(1)
+            ?: DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE
+    val longTermMemoryEnabled =
+        resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED
+    val longTermMemoryTopK =
+        resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 50)
+            ?: DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K
+    val openTelemetryServiceName =
+        resolveRuntimeSetting("BERTBOT_KOOG_OTEL_SERVICE_NAME", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME
+    val openTelemetryServiceVersion =
+        resolveRuntimeSetting("BERTBOT_KOOG_OTEL_SERVICE_VERSION", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION
+    val openTelemetryVerbose =
+        resolveRuntimeSetting("BERTBOT_KOOG_OTEL_VERBOSE", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE
+    val openTelemetryOtlpEndpoint =
+        resolveRuntimeSetting("BERTBOT_KOOG_OTEL_OTLP_ENDPOINT", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+
+    return KoogFeatureRuntimeConfiguration(
+        chatMemoryEnabled = chatMemoryEnabled,
+        chatMemoryWindowSize = chatMemoryWindowSize,
+        longTermMemoryEnabled = longTermMemoryEnabled,
+        longTermMemoryTopK = longTermMemoryTopK,
+        openTelemetryServiceName = openTelemetryServiceName,
+        openTelemetryServiceVersion = openTelemetryServiceVersion,
+        openTelemetryVerbose = openTelemetryVerbose,
+        openTelemetryOtlpEndpoint = openTelemetryOtlpEndpoint,
+    )
+}
+
+internal fun resolveCheckpointRollbackPolicyConfiguration(): CheckpointRollbackPolicyConfiguration =
+    resolveCheckpointRollbackPolicyConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveCheckpointRollbackPolicyConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): CheckpointRollbackPolicyConfiguration {
+    val runtimeEnvironment =
+        resolveRuntimeSetting("BERTBOT_RUNTIME_ENV", environment, dotEnvValues)
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_RUNTIME_ENVIRONMENT
+    val rollbackEnabled =
+        resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_CHECKPOINT_ROLLBACK_ENABLED
+    val requireConfirm =
+        resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM
+    val allowInProtectedEnvironment =
+        resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED
+
+    return CheckpointRollbackPolicyConfiguration(
+        environment = runtimeEnvironment,
+        rollbackEnabled = rollbackEnabled,
+        requireConfirm = requireConfirm,
+        allowInProtectedEnvironment = allowInProtectedEnvironment,
+    )
+}
+
 private fun parseCommandArgs(value: String): List<String> {
     return value
         .split(',')
@@ -473,14 +667,8 @@ internal data class AssistantResponseEnvelope(
     val response: String,
 )
 
-internal fun parseAssistantResponseEnvelope(rawOutput: String): AssistantResponseEnvelope {
-    val normalized =
-        rawOutput
-            .removePrefix("```json")
-            .removePrefix("```")
-            .removeSuffix("```")
-            .trim()
-    val json = JsonParser.parseString(normalized).asJsonObject
+internal fun parseAssistantResponseEnvelope(jsonElement: JsonElement): AssistantResponseEnvelope {
+    val json = jsonElement.asJsonObject
     val response = json.get("response")?.asString?.trim().orEmpty()
 
     if (response.isBlank()) {

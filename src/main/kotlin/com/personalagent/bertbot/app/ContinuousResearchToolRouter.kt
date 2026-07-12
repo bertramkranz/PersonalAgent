@@ -14,9 +14,10 @@ internal class ContinuousResearchToolRouter(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
+        val request = ToolInvocationRequestMapper.from(toolName, params)
         return when (toolName) {
-            RESEARCH_LIST_TOOL_NAME -> handleList(params)
-            RESEARCH_RUN_NOW_TOOL_NAME -> handleRunNow(params)
+            RESEARCH_LIST_TOOL_NAME -> handleList(request)
+            RESEARCH_RUN_NOW_TOOL_NAME -> handleRunNow(request)
             else -> null
         }
     }
@@ -38,8 +39,8 @@ internal class ContinuousResearchToolRouter(
             },
         )
 
-    private fun handleList(params: JsonObject): Pair<Boolean, String> {
-        val arguments = readObjectValue(params, "arguments") ?: params
+    private fun handleList(request: ToolInvocationRequestDto): Pair<Boolean, String> {
+        val arguments = request.arguments
         val category = readStringValue(arguments, "category")
         val limit = (readIntValue(arguments, "limit") ?: 10).coerceIn(1, 100)
         val recommendations = service.listRecommendations(limit = limit, category = category)
@@ -62,8 +63,8 @@ internal class ContinuousResearchToolRouter(
         return false to text
     }
 
-    private fun handleRunNow(params: JsonObject): Pair<Boolean, String> {
-        val arguments = readObjectValue(params, "arguments") ?: params
+    private fun handleRunNow(request: ToolInvocationRequestDto): Pair<Boolean, String> {
+        val arguments = request.arguments
         val reason = readStringValue(arguments, "reason") ?: "manual_trigger"
         val report = service.runNow(reason)
         val summary =
@@ -123,17 +124,6 @@ private class ResearchToolSchemaBuilder {
     fun required(vararg names: String) {
         names.forEach { name -> required.add(name) }
     }
-}
-
-private fun readObjectValue(
-    source: JsonObject,
-    name: String,
-): JsonObject? {
-    val element = source.get(name) ?: return null
-    if (!element.isJsonObject) {
-        return null
-    }
-    return element.asJsonObject
 }
 
 private fun readStringValue(

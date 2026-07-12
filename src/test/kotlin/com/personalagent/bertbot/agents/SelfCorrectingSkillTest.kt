@@ -16,7 +16,7 @@ class SelfCorrectingSkillTest {
                 name = "integer_parser",
                 llmGateway = gateway,
                 outputFormatInstructions = "Return only an integer as plain text.",
-                parser = { it.trim().toInt() },
+                parser = { it.asString.trim().toInt() },
                 maxAttempts = 3,
             )
 
@@ -38,7 +38,7 @@ class SelfCorrectingSkillTest {
                 name = "integer_parser",
                 llmGateway = gateway,
                 outputFormatInstructions = "Return only an integer as plain text.",
-                parser = { it.trim().toInt() },
+                parser = { it.asString.trim().toInt() },
                 maxAttempts = 3,
             )
 
@@ -61,7 +61,7 @@ class SelfCorrectingSkillTest {
                 name = "integer_parser",
                 llmGateway = gateway,
                 outputFormatInstructions = "Return only an integer as plain text.",
-                parser = { it.trim().toInt() },
+                parser = { it.asString.trim().toInt() },
                 maxAttempts = 3,
             )
 

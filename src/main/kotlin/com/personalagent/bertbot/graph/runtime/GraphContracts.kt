@@ -22,6 +22,37 @@ interface BertBotStateStore {
     ): T = action()
 }
 
+data class BertBotCheckpoint(
+    val checkpointId: String,
+    val scopeKey: String,
+    val traceId: String?,
+    val nodeId: String?,
+    val state: BertBotState,
+    val createdAtEpochMillis: Long,
+)
+
+interface BertBotCheckpointStore {
+    fun save(checkpoint: BertBotCheckpoint)
+
+    fun loadLatest(scopeKey: String): BertBotCheckpoint?
+
+    fun loadById(
+        scopeKey: String,
+        checkpointId: String,
+    ): BertBotCheckpoint?
+
+    fun list(scopeKey: String): List<BertBotCheckpoint>
+}
+
+interface BertBotRollbackService {
+    fun rollbackToCheckpoint(
+        scopeKey: String,
+        checkpointId: String,
+    ): BertBotState
+
+    fun rollbackToLatest(scopeKey: String): BertBotState
+}
+
 data class BertBotGraphEdge(
     val fromNodeId: String,
     val toNodeId: String,

@@ -32,6 +32,12 @@ internal object McpStatusProviderFactory {
                     input.toolNames.polymarketGamma,
                     input.toolNames.polymarketClob,
                     input.toolNames.polymarketData,
+                    input.toolNames.checkpointList,
+                    input.toolNames.checkpointLatest,
+                    input.toolNames.checkpointGet,
+                    input.toolNames.checkpointRollback,
+                    input.toolNames.checkpointRollbackLatest,
+                    input.toolNames.checkpointPolicy,
                 )
 
             if (input.startup.runtime?.ingestionControlPlane() != null) {
@@ -53,6 +59,12 @@ internal object McpStatusProviderFactory {
             Runtime provider: ${input.aiRuntimeConfiguration.provider}
             Runtime model: ${input.aiRuntimeConfiguration.model}
             Runtime error: ${input.startup.errorMessage ?: "none"}
+                        Checkpoint rollback policy:
+                            environment=${input.checkpointRollbackPolicy.environment}
+                            protectedEnvironment=${input.checkpointRollbackPolicy.isProtectedEnvironment}
+                            rollbackEnabled=${input.checkpointRollbackPolicy.rollbackEnabled}
+                            requireConfirm=${input.checkpointRollbackPolicy.requireConfirm}
+                            allowInProtectedEnvironment=${input.checkpointRollbackPolicy.allowInProtectedEnvironment}
             Session check timestamp: ${Instant.now()}
             """.trimIndent()
         }
@@ -67,4 +79,5 @@ internal data class McpStatusProviderInput(
     val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     val continuousResearchToolRouter: ContinuousResearchToolRouter?,
     val toolNames: McpToolNames,
+    val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration,
 )

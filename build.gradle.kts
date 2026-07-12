@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.3.0"
+    kotlin("plugin.serialization") version "2.3.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
     application
@@ -19,7 +20,21 @@ repositories {
     mavenCentral()
 }
 
+val koogVersion = "1.0.0"
+val koogBetaVersion = "1.0.0-beta"
+
 dependencies {
+    // Koog core runtime and optional features for chat memory, long-term memory, and telemetry.
+    implementation("ai.koog:koog-agents:$koogVersion")
+    implementation("ai.koog:agents-features-memory:$koogVersion")
+    implementation("ai.koog:agents-features-opentelemetry:$koogVersion")
+    implementation("ai.koog:agents-features-longterm-memory:$koogBetaVersion")
+
+    implementation("io.opentelemetry:opentelemetry-api:1.51.0")
+    implementation("io.opentelemetry:opentelemetry-sdk:1.51.0")
+    implementation("io.opentelemetry:opentelemetry-exporter-logging:1.51.0")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.51.0")
+
     // OpenAI Java SDK
     implementation("com.openai:openai-java:4.42.0")
 
@@ -28,6 +43,8 @@ dependencies {
 
     // Coroutines (optional, for async operations)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("net.dv8tion:JDA:5.0.0-beta.24")
 
     // JDBC driver for optional PostgreSQL-backed state persistence.
     runtimeOnly("org.postgresql:postgresql:42.7.4")
@@ -39,6 +56,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
 }
 
 detekt {
@@ -83,6 +101,14 @@ tasks.register<JavaExec>("runWebhookServer") {
     description = "Run BertBot webhook server for Telegram, Slack, and WhatsApp payload routing."
     classpath = sourceSets.main.get().runtimeClasspath
     mainClass.set("com.personalagent.bertbot.app.WebhookMainKt")
+    standardInput = System.`in`
+}
+
+tasks.register<JavaExec>("runDiscordBot") {
+    group = "application"
+    description = "Run BertBot Discord bot listener for two-way message integration."
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.personalagent.bertbot.app.DiscordBotMainKt")
     standardInput = System.`in`
 }
 

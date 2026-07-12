@@ -7,10 +7,13 @@ import com.personalagent.bertbot.graph.nodes.ExecutorNode
 import com.personalagent.bertbot.graph.nodes.MessageCaptureNode
 import com.personalagent.bertbot.graph.nodes.NodeIds
 import com.personalagent.bertbot.graph.nodes.PlannerNode
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
+import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
 import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphEdge
 import com.personalagent.bertbot.graph.runtime.BertBotGraphNode
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
+import com.personalagent.bertbot.graph.runtime.BertBotStateStore
 import com.personalagent.bertbot.graph.runtime.InvalidStateHandoffException
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
 import com.personalagent.bertbot.graph.runtime.RequiredFieldsStateValidator
@@ -26,6 +29,33 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BertBotGraphTest {
+    @Test
+    fun `graph writes automatic checkpoints using provided scope key`() {
+        val stateStore = InMemoryBertBotStateStore()
+        val recordingCheckpointStore = RecordingCheckpointStore()
+        val definition =
+            BertBotGraphDefinition(
+                entryNodeId = NodeIds.CAPTURE,
+                nodes = listOf(MessageCaptureNode()),
+                edges = emptyList(),
+            )
+        val graph =
+            BertBotGraphRunner(
+                definition = definition,
+                stateStore = stateStore,
+                checkpointStore = recordingCheckpointStore,
+                enableAutomaticCheckpointing = true,
+            )
+
+        graph.run(
+            initialState = BertBotState(lastUserMessage = "checkpoint scope"),
+            checkpointScopeKey = "external_telegram_user_1",
+        )
+
+        assertEquals(1, recordingCheckpointStore.saved.size)
+        assertEquals("external_telegram_user_1", recordingCheckpointStore.saved.first().scopeKey)
+    }
+
     @Test
     fun `graph persists latest execution snapshot and routes through planner and executor nodes`() {
         val tempFile = File.createTempFile("bertbot-state", ".json")
@@ -81,10 +111,7 @@ class BertBotGraphTest {
 
     @Test
     fun `graph starts each request from the provided state instead of persisted workflow fields`() {
-        val tempFile = File.createTempFile("bertbot-state", ".json")
-        tempFile.deleteOnExit()
-
-        val stateStore = FileBertBotStateStore(tempFile)
+        val stateStore = InMemoryBertBotStateStore()
         stateStore.save(
             BertBotState(
                 traceId = "persisted-trace",
@@ -160,10 +187,7 @@ class BertBotGraphTest {
 
     @Test
     fun `graph skips delegation execution when no sub-agent match is found`() {
-        val tempFile = File.createTempFile("bertbot-state", ".json")
-        tempFile.deleteOnExit()
-
-        val stateStore = FileBertBotStateStore(tempFile)
+        val stateStore = InMemoryBertBotStateStore()
         val definition =
             BertBotGraphDefinition(
                 entryNodeId = NodeIds.CAPTURE,
@@ -199,10 +223,7 @@ class BertBotGraphTest {
 
     @Test
     fun `graph can route planner directly to executor when no follow-up is needed`() {
-        val tempFile = File.createTempFile("bertbot-state", ".json")
-        tempFile.deleteOnExit()
-
-        val stateStore = FileBertBotStateStore(tempFile)
+        val stateStore = InMemoryBertBotStateStore()
         val definition =
             BertBotGraphDefinition(
                 entryNodeId = NodeIds.CAPTURE,
@@ -232,10 +253,7 @@ class BertBotGraphTest {
 
     @Test
     fun `graph throws max turns exceeded when no node resolves intent`() {
-        val tempFile = File.createTempFile("bertbot-state", ".json")
-        tempFile.deleteOnExit()
-
-        val stateStore = FileBertBotStateStore(tempFile)
+        val stateStore = InMemoryBertBotStateStore()
         val spinningNode =
             object : BertBotGraphNode {
                 override val id: String = "SPIN"
@@ -264,10 +282,7 @@ class BertBotGraphTest {
 
     @Test
     fun `graph blocks invalid state handoff when required fields are missing`() {
-        val tempFile = File.createTempFile("bertbot-state", ".json")
-        tempFile.deleteOnExit()
-
-        val stateStore = FileBertBotStateStore(tempFile)
+        val stateStore = InMemoryBertBotStateStore()
         val firstNode =
             object : BertBotGraphNode {
                 override val id: String = "FIRST"
@@ -329,5 +344,37 @@ class BertBotGraphTest {
         assertEquals("", state.lastUserMessage)
         val backups = tempDirectory.listFiles { _, name -> name.startsWith("bertbot-state.corrupt-") }
         assertTrue(backups?.isNotEmpty() == true)
+    }
+}
+
+private class RecordingCheckpointStore : BertBotCheckpointStore {
+    val saved: MutableList<BertBotCheckpoint> = mutableListOf()
+
+    override fun save(checkpoint: BertBotCheckpoint) {
+        saved.add(checkpoint)
+    }
+
+    override fun loadLatest(scopeKey: String): BertBotCheckpoint? =
+        saved
+            .asReversed()
+            .firstOrNull { it.scopeKey == scopeKey }
+
+    override fun loadById(
+        scopeKey: String,
+        checkpointId: String,
+    ): BertBotCheckpoint? =
+        saved.firstOrNull { it.scopeKey == scopeKey && it.checkpointId == checkpointId }
+
+    override fun list(scopeKey: String): List<BertBotCheckpoint> =
+        saved.filter { it.scopeKey == scopeKey }
+}
+
+private class InMemoryBertBotStateStore : BertBotStateStore {
+    private var state: BertBotState = BertBotState()
+
+    override fun load(): BertBotState = state.copy()
+
+    override fun save(state: BertBotState) {
+        this.state = state.copy()
     }
 }

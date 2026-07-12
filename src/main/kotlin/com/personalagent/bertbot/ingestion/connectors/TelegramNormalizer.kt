@@ -7,41 +7,55 @@ import com.personalagent.bertbot.ingestion.IngestionSource
 import com.personalagent.bertbot.ingestion.IngestionSourceKind
 import com.personalagent.bertbot.ingestion.NormalizedAttachment
 import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class TelegramChatPayload(
     val id: String,
 )
 
+@Serializable
 data class TelegramUserPayload(
     val id: String,
     val username: String? = null,
+    @SerialName("first_name")
     @SerializedName("first_name")
     val firstName: String? = null,
+    @SerialName("last_name")
     @SerializedName("last_name")
     val lastName: String? = null,
 )
 
+@Serializable
 data class TelegramPhotoPayload(
+    @SerialName("file_id")
     @SerializedName("file_id")
     val fileId: String,
     val width: Int? = null,
     val height: Int? = null,
 )
 
+@Serializable
 data class TelegramMessagePayload(
+    @SerialName("message_id")
     @SerializedName("message_id")
     val messageId: String,
+    @SerialName("date")
     @SerializedName("date")
     val dateEpochSeconds: Long,
     val chat: TelegramChatPayload,
     val from: TelegramUserPayload? = null,
     val text: String? = null,
     val caption: String? = null,
+    @SerialName("photo")
     @SerializedName("photo")
     val photos: List<TelegramPhotoPayload>? = null,
 )
 
+@Serializable
 data class TelegramUpdatePayload(
+    @SerialName("update_id")
     @SerializedName("update_id")
     val updateId: String,
     val message: TelegramMessagePayload? = null,

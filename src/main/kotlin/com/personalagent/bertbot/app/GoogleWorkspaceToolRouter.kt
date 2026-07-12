@@ -35,19 +35,20 @@ internal class GoogleWorkspaceToolRouter(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
-        if (toolName.isNullOrBlank() || !toolName.startsWith(runtimeConfiguration.toolNamePrefix)) {
+        val request = ToolInvocationRequestMapper.from(toolName, params)
+        val requestedToolName = request.toolName
+        if (requestedToolName.isNullOrBlank() || !requestedToolName.startsWith(runtimeConfiguration.toolNamePrefix)) {
             return null
         }
 
         val tools = discoverTools() ?: return true to "Google Workspace tool discovery failed. Check runtime configuration and process logs."
         val toolByProxyName = tools.associateBy { proxyToolName(it.name) }
-        val targetTool = toolByProxyName[toolName]
+        val targetTool = toolByProxyName[requestedToolName]
         if (targetTool == null) {
-            return true to "Unknown Google Workspace proxy tool: $toolName"
+            return true to "Unknown Google Workspace proxy tool: $requestedToolName"
         }
 
-        val arguments = params.objectValue("arguments") ?: JsonObject()
-        return transport.callTool(targetTool.name, arguments)
+        return transport.callTool(targetTool.name, request.arguments)
     }
 
     private fun discoverTools(): List<GoogleWorkspaceDiscoveredTool>? {

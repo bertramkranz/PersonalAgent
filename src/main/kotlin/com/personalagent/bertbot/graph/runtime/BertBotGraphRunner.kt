@@ -1,14 +1,25 @@
 package com.personalagent.bertbot.graph.runtime
 
 import com.personalagent.bertbot.graph.model.BertBotState
+import java.util.UUID
 
+@Suppress("LongParameterList")
 class BertBotGraphRunner(
     private val definition: BertBotGraphDefinition,
     private val stateStore: BertBotStateStore,
     private val maxTurns: Int = 5,
     private val handoffValidators: List<StateHandoffValidator<BertBotState>> = emptyList(),
+    private val checkpointStore: BertBotCheckpointStore? = null,
+    private val enableAutomaticCheckpointing: Boolean = false,
+    private val eventSourcing: EventSourcingConfiguration = EventSourcingConfiguration(),
 ) {
-    fun run(initialState: BertBotState): BertBotState {
+    fun run(initialState: BertBotState): BertBotState = run(initialState, DEFAULT_CHECKPOINT_SCOPE_KEY)
+
+    @Suppress("LongMethod")
+    fun run(
+        initialState: BertBotState,
+        checkpointScopeKey: String,
+    ): BertBotState {
         val tracingContext = TracingContext(initialState.traceId ?: "")
         val effectiveTracingContext =
             if (tracingContext.traceId.isBlank()) {
@@ -53,6 +64,22 @@ class BertBotGraphRunner(
             TraceLogger.info(effectiveTracingContext, "node_start", "node_id=${node.id}")
             state = node.execute(state, effectiveTracingContext)
             TraceLogger.info(effectiveTracingContext, "node_complete", "node_id=${node.id}")
+            maybeEmitStateEvent(
+                eventType = StateEventType.NODE_EXECUTED,
+                state = state,
+                context =
+                    StateEventContext(
+                        nodeId = node.id,
+                        traceId = effectiveTracingContext.traceId,
+                        scopeKey = checkpointScopeKey,
+                    ),
+            )
+            maybeCheckpoint(
+                state = state,
+                nodeId = node.id,
+                traceId = effectiveTracingContext.traceId,
+                checkpointScopeKey = checkpointScopeKey,
+            )
 
             if (isIntentResolved(state)) {
                 unresolvedTurns = 0
@@ -87,6 +114,70 @@ class BertBotGraphRunner(
     private fun isIntentResolved(state: BertBotState): Boolean =
         state.intentResolved
 
+    private fun maybeCheckpoint(
+        state: BertBotState,
+        nodeId: String,
+        traceId: String,
+        checkpointScopeKey: String,
+    ) {
+        if (!enableAutomaticCheckpointing) {
+            return
+        }
+
+        val store = checkpointStore ?: return
+        val checkpoint =
+            BertBotCheckpoint(
+                checkpointId = UUID.randomUUID().toString(),
+                scopeKey = checkpointScopeKey,
+                traceId = traceId,
+                nodeId = nodeId,
+                state = state.copyForPersistence(),
+                createdAtEpochMillis = System.currentTimeMillis(),
+            )
+        store.save(checkpoint)
+        maybeEmitStateEvent(
+            eventType = StateEventType.CHECKPOINT_CREATED,
+            state = state,
+            context = StateEventContext(nodeId = nodeId, traceId = traceId, scopeKey = checkpointScopeKey),
+            metadata = mapOf("checkpointId" to checkpoint.checkpointId),
+        )
+    }
+
+    private fun maybeEmitStateEvent(
+        eventType: StateEventType,
+        state: BertBotState,
+        context: StateEventContext,
+        metadata: Map<String, String> = emptyMap(),
+    ) {
+        if (!eventSourcing.enabled) {
+            return
+        }
+
+        eventSourcing.store?.append(
+            StateEvent(
+                eventId = UUID.randomUUID().toString(),
+                scopeKey = context.scopeKey,
+                traceId = context.traceId,
+                nodeId = context.nodeId,
+                eventType = eventType,
+                state = state.copyForPersistence(),
+                metadata = metadata,
+                createdAtEpochMillis = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    data class EventSourcingConfiguration(
+        val enabled: Boolean = false,
+        val store: StateEventStore? = null,
+    )
+
+    private data class StateEventContext(
+        val nodeId: String,
+        val traceId: String,
+        val scopeKey: String,
+    )
+
     private fun validateHandoff(
         fromNodeId: String,
         toNodeId: String,
@@ -106,5 +197,9 @@ class BertBotGraphRunner(
                     throw InvalidStateHandoffException(fromNodeId, toNodeId, result.errors)
                 }
             }
+    }
+
+    private companion object {
+        private const val DEFAULT_CHECKPOINT_SCOPE_KEY = "global"
     }
 }

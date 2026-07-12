@@ -9,6 +9,7 @@ internal object McpServerBootstrap {
         val googleWorkspaceRuntimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
         val workspaceRoot: File,
         val toolNames: McpToolNames,
+        val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration? = null,
     )
 
     data class DispatcherContext(
@@ -16,8 +17,10 @@ internal object McpServerBootstrap {
         val dispatcher: McpRequestDispatcher,
     )
 
+    @Suppress("CyclomaticComplexMethod")
     fun createDispatcherContext(input: DispatcherContextInput): DispatcherContext {
         val startup = createStartupState(input.aiRuntimeConfiguration, input.workspaceRoot)
+        val checkpointRollbackPolicy = input.checkpointRollbackPolicy ?: resolveCheckpointRollbackPolicyConfiguration()
         val macrofactorToolRouter =
             if (input.macrofactorRuntimeConfiguration.enabled) {
                 MacrofactorToolRouter(input.macrofactorRuntimeConfiguration)
@@ -45,6 +48,7 @@ internal object McpServerBootstrap {
                     googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                     continuousResearchToolRouter = continuousResearchToolRouter,
                     toolNames = input.toolNames,
+                    checkpointRollbackPolicy = checkpointRollbackPolicy,
                 ),
             )
 
@@ -68,6 +72,11 @@ internal object McpServerBootstrap {
                 continuousResearchToolRouter = continuousResearchToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
                 externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
+                listCheckpoints = startup.runtime?.let { runtime -> { scopeKey -> runtime.listCheckpoints(scopeKey ?: "global") } },
+                latestCheckpoint = startup.runtime?.let { runtime -> { scopeKey -> runtime.latestCheckpoint(scopeKey ?: "global") } },
+                checkpointById = startup.runtime?.let { runtime -> { checkpointId, scopeKey -> runtime.checkpointById(checkpointId, scopeKey ?: "global") } },
+                rollbackToCheckpoint = startup.runtime?.let { runtime -> { checkpointId, scopeKey -> runtime.rollbackToCheckpoint(checkpointId, scopeKey ?: "global") } },
+                checkpointRollbackPolicy = checkpointRollbackPolicy,
                 statusProvider = statusProvider,
             )
 

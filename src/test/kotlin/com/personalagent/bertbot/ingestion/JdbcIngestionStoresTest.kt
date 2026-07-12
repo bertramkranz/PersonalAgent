@@ -118,6 +118,33 @@ class JdbcIngestionStoresTest {
         assertNotNull(bCursor)
     }
 
+    @Test
+    fun `jdbc stores round-trip discord source approvals and cursors`() {
+        val jdbcUrl = h2JdbcUrl()
+        val consentStore = JdbcConsentStore(jdbcUrl = jdbcUrl, tableName = "bertbot_consent_snapshot")
+        val sourceStateStore = JdbcSourceStateStore(jdbcUrl = jdbcUrl, tableName = "bertbot_source_snapshot")
+
+        val source =
+            IngestionSource(
+                platform = IngestionPlatform.DISCORD,
+                sourceKind = IngestionSourceKind.CHANNEL,
+                sourceId = "discord-channel-99",
+                workspaceId = "discord-guild-8",
+            )
+
+        consentStore.upsert(ApprovalRecord(source = source, scope = ApprovalScope.CHANNEL, approved = true))
+        sourceStateStore.upsert(SyncCursor(source = source, cursor = "discord-cursor-jdbc"))
+
+        val reloadedConsent = JdbcConsentStore(jdbcUrl = jdbcUrl, tableName = "bertbot_consent_snapshot")
+        val reloadedSource = JdbcSourceStateStore(jdbcUrl = jdbcUrl, tableName = "bertbot_source_snapshot")
+
+        assertTrue(reloadedConsent.isApproved(source))
+        assertEquals(IngestionPlatform.DISCORD, reloadedConsent.listApproved().first().source.platform)
+        val cursor = reloadedSource.find(source)
+        assertNotNull(cursor)
+        assertEquals("discord-cursor-jdbc", cursor.cursor)
+    }
+
     private fun submitWorker(
         pool: java.util.concurrent.ExecutorService,
         start: CountDownLatch,

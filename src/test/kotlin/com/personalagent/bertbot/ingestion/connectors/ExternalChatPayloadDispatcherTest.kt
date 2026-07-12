@@ -140,6 +140,46 @@ class ExternalChatPayloadDispatcherTest {
     }
 
     @Test
+    fun `dispatcher routes discord event json and returns reply json`() {
+        val discordAdapter =
+            DiscordConnectorAdapter(
+                DiscordChatBridge { inbound, _ ->
+                    ExternalChatOutcome(
+                        inbound = inbound,
+                        ingestion = IngestionOutcome(inbound, IngestionDecision.APPROVED),
+                        outbound = NormalizedOutboundMessage(source = inbound.source, text = "hi discord", replyToMessageId = inbound.messageId),
+                    )
+                },
+            )
+        val dispatcher =
+            ExternalChatPayloadDispatcher(
+                connectors = BertBotExternalConnectors(discord = discordAdapter),
+            )
+
+        val rawJson =
+            """
+            {
+              "message_id": "m-1",
+              "channel_id": "ch-9",
+              "guild_id": "g-1",
+              "author_id": "u-2",
+              "author_display_name": "Ada",
+              "content": "hello",
+              "thread_id": "t-7",
+              "timestamp_iso": "2026-07-12T10:15:30Z"
+            }
+            """.trimIndent()
+
+        val replyJson = dispatcher.handleDiscordMessageJson(rawJson)
+
+        assertNotNull(replyJson)
+        val parsed = JsonParser.parseString(replyJson).asJsonObject
+        assertEquals("ch-9", parsed.get("channelId").asString)
+        assertEquals("hi discord", parsed.get("content").asString)
+        assertEquals("m-1", parsed.get("messageReferenceId").asString)
+    }
+
+    @Test
     fun `dispatcher returns null for invalid payload`() {
         val dispatcher = ExternalChatPayloadDispatcher(connectors = BertBotExternalConnectors())
 

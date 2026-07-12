@@ -2,6 +2,7 @@ package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.ConnectorConfig
+import com.personalagent.bertbot.config.DiscordIntegrationConfig
 import com.personalagent.bertbot.config.IngestionConfig
 import com.personalagent.bertbot.config.IngestionPolicyConfig
 import com.personalagent.bertbot.config.SlackIntegrationConfig
@@ -31,6 +32,7 @@ class BertBotConnectorRuntimeFactoryTest {
                         telegram = TelegramIntegrationConfig(connector = ConnectorConfig(enabled = true)),
                         slack = SlackIntegrationConfig(connector = ConnectorConfig(enabled = true, approvalScope = "channel")),
                         whatsapp = WhatsAppIntegrationConfig(connector = ConnectorConfig(enabled = true, approvalScope = "conversation")),
+                        discord = DiscordIntegrationConfig(connector = ConnectorConfig(enabled = true, approvalScope = "channel")),
                     ),
             )
 
@@ -41,6 +43,7 @@ class BertBotConnectorRuntimeFactoryTest {
         assertNotNull(connectors.telegram)
         assertNotNull(connectors.slack)
         assertNotNull(connectors.whatsapp)
+        assertNotNull(connectors.discord)
         runtime.close()
     }
 
@@ -54,6 +57,7 @@ class BertBotConnectorRuntimeFactoryTest {
         assertNull(connectors.telegram)
         assertNull(connectors.slack)
         assertNull(connectors.whatsapp)
+        assertNull(connectors.discord)
         runtime.close()
     }
 }

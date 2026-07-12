@@ -2,6 +2,7 @@ package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.ConnectorConfig
+import com.personalagent.bertbot.config.DiscordIntegrationConfig
 import com.personalagent.bertbot.config.IngestionConfig
 import com.personalagent.bertbot.config.IngestionPolicyConfig
 import com.personalagent.bertbot.config.SlackIntegrationConfig
@@ -51,8 +52,9 @@ internal fun resolveWebhookAgentConfig(
     val enableTelegram = env("BERTBOT_TELEGRAM_ENABLED").toBooleanEnv(defaultValue = true)
     val enableSlack = env("BERTBOT_SLACK_ENABLED").toBooleanEnv(defaultValue = true)
     val enableWhatsApp = env("BERTBOT_WHATSAPP_ENABLED").toBooleanEnv(defaultValue = true)
+    val enableDiscord = env("BERTBOT_DISCORD_ENABLED").toBooleanEnv(defaultValue = false)
 
-    val ingestionEnabled = enableTelegram || enableSlack || enableWhatsApp
+    val ingestionEnabled = enableTelegram || enableSlack || enableWhatsApp || enableDiscord
     return BertBotAgentConfig(
         ingestion =
             IngestionConfig(
@@ -73,7 +75,26 @@ internal fun resolveWebhookAgentConfig(
                         connector = ConnectorConfig(enabled = enableWhatsApp, approvalScope = "conversation"),
                         businessPhoneNumberId = env("BERTBOT_WHATSAPP_BUSINESS_PHONE_ID")?.takeIf { it.isNotBlank() },
                     ),
+                discord =
+                    DiscordIntegrationConfig(
+                        connector = ConnectorConfig(enabled = enableDiscord, approvalScope = "channel"),
+                        guildId = env("BERTBOT_DISCORD_GUILD_ID")?.takeIf { it.isNotBlank() },
+                        approvedChannelIds = parseCsvSet(env("BERTBOT_DISCORD_APPROVED_CHANNEL_IDS")),
+                        approvedDirectMessageIds = parseCsvSet(env("BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS")),
+                    ),
             ),
+    )
+}
+
+internal fun resolveDiscordBotRuntimeConfig(
+    environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
+): DiscordBotRuntimeConfig {
+    fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
+    val enabled = env("BERTBOT_DISCORD_ENABLED").toBooleanEnv(defaultValue = false)
+    return DiscordBotRuntimeConfig(
+        enabled = enabled,
+        token = env("BERTBOT_DISCORD_BOT_TOKEN")?.takeIf { it.isNotBlank() },
     )
 }
 

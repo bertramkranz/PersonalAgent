@@ -15,11 +15,37 @@ services:
       BERTBOT_STATE_JDBC_PASSWORD: bertbot
       BERTBOT_WEBHOOK_HOST: 0.0.0.0
       BERTBOT_WEBHOOK_PORT: 8088
+      # Optional Discord mode overrides:
+      # BERTBOT_RUN_MODE: discord
+      # BERTBOT_DISCORD_ENABLED: "true"
+      # BERTBOT_DISCORD_BOT_TOKEN: <token>
     ports:
       - "8088:8088"
     depends_on:
       postgres:
         condition: service_healthy
+
+  bertbot-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: personalagent-bertbot:local
+    profiles:
+      - mcp
+    restart: "no"
+    env_file:
+      - .env.compose
+    environment:
+      BERTBOT_RUN_MODE: mcp
+      BERTBOT_STATE_STORE: postgres
+      BERTBOT_STATE_JDBC_URL: jdbc:postgresql://postgres:5432/bertbot
+      BERTBOT_STATE_JDBC_USER: bertbot
+      BERTBOT_STATE_JDBC_PASSWORD: bertbot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
 
   postgres:
     image: postgres:16-alpine

@@ -6,12 +6,16 @@ import com.google.gson.JsonParser
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.llm.LlmGateway
+import com.personalagent.bertbot.serialization.AgentJsonCodec
+import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 
 internal class ToolCallingSkill(
     private val llmGateway: LlmGateway,
     private val toolDefinitions: List<JsonObject>,
     private val toolExecutor: (name: String, args: JsonObject) -> String,
     private val maxIterations: Int = 5,
+    private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
+    private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
 ) {
     fun invoke(
         systemPrompt: String,
@@ -137,12 +141,38 @@ internal class ToolCallingSkill(
     private fun formatToolResult(raw: String): String {
         return runCatching {
             val json = JsonParser.parseString(raw).asJsonObject
+            val unwrapped = unwrapToolResult(json)
+            if (unwrapped != null) {
+                return runCatching {
+                    val unwrappedJson = JsonParser.parseString(unwrapped).asJsonObject
+                    when {
+                        unwrappedJson.has("events") -> formatCalendarEvents(unwrappedJson)
+                        unwrappedJson.has("calendars") -> formatCalendars(unwrappedJson)
+                        else -> formatGenericJson(unwrappedJson)
+                    }
+                }.getOrElse { unwrapped }
+            }
             when {
                 json.has("events") -> formatCalendarEvents(json)
                 json.has("calendars") -> formatCalendars(json)
                 else -> formatGenericJson(json)
             }
         }.getOrElse { raw }
+    }
+
+    private fun unwrapToolResult(json: JsonObject): String? {
+        val content = json.getAsJsonArray("content") ?: return null
+        val firstText =
+            content
+                .firstOrNull()
+                ?.takeIf { it.isJsonObject }
+                ?.asJsonObject
+                ?.get("text")
+                ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString
+                ?.trim()
+                ?: return null
+        return firstText.takeIf { it.isNotBlank() }
     }
 
     private fun formatCalendarEvents(json: JsonObject): String {
@@ -198,26 +228,24 @@ internal class ToolCallingSkill(
         return gson.toJson(json)
     }
 
-    private fun parseActionResponse(raw: String): ToolActionResponse? {
-        val normalized =
-            raw
-                .removePrefix("```json")
-                .removePrefix("```")
-                .removeSuffix("```")
-                .trim()
+    private fun parseActionResponse(raw: String): ToolAction? {
+        val payload =
+            runCatching {
+                codec.decode(structuredOutputGateway.parse(raw).toString(), ToolActionEnvelope::class.java)
+            }.getOrNull() ?: return null
+
         return runCatching {
-            val json = JsonParser.parseString(normalized).asJsonObject
-            when (json.get("action")?.asString) {
+            when (payload.action) {
                 "respond" ->
-                    ToolActionResponse(
+                    ToolAction(
                         isRespond = true,
-                        response = json.get("response")?.asString?.trim(),
+                        response = payload.response?.trim(),
                     )
                 "call_tool" ->
-                    ToolActionResponse(
+                    ToolAction(
                         isCallTool = true,
-                        tool = json.get("tool")?.asString,
-                        arguments = json.getAsJsonObject("arguments"),
+                        tool = payload.tool,
+                        arguments = payload.arguments ?: JsonObject(),
                     )
                 else -> null
             }
@@ -225,9 +253,16 @@ internal class ToolCallingSkill(
     }
 }
 
-private data class ToolActionResponse(
+private data class ToolAction(
     val isRespond: Boolean = false,
     val isCallTool: Boolean = false,
+    val response: String? = null,
+    val tool: String? = null,
+    val arguments: JsonObject? = null,
+)
+
+private data class ToolActionEnvelope(
+    val action: String? = null,
     val response: String? = null,
     val tool: String? = null,
     val arguments: JsonObject? = null,
