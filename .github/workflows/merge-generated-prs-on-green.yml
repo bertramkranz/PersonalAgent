@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      verify_token_identity:
+        description: "Log AUTOMATION_PAT actor identity for diagnostics"
+        required: false
+        default: "false"
 
 permissions:
   actions: write
@@ -24,6 +29,15 @@ jobs:
       github.event_name == 'schedule'
 
     steps:
+      - name: Verify automation token identity
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.verify_token_identity == 'true' }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ secrets.AUTOMATION_PAT || github.token }}
+          script: |
+            const { data: actor } = await github.rest.users.getAuthenticated();
+            core.info(`Automation token authenticates as '${actor.login}'.`);
+
       - name: Approve and merge trusted generated PR when ready
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
@@ -34,9 +48,10 @@ jobs:
             const allowlistedAutoApproveAuthors = new Set(['bertramkranz']);
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
-            const baseRequiredCheckNames = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
+            const fallbackRequiredCheckNames = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
             const autoMergeLabel = 'auto-merge';
+            let branchProtectionRequiredCheckNames = null;
 
             function isAcceptedCheckConclusion(conclusion) {
               return acceptedCheckConclusions.has(conclusion || '');
@@ -81,23 +96,42 @@ jobs:
               return isSameRepoEligiblePr(pr) && hasAutoMergeLabel(pr);
             }
 
-            async function requiredCheckNamesForPr(pr) {
-              const names = [...baseRequiredCheckNames];
-
-              // Include lint-workflows when the PR touches workflow files
-              const changedFiles = await github.paginate(
-                github.rest.pulls.listFiles,
-                { owner, repo, pull_number: pr.number, per_page: 100 },
-                (response) => response.data
-              );
-              const touchesWorkflows = changedFiles.some((f) =>
-                f.filename?.startsWith('.github/workflows/')
-              );
-              if (touchesWorkflows) {
-                names.push('lint-workflows');
+            async function getBranchProtectionRequiredCheckNames() {
+              if (Array.isArray(branchProtectionRequiredCheckNames)) {
+                return branchProtectionRequiredCheckNames;
               }
 
-              return names;
+              try {
+                const { data: protection } = await github.rest.repos.getBranchProtection({
+                  owner,
+                  repo,
+                  branch: defaultBranch,
+                });
+
+                const contexts = (protection?.required_status_checks?.contexts || [])
+                  .map((value) => String(value || '').trim())
+                  .filter(Boolean);
+
+                if (contexts.length > 0) {
+                  branchProtectionRequiredCheckNames = [...new Set(contexts)];
+                  core.info(
+                    `Using branch protection required checks: ${branchProtectionRequiredCheckNames.join(', ')}`
+                  );
+                  return branchProtectionRequiredCheckNames;
+                }
+              } catch (error) {
+                core.info(`Unable to read branch protection checks: ${error.message}`);
+              }
+
+              branchProtectionRequiredCheckNames = [...fallbackRequiredCheckNames];
+              core.info(
+                `Falling back to workflow required checks: ${branchProtectionRequiredCheckNames.join(', ')}`
+              );
+              return branchProtectionRequiredCheckNames;
+            }
+
+            async function requiredCheckNamesForPr() {
+              return getBranchProtectionRequiredCheckNames();
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -116,7 +150,7 @@ jobs:
             }
 
             async function checksAreGreen(pr) {
-              const required = await requiredCheckNamesForPr(pr);
+              const required = await requiredCheckNamesForPr();
               const allRuns = await listAllCheckRunsForRef(pr.head.sha);
 
               for (const name of required) {
