@@ -20,7 +20,12 @@ class ExternalChatPayloadDispatcherTest {
                     ExternalChatOutcome(
                         inbound = inbound,
                         ingestion = IngestionOutcome(inbound, IngestionDecision.APPROVED),
-                        outbound = NormalizedOutboundMessage(source = inbound.source, text = "hi telegram", replyToMessageId = inbound.messageId),
+                        outbound =
+                            NormalizedOutboundMessage(
+                                source = inbound.source,
+                                text = "**hi telegram** [View Event](https://example.com)",
+                                replyToMessageId = inbound.messageId,
+                            ),
                     )
                 },
             )
@@ -49,11 +54,54 @@ class ExternalChatPayloadDispatcherTest {
         val parsed = JsonParser.parseString(replyJson).asJsonObject
         assertEquals("sendMessage", parsed.get("method").asString)
         assertEquals("chat-9", parsed.get("chat_id").asString)
-        assertEquals("hi telegram", parsed.get("text").asString)
+        assertEquals("Markdown", parsed.get("parse_mode").asString)
+        assertEquals("*hi telegram* [View Event](https://example.com)", parsed.get("text").asString)
         val replyContext = parsed.get("reply_to_message_id")
         if (replyContext != null && !replyContext.isJsonNull) {
             assertTrue(replyContext.asString.isNotBlank())
         }
+    }
+
+    @Test
+    fun `dispatcher normalizes telegram heading and indented list markdown`() {
+        val telegramAdapter =
+            TelegramConnectorAdapter(
+                TelegramChatBridge { inbound, _ ->
+                    ExternalChatOutcome(
+                        inbound = inbound,
+                        ingestion = IngestionOutcome(inbound, IngestionDecision.APPROVED),
+                        outbound =
+                            NormalizedOutboundMessage(
+                                source = inbound.source,
+                                text = "# Upcoming\n  - First\n    - Nested\n  1. Ordered",
+                            ),
+                    )
+                },
+            )
+        val dispatcher =
+            ExternalChatPayloadDispatcher(
+                connectors = BertBotExternalConnectors(telegram = telegramAdapter),
+            )
+
+        val rawJson =
+            """
+            {
+              "update_id": 2002,
+              "message": {
+                "message_id": 78,
+                "date": 1700000000,
+                "chat": { "id": "chat-10" },
+                "text": "hello"
+              }
+            }
+            """.trimIndent()
+
+        val replyJson = dispatcher.handleTelegramUpdateJson(rawJson)
+
+        assertNotNull(replyJson)
+        val parsed = JsonParser.parseString(replyJson).asJsonObject
+        assertEquals("Markdown", parsed.get("parse_mode").asString)
+        assertEquals("*Upcoming*\n- First\n- Nested\n1. Ordered", parsed.get("text").asString)
     }
 
     @Test
