@@ -97,18 +97,15 @@ internal class McpWorkspaceToolHandler(
                 return@forEach
             }
 
-            var lineNumber = 0
-            var matched = false
             runCatching {
-                file.bufferedReader().use { reader ->
-                    reader.forEachLine { line ->
-                        lineNumber++
-                        if (!matched && line.contains(query, ignoreCase = true)) {
-                            matched = true
+                file.bufferedReader().useLines { lines ->
+                    lines.withIndex()
+                        .firstOrNull { (_, line) -> line.contains(query, ignoreCase = true) }
+                        ?.let { (index, line) ->
+                            val lineNumber = index + 1
                             val snippet = line.trim().take(200)
                             matches.add("${inspector.toWorkspaceRelativePath(file)}:$lineNumber: $snippet")
                         }
-                    }
                 }
             }
         }
