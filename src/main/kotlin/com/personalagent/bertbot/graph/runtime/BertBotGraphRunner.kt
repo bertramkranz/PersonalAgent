@@ -124,6 +124,7 @@ class BertBotGraphRunner(
             return
         }
 
+        val store = checkpointStore ?: return
         val checkpoint =
             BertBotCheckpoint(
                 checkpointId = UUID.randomUUID().toString(),
@@ -133,7 +134,7 @@ class BertBotGraphRunner(
                 state = state.copyForPersistence(),
                 createdAtEpochMillis = System.currentTimeMillis(),
             )
-        checkpointStore?.save(checkpoint)
+        store.save(checkpoint)
         maybeEmitStateEvent(
             eventType = StateEventType.CHECKPOINT_CREATED,
             state = state,
