@@ -23,6 +23,7 @@ updates:
       - "dependencies"
       - "gradle"
       - "production"
+      - "auto-merge"
 
   - package-ecosystem: "gradle"
     directory: "/"
@@ -47,6 +48,7 @@ updates:
       - "dependencies"
       - "gradle"
       - "development"
+      - "auto-merge"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -68,3 +70,4 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+      - "auto-merge"
