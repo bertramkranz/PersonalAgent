@@ -84,11 +84,21 @@ fun main() {
     val securityConfig = resolveWebhookSecurityConfig()
     val agentConfig = resolveWebhookAgentConfig()
     val workspaceRoot = resolveWorkspaceRoot()
+
+    val googleWorkspaceRuntime = resolveGoogleWorkspaceRuntimeConfiguration()
+    val googleWorkspaceRouter =
+        if (googleWorkspaceRuntime.enabled) {
+            GoogleWorkspaceToolRouter(googleWorkspaceRuntime)
+        } else {
+            null
+        }
+
     val runtime =
         BertBotRuntimeFactory.create(
             config = agentConfig,
             workspaceRoot = workspaceRoot,
             enablePeriodicResearchScheduler = true,
+            googleWorkspaceRouter = googleWorkspaceRouter,
         )
     if (runtime == null) {
         printMissingApiKeyHelp()
@@ -114,6 +124,7 @@ fun main() {
     println("Proxy header trust enabled: ${securityConfig.trustProxyHeaders}")
     println("IP allowlist entries: ${securityConfig.allowedIpCidrs.size}")
     println("Rate limit: ${securityConfig.rateLimitMaxRequests} requests/${securityConfig.rateLimitWindowSeconds}s")
+    println("Google Workspace tools enabled: ${googleWorkspaceRouter != null}")
 
     Runtime.getRuntime().addShutdownHook(
         Thread {

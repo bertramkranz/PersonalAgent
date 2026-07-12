@@ -61,7 +61,7 @@ interface BertBotMemoryStore {
 }
 
 class BertBotMemory(
-    private val storageFile: File = File("bertbot-memory.txt"),
+    private val storageFile: File = File("state/bertbot-memory.txt"),
     private val gson: Gson = Gson(),
 ) : BertBotMemoryStore {
     private val lock = Any()

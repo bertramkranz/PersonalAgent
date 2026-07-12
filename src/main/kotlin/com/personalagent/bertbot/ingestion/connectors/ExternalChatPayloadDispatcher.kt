@@ -15,7 +15,7 @@ class ExternalChatPayloadDispatcher(
         val adapter = connectors.telegram ?: return null
         val update = parseTelegramUpdate(rawJson) ?: return null
         val reply = adapter.onUpdate(update, dryRun) ?: return null
-        return gson.toJson(reply)
+        return buildTelegramInlineReply(reply)
     }
 
     fun handleSlackEventJson(
@@ -44,6 +44,15 @@ data class BertBotExternalConnectors(
     val slack: SlackConnectorAdapter? = null,
     val whatsapp: WhatsAppConnectorAdapter? = null,
 )
+
+private fun buildTelegramInlineReply(reply: TelegramReplyPayload): String {
+    val obj = JsonObject()
+    obj.addProperty("method", "sendMessage")
+    obj.addProperty("chat_id", reply.chatId)
+    obj.addProperty("text", reply.text)
+    reply.replyToMessageId?.let { obj.addProperty("reply_to_message_id", it) }
+    return obj.toString()
+}
 
 private fun parseTelegramUpdate(rawJson: String): TelegramUpdatePayload? {
     val root = rawJson.toJsonObjectOrNull() ?: return null

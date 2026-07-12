@@ -47,9 +47,10 @@ class ExternalChatPayloadDispatcherTest {
 
         assertNotNull(replyJson)
         val parsed = JsonParser.parseString(replyJson).asJsonObject
-        assertEquals("chat-9", parsed.get("chatId").asString)
+        assertEquals("sendMessage", parsed.get("method").asString)
+        assertEquals("chat-9", parsed.get("chat_id").asString)
         assertEquals("hi telegram", parsed.get("text").asString)
-        val replyContext = parsed.get("replyToMessageId")
+        val replyContext = parsed.get("reply_to_message_id")
         if (replyContext != null && !replyContext.isJsonNull) {
             assertTrue(replyContext.asString.isNotBlank())
         }

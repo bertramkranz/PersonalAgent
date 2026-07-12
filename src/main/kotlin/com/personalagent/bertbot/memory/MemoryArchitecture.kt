@@ -22,7 +22,7 @@ interface MemoryStore {
 }
 
 class EpisodicMemory(
-    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-memory.txt")),
+    private val backing: BertBotMemoryStore = createDefaultEpisodicBacking(),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)
@@ -45,7 +45,7 @@ class EpisodicMemory(
 }
 
 class SemanticMemory(
-    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-semantic-memory.txt")),
+    private val backing: BertBotMemoryStore = createDefaultSemanticBacking(),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)
@@ -197,5 +197,32 @@ class MemorySummarizationWorker(
 
     override fun close() {
         scope.cancel()
+    }
+}
+
+private fun createDefaultEpisodicBacking(): BertBotMemoryStore {
+    val newPath = File("state/bertbot-memory.txt")
+    migrateMemoryFileIfNeeded(newPath, File("bertbot-memory.txt"))
+    return BertBotMemory(newPath)
+}
+
+private fun createDefaultSemanticBacking(): BertBotMemoryStore {
+    val newPath = File("state/bertbot-semantic-memory.txt")
+    migrateMemoryFileIfNeeded(newPath, File("bertbot-semantic-memory.txt"))
+    return BertBotMemory(newPath)
+}
+
+private fun migrateMemoryFileIfNeeded(
+    newPath: File,
+    legacyPath: File,
+) {
+    if (!newPath.exists() && legacyPath.exists()) {
+        newPath.parentFile?.mkdirs()
+        try {
+            legacyPath.copyTo(newPath)
+            legacyPath.delete()
+        } catch (e: Exception) {
+            println("Warning: failed to migrate legacy memory file '${legacyPath.path}' to '${newPath.path}': ${e.message}")
+        }
     }
 }

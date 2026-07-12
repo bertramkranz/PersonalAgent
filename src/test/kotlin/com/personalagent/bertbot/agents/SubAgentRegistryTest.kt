@@ -14,7 +14,18 @@ class SubAgentRegistryTest {
         val ids = registry.enabledAgents().map { it.id }.toSet()
 
         assertEquals(
-            setOf("coder", "planner", "architect", "analyst", "polymarket_analyst", "copywriter", "red_teamer", "philosopher", "psychologist"),
+            setOf(
+                "coder",
+                "planner",
+                "architect",
+                "analyst",
+                "polymarket_analyst",
+                "copywriter",
+                "red_teamer",
+                "philosopher",
+                "psychologist",
+                "google_workspace_operator",
+            ),
             ids,
         )
     }
@@ -51,6 +62,36 @@ class SubAgentRegistryTest {
 
         assertNotNull(match)
         assertEquals("polymarket_analyst", match.id)
+    }
+
+    @Test
+    fun `registry routes playwright browser automation requests to coder`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Use playwright mcp for end-to-end browser automation checks")
+
+        assertNotNull(match)
+        assertEquals("coder", match.id)
+    }
+
+    @Test
+    fun `registry routes google workspace requests to google workspace operator`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Use Google Workspace MCP to draft a Gmail update and schedule a calendar event")
+
+        assertNotNull(match)
+        assertEquals("google_workspace_operator", match.id)
+    }
+
+    @Test
+    fun `registry routes github mcp remote server toolset requests to coder`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Configure GitHub MCP remote server toolsets for repos, issues, pull_requests, and actions")
+
+        assertNotNull(match)
+        assertEquals("coder", match.id)
     }
 
     @Test

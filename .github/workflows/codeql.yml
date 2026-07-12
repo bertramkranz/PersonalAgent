@@ -27,26 +27,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Skip custom CodeQL upload on pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Repository-level CodeQL default setup owns pull request scanning."
+          echo "Skipping custom CodeQL SARIF upload for this pull request workflow run."
+
       - name: Initialize CodeQL
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/init@641a925cfafe92d0fdf8b239ba4053e3f8d99d6d # v3
         with:
           languages: java-kotlin
           dependency-caching: true
 
       - name: Set up JDK 17
+        if: github.event_name != 'pull_request'
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
+        if: github.event_name != 'pull_request'
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Make Gradle wrapper executable
+        if: github.event_name != 'pull_request'
         run: chmod +x gradlew
 
       - name: Build project for analysis
+        if: github.event_name != 'pull_request'
         run: ./gradlew --no-daemon --build-cache classes
 
       - name: Perform CodeQL analysis
+        if: github.event_name != 'pull_request'
         uses: github/codeql-action/analyze@641a925cfafe92d0fdf8b239ba4053e3f8d99d6d # v3

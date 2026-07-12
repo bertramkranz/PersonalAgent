@@ -38,14 +38,14 @@ This structure keeps the orchestration logic easy to visualize and makes it stra
 
 ## Persistence
 
-BertBot currently persists local state in these files:
+BertBot currently persists local state in the `state/` directory and runtime logs in `logs/`:
 
-- `bertbot-state.json` - latest graph execution snapshot and delegation context for inspection/debugging.
-- `bertbot-memory.txt` - episodic memory entries from recent interactions.
-- `bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
-- `bertbot-profile.json` - structured profile facts (for example, remembered user name).
-- `bertbot-trace.jsonl` - structured runtime trace events with trace IDs.
-- `bertbot-interactions.mmd` - Mermaid sequence diagram generated from the latest trace and graph state.
+- `state/bertbot-state.json` - latest graph execution snapshot and delegation context for inspection/debugging.
+- `state/bertbot-memory.txt` - episodic memory entries from recent interactions.
+- `state/bertbot-semantic-memory.txt` - summarized semantic memory created from episodic history.
+- `state/bertbot-profile.json` - structured profile facts (for example, remembered user name).
+- `logs/bertbot-trace.jsonl` - structured runtime trace events with trace IDs.
+- `state/bertbot-interactions.mmd` - Mermaid sequence diagram generated from the latest trace and graph state.
 
 These files are local to the workspace. Memory and profile files retain conversational context across runs, while the state, trace, and Mermaid files capture the latest orchestration run for inspection.
 
@@ -60,6 +60,13 @@ To add a new capability:
 
 Default sub-agent roles currently include: Coder Agent, Planner Agent, Architect Agent, Analyst Agent, Polymarket Analyst, Copywriter Agent, Red Team Agent, Philosopher Agent, and Psychologist Agent.
 
+Coder Agent skill coverage currently includes:
+
+- Core software delivery tasks: implementation, coding, Kotlin development, debugging, and refactoring.
+- Browser automation and UI validation requests: Playwright, Playwright MCP, browser automation, UI testing, and end-to-end (e2e) checks.
+- GitHub MCP remote server and toolset workflows: GitHub MCP, remote server/toolset setup, and toolset-oriented requests such as repos, issues, pull_requests, and actions.
+- Copilot-oriented GitHub MCP remote capabilities, including copilot_spaces, github_support_docs_search, and create_pull_request_with_copilot.
+
 ## Configuration
 
 BertBot reads configuration from the process environment first and falls back to a local `.env` file in the workspace root.
@@ -70,12 +77,21 @@ The runtime is provider-aware at the LLM adapter boundary. The repository ships 
 
 The current configuration variables are:
 
+- `BERTBOT_RUN_MODE` - selects the container entrypoint run mode. Supported values: `webhook`, `mcp`, `headless`, `interactive`. Default: `webhook`. Only applies when running via Docker.
 - `BERTBOT_AI_PROVIDER` - selects the active AI provider adapter. Supported values: `openai`, `ollama`.
 - `BERTBOT_AI_MODEL` - selects the chat model for the active provider adapter.
 - `BERTBOT_AI_API_KEY` - OpenAI API key (required when `BERTBOT_AI_PROVIDER=openai`).
 - `BERTBOT_OLLAMA_BASE_URL` - Ollama server base URL (used when `BERTBOT_AI_PROVIDER=ollama`). Default: `http://localhost:11434`.
 - `BERTBOT_OLLAMA_TIMEOUT_SECONDS` - Ollama request timeout in seconds. Default: `120`.
 - `BERTBOT_WORKSPACE_ROOT` - optional MCP workspace root override used by workspace tool routes.
+
+Google Workspace MCP proxy variables:
+
+- `BERTBOT_GOOGLE_WORKSPACE_ENABLED` - enable Google Workspace MCP proxy tool registration. Default: `false`.
+- `BERTBOT_GOOGLE_WORKSPACE_COMMAND` - executable used to launch the Google Workspace MCP server. Default: `npx`.
+- `BERTBOT_GOOGLE_WORKSPACE_ARGS` - comma-separated command args used to launch the Google Workspace MCP server.
+- `BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS` - timeout for upstream Google Workspace MCP responses in seconds. Default: `60`.
+- `BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX` - proxy tool name prefix exposed by BertBot. Default: `google_workspace_`.
 
 MacroFactor MCP proxy variables:
 
@@ -95,13 +111,15 @@ MacroFactor MCP proxy variables:
 State persistence backend variables:
 
 - `BERTBOT_STATE_STORE` - state store backend. Supported values: `file` (default), `jdbc`, `postgres`, `postgresql`.
-- `BERTBOT_STATE_FILE_PATH` - state snapshot file path when file backend is used. Default: `bertbot-state.json`.
-- `BERTBOT_MEMORY_EPISODIC_FILE_PATH` - episodic memory file path when file backend is used. Default: `bertbot-memory.txt`.
-- `BERTBOT_MEMORY_SEMANTIC_FILE_PATH` - semantic memory file path when file backend is used. Default: `bertbot-semantic-memory.txt`.
-- `BERTBOT_PROFILE_FILE_PATH` - user profile file path when file backend is used. Default: `bertbot-profile.json`.
-- `BERTBOT_INGESTION_CONSENT_FILE_PATH` - ingestion consent file path when file backend is used. Default: `bertbot-ingestion-consent.json`.
-- `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` - ingestion source-state file path when file backend is used. Default: `bertbot-ingestion-source-state.json`.
-- `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` - continuous-improvement recommendations file path for file backend. Default: `bertbot-research-recommendations.json`.
+- `BERTBOT_STATE_FILE_PATH` - state snapshot file path when file backend is used. Default: `state/bertbot-state.json`.
+- `BERTBOT_MEMORY_EPISODIC_FILE_PATH` - episodic memory file path when file backend is used. Default: `state/bertbot-memory.txt`.
+- `BERTBOT_MEMORY_SEMANTIC_FILE_PATH` - semantic memory file path when file backend is used. Default: `state/bertbot-semantic-memory.txt`.
+- `BERTBOT_PROFILE_FILE_PATH` - user profile file path when file backend is used. Default: `state/bertbot-profile.json`.
+- `BERTBOT_INGESTION_CONSENT_FILE_PATH` - ingestion consent file path when file backend is used. Default: `state/bertbot-ingestion-consent.json`.
+- `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` - ingestion source-state file path when file backend is used. Default: `state/bertbot-ingestion-source-state.json`.
+- `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` - continuous-improvement recommendations file path for file backend. Default: `state/bertbot-research-recommendations.json`.
+- `BERTBOT_TRACE_FILE_PATH` - runtime trace log file path. Default: `logs/bertbot-trace.jsonl`.
+- `BERTBOT_INTERACTIONS_FILE_PATH` - Mermaid interaction graph file path. Default: `state/bertbot-interactions.mmd`.
 - `BERTBOT_STATE_JDBC_URL` - JDBC connection URL when JDBC/PostgreSQL backend is used.
 - `BERTBOT_STATE_JDBC_USER` - optional JDBC username.
 - `BERTBOT_STATE_JDBC_PASSWORD` - optional JDBC password.
@@ -152,7 +170,7 @@ Connector enablement and platform metadata:
 - `BERTBOT_WHATSAPP_ENABLED` - enable WhatsApp adapter wiring. Default: `true` for webhook mode.
 - `BERTBOT_SLACK_WORKSPACE_ID` - optional Slack workspace/team identifier used in normalized source metadata.
 - `BERTBOT_WHATSAPP_BUSINESS_PHONE_ID` - optional WhatsApp Business phone number ID used in normalized source metadata.
-- `BERTBOT_INGESTION_REQUIRE_APPROVAL` - require source approval before accepted message ingestion/chat state updates.
+- `BERTBOT_INGESTION_REQUIRE_APPROVAL` - require source approval before accepted message ingestion/chat state updates. Default: `true`.
 
 Provider verification variables (used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`):
 
@@ -170,7 +188,7 @@ BERTBOT_AI_MODEL=gpt-4o-mini
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
-If you are running the repo-local Copilot agent or the MCP server from VS Code, make sure the command is launched from the repository root so `bertbot-state.json`, `bertbot-memory.txt`, and `.env` resolve correctly.
+If you are running the repo-local Copilot agent or the MCP server from VS Code, make sure the command is launched from the repository root so `state/`, `.env`, and workspace-relative paths resolve correctly.
 
 The model field is kept in the config surface so the runtime can be pointed at different provider adapters without changing the command-line or manifest shape.
 
@@ -224,15 +242,27 @@ When ingestion control is enabled, additional ingestion tools are also exposed:
 
 When `BERTBOT_MACROFACTOR_ENABLED=true` and MacroFactor credentials are configured, additional MacroFactor proxy tools are surfaced in `tools/list` with the configured prefix (default `macrofactor_`).
 
+When `BERTBOT_GOOGLE_WORKSPACE_ENABLED=true`, BertBot also proxies Google Workspace MCP tools from the external server with prefix `google_workspace_` (configurable via `BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX`).
+
 For workspace-managed startup in VS Code, this repository uses a stale-process-safe launcher at [scripts/mcp-stdio-launcher.ps1](scripts/mcp-stdio-launcher.ps1). It clears old workspace/task-matching processes before starting the selected Gradle MCP task.
 
 A second launcher variant is available at [scripts/mcp-stdio-launcher-bertbot.ps1](scripts/mcp-stdio-launcher-bertbot.ps1). This wrapper pins the task to `runMcpServer` and is useful as a copy pattern for future backends that should each have their own task-specific wrapper.
 
-Sample workspace MCP config for adding a second backend entry:
+Sample workspace MCP config with BertBot and Google Workspace servers:
 
 ```json
 {
 	"servers": {
+		"google-workspace": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"-p",
+				"github:gemini-cli-extensions/workspace#v0.0.8",
+				"gemini-workspace-server"
+			]
+		},
 		"bertbot-backend": {
 			"type": "stdio",
 			"command": "powershell.exe",
@@ -245,26 +275,12 @@ Sample workspace MCP config for adding a second backend entry:
 			],
 			"cwd": "${workspaceFolder}",
 			"envFile": "${workspaceFolder}/.env"
-		},
-		"another-backend": {
-			"type": "stdio",
-			"command": "powershell.exe",
-			"args": [
-				"-NoProfile",
-				"-ExecutionPolicy",
-				"Bypass",
-				"-File",
-				"${workspaceFolder}/scripts/mcp-stdio-launcher.ps1",
-				"runAnotherMcpServerTask"
-			],
-			"cwd": "${workspaceFolder}",
-			"envFile": "${workspaceFolder}/.env"
 		}
 	}
 }
 ```
 
-The second entry is only a template. It requires a real Gradle task (`runAnotherMcpServerTask`) that starts a valid MCP stdio server.
+The Google Workspace server is an external MCP endpoint that runs through `npx`. Authenticate it per the upstream extension instructions if prompted.
 
 ### Webhook Server Mode
 
@@ -273,6 +289,14 @@ Use this mode when Telegram, Slack, or WhatsApp should POST webhook payloads dir
 ```bash
 .\gradlew.bat runWebhookServer --no-daemon
 ```
+
+To retain a single local webhook runtime log file, use:
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-webhook-with-log.ps1
+```
+
+This writes to `logs/webhook_output.log`.
 
 Default local endpoints:
 
@@ -299,13 +323,20 @@ Additional hardening controls:
 
 BertBot emits structured tracing for graph execution and delegation lifecycles, including events like node start/completion, edge transitions, delegation requested/started/completed, and skill invocation.
 
-The generated `bertbot-trace.jsonl` file can be tailed or filtered by `traceId` for debugging.
+The generated `logs/bertbot-trace.jsonl` file can be tailed or filtered by `traceId` for debugging.
 
-For a quick graphical view of interactions, open `bertbot-interactions.mmd` in VS Code Markdown preview (or Mermaid-compatible viewers). The file is refreshed after each request and renders a time-ordered sequence of delegation and node transitions.
+For a quick graphical view of interactions, open `state/bertbot-interactions.mmd` in VS Code Markdown preview (or Mermaid-compatible viewers). The file is refreshed after each request and renders a time-ordered sequence of delegation and node transitions.
+
+## Documentation Layout
+
+Project documentation artifacts are kept in `docs/`:
+
+- `docs/architecture.mmd` - architecture diagram.
+- `docs/cicd-diagram.mmd` - CI/CD automation diagram.
 
 ### Copilot Custom Agent
 
-The repository-local agent is defined in [.github/agents/bertbot.agent.md](.github/agents/bertbot.agent.md) and points at the `bertbot-backend` MCP server.
+The repository-local agent is defined in [.github/agents/bertbot.agent.md](.github/agents/bertbot.agent.md) and is allowed to use `bertbot-backend`, `google-workspace`, and `playwright` MCP tool surfaces.
 
 The MCP server registration is workspace-local in [.vscode/mcp.json](.vscode/mcp.json). This is what lets VS Code discover and start `bertbot-backend`.
 

@@ -11,186 +11,62 @@ on:
       - unlabeled
 
 permissions:
-  checks: read
   contents: write
   pull-requests: write
 
 concurrency:
-  group: auto-merge-pr-${{ github.event.pull_request.number }}
+  group: auto-merge-pr-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
   merge-when-green:
-    if: ${{ github.event.pull_request.state == 'open' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Generate personal-merge-bot token
-        id: get_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: 4277645
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-
       - name: Evaluate auto-merge conditions
         id: evaluate
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
-          github-token: ${{ steps.get_token.outputs.token }}
+          github-token: ${{ github.token }}
           script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pullNumber = context.payload.pull_request.number;
+            const pr = context.payload.pull_request;
             const autoMergeLabel = 'auto-merge';
-            const acceptedConclusions = new Set(['success', 'neutral', 'skipped']);
 
             function normalize(name) {
               return String(name || '').trim().toLowerCase();
             }
 
-            function hasAutoMergeLabel(pr) {
-              return (pr.labels || []).some((label) => normalize(label.name) === autoMergeLabel);
-            }
-
-            function isAcceptedConclusion(conclusion) {
-              return acceptedConclusions.has(normalize(conclusion));
-            }
-
-            async function getRequiredCheckNames(baseBranch) {
-              const { data: protection } = await github.rest.repos.getBranchProtection({
-                owner,
-                repo,
-                branch: baseBranch,
-              });
-
-              return [...new Set(
-                (protection?.required_status_checks?.contexts || [])
-                  .map((name) => String(name || '').trim())
-                  .filter(Boolean)
-              )];
-            }
-
-            async function listCheckRuns(ref) {
-              const checkRuns = await github.paginate(
-                github.rest.checks.listForRef,
-                {
-                  owner,
-                  repo,
-                  ref,
-                  per_page: 100,
-                },
-                (response) => response.data.check_runs || []
-              );
-
-              return checkRuns.filter(Boolean);
-            }
-
-            async function listStatusContexts(ref) {
-              const { data } = await github.rest.repos.getCombinedStatusForRef({
-                owner,
-                repo,
-                ref,
-              });
-
-              return data.statuses || [];
-            }
-
-            function latestCompletedCheckRun(checkRuns, requiredName) {
-              const normalizedRequiredName = normalize(requiredName);
-              return checkRuns
-                .filter((run) => normalize(run.name) === normalizedRequiredName)
-                .filter((run) => run.status === 'completed')
-                .sort((left, right) => new Date(right.completed_at || 0) - new Date(left.completed_at || 0))[0];
-            }
-
-            function latestStatusContext(statuses, requiredName) {
-              const normalizedRequiredName = normalize(requiredName);
-              return statuses
-                .filter((status) => normalize(status.context) === normalizedRequiredName)
-                .sort((left, right) => new Date(right.updated_at || 0) - new Date(left.updated_at || 0))[0];
-            }
-
-            async function requiredChecksAreGreen(pr) {
-              const requiredChecks = await getRequiredCheckNames(pr.base.ref);
-              if (requiredChecks.length === 0) {
-                core.info(`PR #${pr.number}: no required checks configured on '${pr.base.ref}'.`);
-                return true;
-              }
-
-              const checkRuns = await listCheckRuns(pr.head.sha);
-              const statuses = await listStatusContexts(pr.head.sha);
-
-              for (const requiredCheck of requiredChecks) {
-                const latestCheckRun = latestCompletedCheckRun(checkRuns, requiredCheck);
-                if (latestCheckRun) {
-                  if (!isAcceptedConclusion(latestCheckRun.conclusion)) {
-                    core.info(
-                      `PR #${pr.number}: required check '${requiredCheck}' concluded with '${latestCheckRun.conclusion}'.`
-                    );
-                    return false;
-                  }
-                  continue;
-                }
-
-                const latestStatus = latestStatusContext(statuses, requiredCheck);
-                if (latestStatus) {
-                  if (!isAcceptedConclusion(latestStatus.state)) {
-                    core.info(
-                      `PR #${pr.number}: required status '${requiredCheck}' is '${latestStatus.state}'.`
-                    );
-                    return false;
-                  }
-                  continue;
-                }
-
-                core.info(`PR #${pr.number}: required check '${requiredCheck}' has not reported yet.`);
-                return false;
-              }
-
-              return true;
-            }
-
-            const { data: pr } = await github.rest.pulls.get({
-              owner,
-              repo,
-              pull_number: pullNumber,
-            });
+            const hasAutoMergeLabel = (pr.labels || []).some(
+              (label) => normalize(label.name) === autoMergeLabel
+            );
 
             if (pr.state !== 'open') {
-              core.info(`PR #${pullNumber}: skipping because it is '${pr.state}'.`);
+              core.info(`PR #${pr.number}: skipping because it is '${pr.state}'.`);
               core.setOutput('should_merge', 'false');
               return;
             }
 
             if (pr.draft) {
-              core.info(`PR #${pullNumber}: skipping because it is still a draft.`);
+              core.info(`PR #${pr.number}: skipping because it is still a draft.`);
               core.setOutput('should_merge', 'false');
               return;
             }
 
-            if (!hasAutoMergeLabel(pr)) {
-              core.info(`PR #${pullNumber}: skipping because '${autoMergeLabel}' label is not present.`);
+            if (!hasAutoMergeLabel) {
+              core.info(`PR #${pr.number}: skipping because '${autoMergeLabel}' label is not present.`);
               core.setOutput('should_merge', 'false');
               return;
             }
 
-            const checksGreen = await requiredChecksAreGreen(pr);
-            if (!checksGreen) {
-              core.info(`PR #${pullNumber}: required checks are not green yet.`);
-              core.setOutput('should_merge', 'false');
-              return;
-            }
-
-            core.info(`PR #${pullNumber}: auto-merge conditions satisfied.`);
+            core.info(`PR #${pr.number}: enabling approval and GitHub native auto-merge.`);
             core.setOutput('should_merge', 'true');
 
-      - name: Approve and merge PR
+      - name: Enable GitHub auto-merge
         if: ${{ steps.evaluate.outputs.should_merge == 'true' }}
         run: |
-          gh pr review ${{ github.event.pull_request.number }} --approve
-          gh pr merge ${{ github.event.pull_request.number }} --auto --squash
+          gh pr merge ${{ github.event.number }} --auto --squash
         env:
-          GH_TOKEN: ${{ steps.get_token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}

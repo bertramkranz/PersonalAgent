@@ -8,20 +8,17 @@ flowchart TD
     AUTO_PR["auto-pr.yml\nOpens 'chore: merge …' PR\nif none exists\n(skips dependabot branches)"]
 
     %% ── Required CI checks ────────────────────────────────────────────────────
-    subgraph CI ["CI checks  (run in parallel on every PR)"]
+    subgraph CI ["CI checks (parallel; actionlint is path-filtered)"]
         direction LR
         CI_JOB["ci.yml\nquality-and-test\n(detekt · ktlint · tests)"]
-        CODEQL["codeql.yml\nanalyze\n(CodeQL SAST)"]
+        CODEQL["codeql.yml\nanalyze\n(PR: acknowledge repo default setup;\nmain/schedule: custom CodeQL SAST)"]
         DEPREVIEW["dependency-review.yml\ndependency-review\n(CVE gate ≥ moderate)"]
         SECRET["secret-scan.yml\ngitleaks\n(secret detection)"]
         ACTIONLINT["actionlint.yml\nlint-workflows\n(workflow-file lint, path-filtered)"]
     end
 
-    %% ── Review ────────────────────────────────────────────────────────────────
-    COPILOT_BOT([copilot-pull-request-reviewer bot\nreviews the PR])
-
     %% ── Merge ─────────────────────────────────────────────────────────────────
-    MERGE["merge-generated-prs-on-green.yml\nApproves + squash-merges eligible PRs\n\nEligible if:\n  • Trusted generated PR (github-actions[bot]\n    + title 'chore: merge …') — auto-approved\n  • OR labelled 'auto-merge'\n\nTriggered by:\n  • schedule: every 5 minutes\n  • workflow_dispatch"]
+    MERGE["merge-generated-prs-on-green.yml\nEnables squash auto-merge\n\nTrigger:\n  • pull_request_target\n    (opened, reopened, synchronize,\n     ready_for_review, labeled, unlabeled)\n\nRequires to arm auto-merge:\n  • PR open and not draft\n  • 'auto-merge' label present\n\nGitHub completes merge later when\nrequired branch-protection checks pass"]
 
     %% ── CD ────────────────────────────────────────────────────────────────────
     MAIN([main branch])
@@ -33,9 +30,7 @@ flowchart TD
     DEP -->|PR already open| CI
 
     AUTO_PR -->|PR opened| CI
-    CI --> COPILOT_BOT
-
-    COPILOT_BOT -->|APPROVED review| MERGE
+    CI --> MERGE
 
     MERGE -->|squash merge| MAIN
 
@@ -48,6 +43,6 @@ flowchart TD
     classDef external fill:#161b22,stroke:#238636,color:#3fb950,shape:stadium
 
     class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,CD workflow
-    class DEV,DEP,COPILOT_BOT actor
+    class DEV,DEP actor
     class MAIN,RELEASE external
 ```

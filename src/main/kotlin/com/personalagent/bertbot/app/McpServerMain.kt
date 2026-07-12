@@ -10,12 +10,14 @@ import java.io.File
 fun main() {
     val aiRuntimeConfiguration = resolveAiRuntimeConfiguration()
     val macrofactorRuntimeConfiguration = resolveMacrofactorRuntimeConfiguration()
+    val googleWorkspaceRuntimeConfiguration = resolveGoogleWorkspaceRuntimeConfiguration()
     val workspaceRoot = resolveWorkspaceRoot()
     val dispatcherContext =
         McpServerBootstrap.createDispatcherContext(
             McpServerBootstrap.DispatcherContextInput(
                 aiRuntimeConfiguration = aiRuntimeConfiguration,
                 macrofactorRuntimeConfiguration = macrofactorRuntimeConfiguration,
+                googleWorkspaceRuntimeConfiguration = googleWorkspaceRuntimeConfiguration,
                 workspaceRoot = workspaceRoot,
                 toolNames = McpConstants.toolNames,
             ),
@@ -33,6 +35,7 @@ fun main() {
             model = aiRuntimeConfiguration.model,
             macrofactorEnabled = macrofactorRuntimeConfiguration.enabled,
             macrofactorConfigured = macrofactorRuntimeConfiguration.isConfigured,
+            googleWorkspaceEnabled = googleWorkspaceRuntimeConfiguration.enabled,
             runtimeReady = startup.runtime != null,
             runtimeError = startup.errorMessage ?: "none",
         ),
@@ -69,6 +72,7 @@ internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
     private val macrofactorToolRouter: MacrofactorToolRouter? = null,
+    private val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter? = null,
     private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
@@ -117,6 +121,7 @@ internal class McpRequestDispatcher(
                         includeIngestionTools = ingestionControlPlane != null,
                         toolNames = McpConstants.toolNames,
                         macrofactorToolDefinitions = macrofactorToolRouter?.toolDefinitions() ?: emptyList(),
+                        googleWorkspaceToolDefinitions = googleWorkspaceToolRouter?.toolDefinitions() ?: emptyList(),
                         continuousResearchToolDefinitions = continuousResearchToolRouter?.toolDefinitions() ?: emptyList(),
                     ),
                 )
@@ -134,6 +139,10 @@ internal class McpRequestDispatcher(
         val macrofactorResult = macrofactorToolRouter?.handle(toolName, params)
         if (macrofactorResult != null) {
             return toolResultResponse(requestId, macrofactorResult.first, macrofactorResult.second)
+        }
+        val googleWorkspaceResult = googleWorkspaceToolRouter?.handle(toolName, params)
+        if (googleWorkspaceResult != null) {
+            return toolResultResponse(requestId, googleWorkspaceResult.first, googleWorkspaceResult.second)
         }
         val continuousResearchResult = continuousResearchToolRouter?.handle(toolName, params)
         if (continuousResearchResult != null) {

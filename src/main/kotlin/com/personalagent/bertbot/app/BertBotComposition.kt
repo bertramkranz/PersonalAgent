@@ -22,7 +22,6 @@ import com.personalagent.bertbot.ingestion.FileSourceStateStore
 import com.personalagent.bertbot.ingestion.IngestionService
 import com.personalagent.bertbot.ingestion.JdbcConsentStore
 import com.personalagent.bertbot.ingestion.JdbcSourceStateStore
-import com.personalagent.bertbot.ingestion.ReferenceOnlyMediaPolicy
 import com.personalagent.bertbot.ingestion.connectors.SlackChatBridge
 import com.personalagent.bertbot.ingestion.connectors.SlackConnectorAdapter
 import com.personalagent.bertbot.ingestion.connectors.TelegramChatBridge
@@ -255,7 +254,7 @@ private object BertBotIngestionRuntimeFactory {
                 episodicMemory = memoryRuntime.episodicMemory,
                 semanticSummarizationTrigger = { memoryRuntime.memoryWorker.scheduleIfNeeded() },
                 userProfileStore = memoryRuntime.userProfileStore,
-                mediaPolicy = ReferenceOnlyMediaPolicy(),
+                requireApproval = config.ingestion.policy.requireApproval,
             )
 
         return BertBotIngestionRuntime(controlPlane = service)
