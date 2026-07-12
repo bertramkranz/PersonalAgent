@@ -14,6 +14,7 @@ internal fun resolveWebhookServerConfig(
     dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): WebhookServerConfig {
     fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
+
     fun portOrNull(key: String) = env(key)?.toIntOrNull()?.coerceIn(1, 65535)
     return WebhookServerConfig(
         host = env("BERTBOT_WEBHOOK_HOST").takeUnless { it.isNullOrBlank() } ?: "0.0.0.0",

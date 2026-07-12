@@ -231,6 +231,7 @@ internal class McpRequestDispatcher(
                 else -> true to "Unsupported checkpoint tool: ${toolName ?: "<missing>"}"
             }
         }
+
     private fun hasCheckpointToolFunctions(): Boolean =
         listCheckpoints != null &&
             latestCheckpoint != null &&
