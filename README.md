@@ -436,7 +436,7 @@ This repository includes GitHub Actions workflows:
 - Merge generated PRs workflow: `.github/workflows/merge-generated-prs-on-green.yml`
 	- Triggers on generated PR activity, check-suite completions, approval review submissions, and manual dispatch.
 	- Applies guardrails for trusted generated PRs and `auto-merge`-labeled PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
-	- Uses a GitHub App token when `BOT_APP_ID` and `BOT_APP_PRIVATE_KEY` are configured, with fallback to `AUTOMATION_PAT`.
+	- Uses `AUTOMATION_PAT` when configured, with fallback to `github.token`.
 
 - Copilot review workflow: `.github/workflows/copilot-review.yml`
 	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.

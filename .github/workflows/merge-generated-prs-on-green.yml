@@ -34,23 +34,12 @@ jobs:
       github.event_name == 'pull_request' ||
       (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
       (github.event_name == 'check_suite' && contains(fromJSON('["success","neutral","skipped"]'), github.event.check_suite.conclusion))
-    env:
-      BOT_APP_ID: ${{ secrets.BOT_APP_ID }}
-      BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
     steps:
-      - name: Generate bot token from GitHub App
-        id: app_token
-        if: env.BOT_APP_ID != '' && env.BOT_APP_PRIVATE_KEY != ''
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ env.BOT_APP_ID }}
-          private-key: ${{ env.BOT_APP_PRIVATE_KEY }}
-
       - name: Approve and merge trusted generated PR when ready
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
-          github-token: ${{ steps.app_token.outputs.token || secrets.AUTOMATION_PAT || github.token }}
+          github-token: ${{ secrets.AUTOMATION_PAT || github.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
