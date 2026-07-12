@@ -13,6 +13,15 @@ class BertBotAgentConfigTest {
         assertEquals(10, config.maxEpisodicContextEntries)
         assertEquals(15, config.memorySummarizationThreshold)
         assertEquals(10, config.memorySummarizationBatchSize)
+        assertEquals(true, config.research.enabled)
+        assertEquals(true, config.research.eventDrivenEnabled)
+        assertEquals(true, config.research.periodicEnabled)
+        assertEquals(false, config.research.llmAssistedEnabled)
+        assertEquals(false, config.research.includeExternalSignals)
+        assertEquals(1800, config.research.periodicIntervalSeconds)
+        assertEquals(300, config.research.minIntervalBetweenRunsSeconds)
+        assertEquals(8, config.research.maxRecommendationsPerCycle)
+        assertEquals(600, config.research.failureCooldownSeconds)
         assertEquals(false, config.ingestion.policy.enabled)
         assertEquals(true, config.ingestion.policy.storeImageReferencesOnly)
         assertEquals(setOf("hi", "hello", "hey", "thanks", "thank you", "ok", "okay"), config.nonActionableMessages)
@@ -97,6 +106,30 @@ class BertBotAgentConfigTest {
                                 connector = ConnectorConfig(approvalScope = "workspace"),
                             ),
                     ),
+            )
+        }
+    }
+
+    @Test
+    fun `research settings must satisfy validation constraints`() {
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                research = ContinuousImprovementResearchConfig(periodicIntervalSeconds = 0),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                research = ContinuousImprovementResearchConfig(minIntervalBetweenRunsSeconds = -1),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                research = ContinuousImprovementResearchConfig(maxRecommendationsPerCycle = 0),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            BertBotAgentConfig(
+                research = ContinuousImprovementResearchConfig(failureCooldownSeconds = -1),
             )
         }
     }

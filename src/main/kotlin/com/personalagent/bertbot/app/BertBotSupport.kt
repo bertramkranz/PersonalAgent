@@ -10,7 +10,6 @@ import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.llm.OllamaLlmGateway
 import com.personalagent.bertbot.llm.OpenAiLlmGateway
-import java.io.File
 import java.time.Duration
 
 internal data class AiRuntimeConfiguration(
@@ -29,6 +28,7 @@ internal data class PersistenceRuntimeConfiguration(
     val profileFilePath: String = DEFAULT_PROFILE_FILE_PATH,
     val ingestionConsentFilePath: String = DEFAULT_INGESTION_CONSENT_FILE_PATH,
     val ingestionSourceStateFilePath: String = DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH,
+    val researchRecommendationsFilePath: String = DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH,
     val jdbcUrl: String? = null,
     val jdbcUser: String? = null,
     val jdbcPassword: String? = null,
@@ -64,6 +64,7 @@ internal const val DEFAULT_SEMANTIC_MEMORY_FILE_PATH = "bertbot-semantic-memory.
 internal const val DEFAULT_PROFILE_FILE_PATH = "bertbot-profile.json"
 internal const val DEFAULT_INGESTION_CONSENT_FILE_PATH = "bertbot-ingestion-consent.json"
 internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "bertbot-ingestion-source-state.json"
+internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "bertbot-research-recommendations.json"
 internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
 internal const val DEFAULT_EPISODIC_MEMORY_JDBC_TABLE = "bertbot_memory_episodic_snapshot"
 internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic_snapshot"
@@ -156,65 +157,45 @@ internal fun resolvePersistenceRuntimeConfiguration(
             ?.takeIf { it.isNotBlank() }
             ?: DEFAULT_PERSISTENCE_BACKEND
 
-    val stateFilePath =
-        resolveRuntimeSetting("BERTBOT_STATE_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_STATE_FILE_PATH
-
+    val stateFilePath = resolvePersistencePathSetting("BERTBOT_STATE_FILE_PATH", environment, dotEnvValues, DEFAULT_STATE_FILE_PATH)
     val episodicMemoryFilePath =
-        resolveRuntimeSetting("BERTBOT_MEMORY_EPISODIC_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_EPISODIC_MEMORY_FILE_PATH
-
+        resolvePersistencePathSetting(
+            "BERTBOT_MEMORY_EPISODIC_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_EPISODIC_MEMORY_FILE_PATH,
+        )
     val semanticMemoryFilePath =
-        resolveRuntimeSetting("BERTBOT_MEMORY_SEMANTIC_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_SEMANTIC_MEMORY_FILE_PATH
-
-    val profileFilePath =
-        resolveRuntimeSetting("BERTBOT_PROFILE_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_PROFILE_FILE_PATH
-
+        resolvePersistencePathSetting(
+            "BERTBOT_MEMORY_SEMANTIC_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_SEMANTIC_MEMORY_FILE_PATH,
+        )
+    val profileFilePath = resolvePersistencePathSetting("BERTBOT_PROFILE_FILE_PATH", environment, dotEnvValues, DEFAULT_PROFILE_FILE_PATH)
     val ingestionConsentFilePath =
-        resolveRuntimeSetting("BERTBOT_INGESTION_CONSENT_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_INGESTION_CONSENT_FILE_PATH
-
+        resolvePersistencePathSetting(
+            "BERTBOT_INGESTION_CONSENT_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_INGESTION_CONSENT_FILE_PATH,
+        )
     val ingestionSourceStateFilePath =
-        resolveRuntimeSetting("BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH
+        resolvePersistencePathSetting(
+            "BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH,
+        )
+    val researchRecommendationsFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH,
+        )
 
-    val jdbcTable =
-        resolveRuntimeSetting("BERTBOT_STATE_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_STATE_JDBC_TABLE
-
-    val episodicMemoryJdbcTable =
-        resolveRuntimeSetting("BERTBOT_MEMORY_EPISODIC_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_EPISODIC_MEMORY_JDBC_TABLE
-
-    val semanticMemoryJdbcTable =
-        resolveRuntimeSetting("BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE
-
-    val profileJdbcTable =
-        resolveRuntimeSetting("BERTBOT_PROFILE_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_PROFILE_JDBC_TABLE
-
-    val ingestionConsentJdbcTable =
-        resolveRuntimeSetting("BERTBOT_INGESTION_CONSENT_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_INGESTION_CONSENT_JDBC_TABLE
-
-    val ingestionSourceStateJdbcTable =
-        resolveRuntimeSetting("BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE", environment, dotEnvValues)
-            ?.takeIf { it.isNotBlank() }
-            ?: DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE
+    val tableNames = resolvePersistenceTableNames(environment, dotEnvValues)
 
     return PersistenceRuntimeConfiguration(
         backend = backend,
@@ -224,17 +205,76 @@ internal fun resolvePersistenceRuntimeConfiguration(
         profileFilePath = profileFilePath,
         ingestionConsentFilePath = ingestionConsentFilePath,
         ingestionSourceStateFilePath = ingestionSourceStateFilePath,
+        researchRecommendationsFilePath = researchRecommendationsFilePath,
         jdbcUrl = resolveRuntimeSetting("BERTBOT_STATE_JDBC_URL", environment, dotEnvValues),
         jdbcUser = resolveRuntimeSetting("BERTBOT_STATE_JDBC_USER", environment, dotEnvValues),
         jdbcPassword = resolveRuntimeSetting("BERTBOT_STATE_JDBC_PASSWORD", environment, dotEnvValues),
-        jdbcTable = jdbcTable,
-        episodicMemoryJdbcTable = episodicMemoryJdbcTable,
-        semanticMemoryJdbcTable = semanticMemoryJdbcTable,
-        profileJdbcTable = profileJdbcTable,
-        ingestionConsentJdbcTable = ingestionConsentJdbcTable,
-        ingestionSourceStateJdbcTable = ingestionSourceStateJdbcTable,
+        jdbcTable = tableNames.jdbcTable,
+        episodicMemoryJdbcTable = tableNames.episodicMemoryJdbcTable,
+        semanticMemoryJdbcTable = tableNames.semanticMemoryJdbcTable,
+        profileJdbcTable = tableNames.profileJdbcTable,
+        ingestionConsentJdbcTable = tableNames.ingestionConsentJdbcTable,
+        ingestionSourceStateJdbcTable = tableNames.ingestionSourceStateJdbcTable,
     )
 }
+
+private fun resolvePersistenceTableNames(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): PersistenceTableNames =
+    PersistenceTableNames(
+        jdbcTable =
+            resolvePersistencePathSetting("BERTBOT_STATE_JDBC_TABLE", environment, dotEnvValues, DEFAULT_STATE_JDBC_TABLE),
+        episodicMemoryJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_MEMORY_EPISODIC_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_EPISODIC_MEMORY_JDBC_TABLE,
+            ),
+        semanticMemoryJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE,
+            ),
+        profileJdbcTable =
+            resolvePersistencePathSetting("BERTBOT_PROFILE_JDBC_TABLE", environment, dotEnvValues, DEFAULT_PROFILE_JDBC_TABLE),
+        ingestionConsentJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_INGESTION_CONSENT_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_INGESTION_CONSENT_JDBC_TABLE,
+            ),
+        ingestionSourceStateJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
+            ),
+    )
+
+private data class PersistenceTableNames(
+    val jdbcTable: String,
+    val episodicMemoryJdbcTable: String,
+    val semanticMemoryJdbcTable: String,
+    val profileJdbcTable: String,
+    val ingestionConsentJdbcTable: String,
+    val ingestionSourceStateJdbcTable: String,
+)
+
+private fun resolvePersistencePathSetting(
+    name: String,
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+    defaultValue: String,
+): String =
+    resolveRuntimeSetting(name, environment, dotEnvValues)
+        ?.takeIf { it.isNotBlank() }
+        ?: defaultValue
 
 internal fun resolveMacrofactorRuntimeConfiguration(): MacrofactorRuntimeConfiguration =
     resolveMacrofactorRuntimeConfiguration(
@@ -282,45 +322,6 @@ internal fun resolveMacrofactorRuntimeConfiguration(
         timeoutSeconds = timeoutSeconds,
         toolNamePrefix = toolNamePrefix,
     )
-}
-
-internal fun resolveRuntimeSetting(
-    name: String,
-    environment: Map<String, String>,
-    dotEnvValues: Map<String, String>,
-): String? {
-    val envValue = environment[name]
-    if (!envValue.isNullOrBlank()) {
-        return envValue.trim().removeSurrounding("\"")
-    }
-
-    return dotEnvValues[name]?.trim()?.removeSurrounding("\"")
-}
-
-private fun loadDotEnvValues(): Map<String, String> {
-    val envFile = File(".env")
-    if (!envFile.exists()) {
-        return emptyMap()
-    }
-
-    return envFile.readLines().asSequence().mapNotNull { parseDotEnvEntry(it) }.toMap()
-}
-
-private fun parseDotEnvEntry(line: String): Pair<String, String>? {
-    val trimmed = line.trim()
-    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-        return null
-    }
-
-    val normalized = trimmed.removePrefix("export ")
-    val separatorIndex = normalized.indexOf('=')
-    if (separatorIndex <= 0) {
-        return null
-    }
-
-    val key = normalized.substring(0, separatorIndex).trim()
-    val value = normalized.substring(separatorIndex + 1).trim().removeSurrounding("\"")
-    return key to value
 }
 
 private fun parseCommandArgs(value: String): List<String> {

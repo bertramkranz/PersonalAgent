@@ -162,6 +162,65 @@ class McpRequestDispatcherTest {
     }
 
     @Test
+    fun `tools list includes continuous research tools when router is configured`() {
+        val workspace = createTempDirectory(prefix = "mcp-research-workspace").toFile()
+        workspace.deleteOnExit()
+        val researchService =
+            ContinuousImprovementResearchService(
+                config = com.personalagent.bertbot.config.BertBotAgentConfig(),
+                workspaceRoot = workspace,
+                store = FileImprovementRecommendationStore(File(workspace, "recommendations.json")),
+            )
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                continuousResearchToolRouter = ContinuousResearchToolRouter(researchService),
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val tools = json.getAsJsonObject("result").getAsJsonArray("tools")
+        val names = tools.map { it.asJsonObject.get("name").asString }
+        assertTrue(names.contains(RESEARCH_LIST_TOOL_NAME))
+        assertTrue(names.contains(RESEARCH_RUN_NOW_TOOL_NAME))
+    }
+
+    @Test
+    fun `tools call can trigger continuous research cycle`() {
+        val workspace = createTempDirectory(prefix = "mcp-research-run").toFile()
+        workspace.deleteOnExit()
+        val researchService =
+            ContinuousImprovementResearchService(
+                config = com.personalagent.bertbot.config.BertBotAgentConfig(),
+                workspaceRoot = workspace,
+                store = FileImprovementRecommendationStore(File(workspace, "recommendations.json")),
+            )
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                continuousResearchToolRouter = ContinuousResearchToolRouter(researchService),
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":303,"method":"tools/call","params":{"name":"repo_improvement_run_now","arguments":{"reason":"test"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("executed=true"))
+        assertEquals(false, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
     fun `ask bertbot attaches workspace evidence for repository verification prompts`() {
         val workspace = createTempDirectory(prefix = "mcp-workspace").toFile()
         workspace.deleteOnExit()
