@@ -33,7 +33,7 @@ internal class FileStateEventStore(
             return loadPayloadInternal()
                 .asSequence()
                 .filter { it.scopeKey == scopeKey }
-                .sortedBy { it.createdAtEpochMillis }
+                .sortedWith(compareBy<PersistedStateEvent> { it.createdAtEpochMillis }.thenBy { it.eventId })
                 .map { it.toDomain() }
                 .toList()
         }
