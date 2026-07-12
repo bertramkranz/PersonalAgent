@@ -20,7 +20,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: auto-merge-${{ github.event.pull_request.head.ref || github.event.check_suite.head_branch || github.event.pull_request.number || github.run_id }}
+  group: auto-merge-${{ github.event.check_suite.head_branch || github.event.pull_request.head.ref || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
