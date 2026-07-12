@@ -433,13 +433,10 @@ This repository includes GitHub Actions workflows:
 	- Triggers on pushes to branches other than the repository default branch (and ignores `main`).
 	- Opens a pull request into the repository default branch when one is not already open.
 
-- Auto-approve Copilot-reviewed PRs workflow: `.github/workflows/auto-approve-copilot-reviewed-prs.yml`
-	- Triggers when `copilot-pull-request-reviewer[bot]` submits an approval review.
-	- Adds an approval review via `hmarr/auto-approve-action` to streamline merge readiness.
-
 - Merge generated PRs workflow: `.github/workflows/merge-generated-prs-on-green.yml`
-	- Triggers on generated PR activity, selected upstream workflow completions, a 10-minute schedule, and manual dispatch.
-	- Applies guardrails for trusted generated PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
+	- Triggers on generated PR activity, check-suite completions, approval review submissions, and manual dispatch.
+	- Applies guardrails for trusted generated PRs and `auto-merge`-labeled PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
+	- Uses `AUTOMATION_PAT` when configured, with fallback to `github.token`.
 
 - Copilot review workflow: `.github/workflows/copilot-review.yml`
 	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.

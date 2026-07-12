@@ -46,6 +46,7 @@ jobs:
               repo: context.repo.repo,
               head: branchName,
               base: baseBranch,
+              draft: true,
               title: `chore: merge ${branchName} into ${baseBranch}`,
               body: [
                 'Automated pull request created after a branch push.',

@@ -6,7 +6,9 @@ on:
       - completed
   pull_request:
     types:
+      - opened
       - labeled
+      - review_requested
       - synchronize
   pull_request_review:
     types:
@@ -41,6 +43,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const allowlistedAutoApproveAuthors = new Set(['bertramkranz']);
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
             const baseRequiredCheckNames = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
@@ -126,24 +129,23 @@ jobs:
               return isSameRepoEligiblePr(pr) && hasAutoMergeLabel(pr);
             }
 
-            async function listChangedFiles(pr) {
-              return github.paginate(github.rest.pulls.listFiles, {
-                owner,
-                repo,
-                pull_number: pr.number,
-                per_page: 100,
-              });
-            }
-
             async function requiredCheckNamesForPr(pr) {
-              const required = new Set(baseRequiredCheckNames);
+              const names = [...baseRequiredCheckNames];
 
-              const changedFiles = await listChangedFiles(pr);
-              if (changedFiles.some((file) => (file.filename || '').startsWith('.github/workflows/'))) {
-                required.add('lint-workflows');
+              // Include lint-workflows when the PR touches workflow files
+              const changedFiles = await github.paginate(
+                github.rest.pulls.listFiles,
+                { owner, repo, pull_number: pr.number, per_page: 100 },
+                (response) => response.data
+              );
+              const touchesWorkflows = changedFiles.some((f) =>
+                f.filename?.startsWith('.github/workflows/')
+              );
+              if (touchesWorkflows) {
+                names.push('lint-workflows');
               }
 
-              return [...required];
+              return names;
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -236,6 +238,8 @@ jobs:
 
               const trustedGeneratedPr = isTrustedGeneratedPr(pr);
               const labelEligiblePr = isLabelEligiblePr(pr);
+              const allowlistedAutoApprove =
+                labelEligiblePr && allowlistedAutoApproveAuthors.has(pr.user?.login || '');
 
               if (!trustedGeneratedPr && !labelEligiblePr) {
                 core.info(
@@ -252,7 +256,7 @@ jobs:
                 continue;
               }
 
-              if (trustedGeneratedPr) {
+              if (trustedGeneratedPr || allowlistedAutoApprove) {
                 const { data: reviews } = await github.rest.pulls.listReviews({
                   owner,
                   repo,
@@ -260,7 +264,9 @@ jobs:
                 });
 
                 const alreadyApproved = reviews.some(
-                  (review) => review.state === 'APPROVED' && trustedAuthors.has(review.user?.login || '')
+                  (review) =>
+                    review.state === 'APPROVED' &&
+                    trustedAuthors.has(review.user?.login || '')
                 );
 
                 if (!alreadyApproved) {
@@ -270,7 +276,7 @@ jobs:
                       repo,
                       pull_number: pullNumber,
                       event: 'APPROVE',
-                      body: 'Automated approval for trusted generated PR after successful checks.',
+                      body: 'Automated approval for auto-merge-eligible PR after successful checks.',
                     });
 
                     core.info(`Approved PR #${pullNumber}.`);
