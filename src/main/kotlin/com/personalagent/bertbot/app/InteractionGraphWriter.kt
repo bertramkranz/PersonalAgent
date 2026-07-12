@@ -6,7 +6,7 @@ import com.personalagent.bertbot.graph.runtime.TraceEventRecord
 import java.io.File
 
 internal class InteractionGraphWriter(
-    private val outputFile: File = File("bertbot-interactions.mmd"),
+    private val outputFile: File = File(resolveInteractionsFilePath()),
     private val participantDisplayNames: Map<String, String> = defaultParticipantDisplayNames(),
 ) {
     companion object {

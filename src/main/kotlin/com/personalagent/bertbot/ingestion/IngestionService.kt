@@ -31,8 +31,10 @@ class IngestionService(
     private val episodicMemory: MemoryStore,
     private val semanticSummarizationTrigger: () -> Unit,
     private val userProfileStore: UserProfileStore,
-    private val mediaPolicy: MediaPolicy = ReferenceOnlyMediaPolicy(),
+    private val requireApproval: Boolean = true,
 ) : IngestionControlPlane {
+    private val mediaPolicy: MediaPolicy = ReferenceOnlyMediaPolicy()
+
     fun ingest(
         messages: List<NormalizedIngestionMessage>,
         dryRun: Boolean = false,
@@ -64,7 +66,7 @@ class IngestionService(
         val cleanedText = message.text?.trim().orEmpty()
         val attachmentRecords = mediaPolicy.toAttachmentRecords(message.attachments)
 
-        if (!consentStore.isApproved(message.source)) {
+        if (requireApproval && !consentStore.isApproved(message.source)) {
             return IngestionOutcome(
                 message = message,
                 decision = IngestionDecision.SKIPPED_UNAPPROVED,

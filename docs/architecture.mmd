@@ -23,10 +23,10 @@ flowchart TD
         Delegate[Delegation Node]
         Execute[Executor Node]
         State[(State Snapshot)]
-        StateFile[(bertbot-state.json)]
+        StateFile[(state/bertbot-state.json)]
         JdbcState[(JDBC State Store)]
-        TraceFile[(bertbot-trace.jsonl)]
-        DiagramFile[(bertbot-interactions.mmd)]
+        TraceFile[(logs/bertbot-trace.jsonl)]
+        DiagramFile[(state/bertbot-interactions.mmd)]
     end
 
     subgraph PlanningAndLLM
@@ -38,7 +38,7 @@ flowchart TD
 
     subgraph Memory
         Episodic[(Episodic Memory: File or JDBC)]
-        Semantic[(bertbot-semantic-memory.txt)]
+        Semantic[(state/bertbot-semantic-memory.txt)]
         Profile[(User Profile: File or JDBC)]
         Summarizer[MemorySummarizationWorker]
     end
@@ -64,7 +64,7 @@ flowchart TD
         ResearchService[ContinuousImprovementResearchService]
         ResearchScheduler[ContinuousImprovementResearchScheduler]
         ResearchRouter[ContinuousResearchToolRouter]
-        ResearchStore[(bertbot-research-recommendations.json)]
+        ResearchStore[(state/bertbot-research-recommendations.json)]
     end
 
     subgraph MacrofactorBridge

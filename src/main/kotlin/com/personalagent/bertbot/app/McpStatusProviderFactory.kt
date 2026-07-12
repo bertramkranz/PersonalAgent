@@ -15,6 +15,11 @@ internal object McpStatusProviderFactory {
                 ?.toolDefinitions()
                 ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
                 ?: emptyList()
+        val googleWorkspaceToolNames =
+            input.googleWorkspaceToolRouter
+                ?.toolDefinitions()
+                ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                ?: emptyList()
 
         return {
             val baseTools =
@@ -38,6 +43,7 @@ internal object McpStatusProviderFactory {
 
             macrofactorToolNames.forEach { name -> baseTools += name }
             researchToolNames.forEach { name -> baseTools += name }
+            googleWorkspaceToolNames.forEach { name -> baseTools += name }
 
             """
             Connected to bertbot MCP server.
@@ -58,6 +64,7 @@ internal data class McpStatusProviderInput(
     val workspaceRoot: File,
     val aiRuntimeConfiguration: AiRuntimeConfiguration,
     val macrofactorToolRouter: MacrofactorToolRouter?,
+    val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     val continuousResearchToolRouter: ContinuousResearchToolRouter?,
     val toolNames: McpToolNames,
 )

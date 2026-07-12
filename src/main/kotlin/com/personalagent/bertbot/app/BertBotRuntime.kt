@@ -1,7 +1,9 @@
 package com.personalagent.bertbot.app
 
+import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
+import com.personalagent.bertbot.agents.ToolCallingSkill
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
 import com.personalagent.bertbot.graph.runtime.MaxTurnsExceededException
@@ -30,6 +32,7 @@ internal class BertBotRuntime(
     private val memoryRuntime: BertBotMemoryRuntime,
     private val ingestionRuntime: BertBotIngestionRuntime? = null,
     private val researchRuntime: BertBotResearchRuntime? = null,
+    private val toolCallingSkill: ToolCallingSkill? = null,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
     private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
@@ -65,6 +68,8 @@ internal class BertBotRuntime(
                 if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
                     TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
                     "Your name is ${requestContext.knownProfile.displayName}."
+                } else if (toolCallingSkill != null) {
+                    toolCallingSkill.invoke(systemPrompt, userMessage, tracingContext)
                 } else {
                     assistantResponseSkill
                         .invoke(
@@ -235,6 +240,7 @@ internal object BertBotRuntimeFactory {
         aiRuntimeConfiguration: AiRuntimeConfiguration = resolveAiRuntimeConfiguration(),
         workspaceRoot: java.io.File = resolveWorkspaceRoot(),
         enablePeriodicResearchScheduler: Boolean = false,
+        googleWorkspaceRouter: GoogleWorkspaceToolRouter? = null,
     ): BertBotRuntime? {
         val runtimeConfig =
             applyResearchRuntimeOverrides(
@@ -279,6 +285,7 @@ internal object BertBotRuntimeFactory {
                 enablePeriodicScheduler = enablePeriodicResearchScheduler,
                 llmGateway = llmGateway,
             )
+        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, llmGateway)
 
         val runtime =
             BertBotRuntime(
@@ -290,11 +297,31 @@ internal object BertBotRuntimeFactory {
                 memoryRuntime = memoryRuntime,
                 ingestionRuntime = ingestionRuntime,
                 researchRuntime = researchRuntime,
+                toolCallingSkill = toolCallingSkill,
             )
         val connectorRuntime = BertBotConnectorRuntimeFactory.create(runtimeConfig, runtime)
         runtime.attachConnectorRuntime(connectorRuntime)
         return runtime
     }
+}
+
+private fun buildToolCallingSkillOrNull(
+    googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
+    llmGateway: com.personalagent.bertbot.llm.LlmGateway,
+): ToolCallingSkill? {
+    if (googleWorkspaceRouter == null) return null
+    val toolDefinitions = googleWorkspaceRouter.toolDefinitions()
+    if (toolDefinitions.isEmpty()) return null
+
+    return ToolCallingSkill(
+        llmGateway = llmGateway,
+        toolDefinitions = toolDefinitions,
+        toolExecutor = { name, args ->
+            val params = JsonObject()
+            params.add("arguments", args)
+            googleWorkspaceRouter.handle(name, params)?.second ?: "Tool '$name' not found"
+        },
+    )
 }
 
 internal fun extractDisplayNameFromMessage(message: String): String? {

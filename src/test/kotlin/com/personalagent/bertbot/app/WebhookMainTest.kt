@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 class WebhookMainTest {
     @Test
     fun `resolve webhook server config uses defaults`() {
-        val config = resolveWebhookServerConfig(environment = emptyMap())
+        val config = resolveWebhookServerConfig(environment = emptyMap(), dotEnvValues = emptyMap())
 
         assertEquals("0.0.0.0", config.host)
         assertEquals(8088, config.port)
@@ -46,7 +46,7 @@ class WebhookMainTest {
 
     @Test
     fun `resolve webhook agent config enables all connectors by default`() {
-        val config = resolveWebhookAgentConfig(environment = emptyMap())
+        val config = resolveWebhookAgentConfig(environment = emptyMap(), dotEnvValues = emptyMap())
 
         assertTrue(config.ingestion.policy.enabled)
         assertTrue(config.ingestion.telegram.connector.enabled)
@@ -72,6 +72,7 @@ class WebhookMainTest {
                         "BERTBOT_WHATSAPP_APP_SECRET" to "wa-secret",
                         "BERTBOT_WHATSAPP_VERIFY_TOKEN" to "wa-verify",
                     ),
+                dotEnvValues = emptyMap(),
             )
 
         assertTrue(config.requireSignatures)

@@ -53,18 +53,30 @@ internal data class MacrofactorRuntimeConfiguration(
         get() = enabled && !username.isNullOrBlank() && !password.isNullOrBlank()
 }
 
+internal data class GoogleWorkspaceRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_GOOGLE_WORKSPACE_ENABLED,
+    val command: String = DEFAULT_GOOGLE_WORKSPACE_COMMAND,
+    val args: List<String> = DEFAULT_GOOGLE_WORKSPACE_ARGS,
+    val timeoutSeconds: Long = DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS,
+    val toolNamePrefix: String = DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX,
+)
+
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
 internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 internal const val DEFAULT_OLLAMA_TIMEOUT_SECONDS: Long = 120
 internal const val DEFAULT_PERSISTENCE_BACKEND = "file"
-internal const val DEFAULT_STATE_FILE_PATH = "bertbot-state.json"
-internal const val DEFAULT_EPISODIC_MEMORY_FILE_PATH = "bertbot-memory.txt"
-internal const val DEFAULT_SEMANTIC_MEMORY_FILE_PATH = "bertbot-semantic-memory.txt"
-internal const val DEFAULT_PROFILE_FILE_PATH = "bertbot-profile.json"
-internal const val DEFAULT_INGESTION_CONSENT_FILE_PATH = "bertbot-ingestion-consent.json"
-internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "bertbot-ingestion-source-state.json"
-internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "bertbot-research-recommendations.json"
+internal const val DEFAULT_STATE_FILES_DIRECTORY = "state"
+internal const val DEFAULT_LOGS_DIRECTORY = "logs"
+internal const val DEFAULT_STATE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-state.json"
+internal const val DEFAULT_EPISODIC_MEMORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-memory.txt"
+internal const val DEFAULT_SEMANTIC_MEMORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-semantic-memory.txt"
+internal const val DEFAULT_PROFILE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-profile.json"
+internal const val DEFAULT_INGESTION_CONSENT_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-ingestion-consent.json"
+internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-ingestion-source-state.json"
+internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-research-recommendations.json"
+internal const val DEFAULT_TRACE_FILE_PATH = "$DEFAULT_LOGS_DIRECTORY/bertbot-trace.jsonl"
+internal const val DEFAULT_INTERACTIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-interactions.mmd"
 internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
 internal const val DEFAULT_EPISODIC_MEMORY_JDBC_TABLE = "bertbot_memory_episodic_snapshot"
 internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic_snapshot"
@@ -76,6 +88,11 @@ internal const val DEFAULT_MACROFACTOR_COMMAND = "npx"
 internal val DEFAULT_MACROFACTOR_ARGS = listOf("-y", "sjawhar-macrofactor")
 internal const val DEFAULT_MACROFACTOR_TIMEOUT_SECONDS: Long = 45
 internal const val DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX = "macrofactor_"
+internal const val DEFAULT_GOOGLE_WORKSPACE_ENABLED = false
+internal const val DEFAULT_GOOGLE_WORKSPACE_COMMAND = "npx"
+internal val DEFAULT_GOOGLE_WORKSPACE_ARGS = listOf("-y", "-p", "github:gemini-cli-extensions/workspace#v0.0.8", "gemini-workspace-server")
+internal const val DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS: Long = 60
+internal const val DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX = "google_workspace_"
 
 internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
@@ -324,12 +341,74 @@ internal fun resolveMacrofactorRuntimeConfiguration(
     )
 }
 
+internal fun resolveGoogleWorkspaceRuntimeConfiguration(): GoogleWorkspaceRuntimeConfiguration =
+    resolveGoogleWorkspaceRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveGoogleWorkspaceRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): GoogleWorkspaceRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_GOOGLE_WORKSPACE_ENABLED
+
+    val command =
+        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_COMMAND", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_GOOGLE_WORKSPACE_COMMAND
+
+    val args =
+        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_ARGS", environment, dotEnvValues)
+            ?.let { parseCommandArgs(it) }
+            ?.takeIf { it.isNotEmpty() }
+            ?: DEFAULT_GOOGLE_WORKSPACE_ARGS
+
+    val timeoutSeconds =
+        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceAtLeast(1)
+            ?: DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS
+
+    val toolNamePrefix =
+        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX
+
+    return GoogleWorkspaceRuntimeConfiguration(
+        enabled = enabled,
+        command = command,
+        args = args,
+        timeoutSeconds = timeoutSeconds,
+        toolNamePrefix = toolNamePrefix,
+    )
+}
+
 private fun parseCommandArgs(value: String): List<String> {
     return value
         .split(',')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 }
+
+internal fun resolveTraceFilePath(
+    environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
+): String =
+    resolveRuntimeSetting("BERTBOT_TRACE_FILE_PATH", environment, dotEnvValues)
+        ?.takeIf { it.isNotBlank() }
+        ?: DEFAULT_TRACE_FILE_PATH
+
+internal fun resolveInteractionsFilePath(
+    environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
+): String =
+    resolveRuntimeSetting("BERTBOT_INTERACTIONS_FILE_PATH", environment, dotEnvValues)
+        ?.takeIf { it.isNotBlank() }
+        ?: DEFAULT_INTERACTIONS_FILE_PATH
 
 internal fun printMissingApiKeyHelp() {
     println("❌ Error: AI provider API key not found")

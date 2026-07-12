@@ -1,6 +1,7 @@
 package com.personalagent.bertbot.graph.runtime
 
 import com.google.gson.Gson
+import com.personalagent.bertbot.app.resolveTraceFilePath
 import java.io.File
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -17,7 +18,7 @@ data class TraceEventRecord(
 object TraceLogger {
     private val logger: Logger = Logger.getLogger("com.personalagent.bertbot")
     private val gson = Gson()
-    private val traceFile = File("bertbot-trace.jsonl")
+    private val traceFile = File(resolveTraceFilePath())
     private val writeLock = Any()
     private val recentEvents = mutableListOf<TraceEventRecord>()
     private const val MAX_RECENT_EVENTS = 2_000

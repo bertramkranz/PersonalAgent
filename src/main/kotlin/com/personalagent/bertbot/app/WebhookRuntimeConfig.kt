@@ -10,41 +10,47 @@ import com.personalagent.bertbot.config.WhatsAppIntegrationConfig
 
 internal fun resolveWebhookServerConfig(
     environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): WebhookServerConfig {
+    fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
     return WebhookServerConfig(
-        host = environment["BERTBOT_WEBHOOK_HOST"]?.trim().takeUnless { it.isNullOrBlank() } ?: "0.0.0.0",
-        port = environment["BERTBOT_WEBHOOK_PORT"]?.toIntOrNull()?.coerceIn(1, 65535) ?: 8088,
-        telegramPath = normalizeWebhookPath(environment["BERTBOT_WEBHOOK_TELEGRAM_PATH"], "/webhook/telegram"),
-        slackPath = normalizeWebhookPath(environment["BERTBOT_WEBHOOK_SLACK_PATH"], "/webhook/slack"),
-        whatsAppPath = normalizeWebhookPath(environment["BERTBOT_WEBHOOK_WHATSAPP_PATH"], "/webhook/whatsapp"),
-        healthPath = normalizeWebhookPath(environment["BERTBOT_WEBHOOK_HEALTH_PATH"], "/health"),
-        dryRun = environment["BERTBOT_WEBHOOK_DRY_RUN"].toBooleanEnv(defaultValue = false),
+        host = env("BERTBOT_WEBHOOK_HOST").takeUnless { it.isNullOrBlank() } ?: "0.0.0.0",
+        port = env("BERTBOT_WEBHOOK_PORT")?.toIntOrNull()?.coerceIn(1, 65535) ?: 8088,
+        telegramPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_TELEGRAM_PATH"), "/webhook/telegram"),
+        slackPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_SLACK_PATH"), "/webhook/slack"),
+        whatsAppPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_WHATSAPP_PATH"), "/webhook/whatsapp"),
+        healthPath = normalizeWebhookPath(env("BERTBOT_WEBHOOK_HEALTH_PATH"), "/health"),
+        dryRun = env("BERTBOT_WEBHOOK_DRY_RUN").toBooleanEnv(defaultValue = false),
     )
 }
 
 internal fun resolveWebhookSecurityConfig(
     environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): WebhookSecurityConfig {
+    fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
     return WebhookSecurityConfig(
-        requireSignatures = environment["BERTBOT_WEBHOOK_REQUIRE_SIGNATURES"].toBooleanEnv(defaultValue = false),
-        trustProxyHeaders = environment["BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS"].toBooleanEnv(defaultValue = false),
-        allowedIpCidrs = parseCsvSet(environment["BERTBOT_WEBHOOK_ALLOWED_IPS"]),
-        telegramSecretToken = environment["BERTBOT_TELEGRAM_SECRET_TOKEN"]?.trim()?.takeIf { it.isNotBlank() },
-        slackSigningSecret = environment["BERTBOT_SLACK_SIGNING_SECRET"]?.trim()?.takeIf { it.isNotBlank() },
-        slackMaxRequestAgeSeconds = environment["BERTBOT_SLACK_MAX_REQUEST_AGE_SECONDS"]?.toLongOrNull()?.coerceAtLeast(30) ?: 300,
-        whatsAppAppSecret = environment["BERTBOT_WHATSAPP_APP_SECRET"]?.trim()?.takeIf { it.isNotBlank() },
-        whatsAppVerifyToken = environment["BERTBOT_WHATSAPP_VERIFY_TOKEN"]?.trim()?.takeIf { it.isNotBlank() },
-        rateLimitWindowSeconds = environment["BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS"]?.toLongOrNull()?.coerceAtLeast(1) ?: 60,
-        rateLimitMaxRequests = environment["BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS"]?.toIntOrNull()?.coerceAtLeast(1) ?: 120,
+        requireSignatures = env("BERTBOT_WEBHOOK_REQUIRE_SIGNATURES").toBooleanEnv(defaultValue = false),
+        trustProxyHeaders = env("BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS").toBooleanEnv(defaultValue = false),
+        allowedIpCidrs = parseCsvSet(env("BERTBOT_WEBHOOK_ALLOWED_IPS")),
+        telegramSecretToken = env("BERTBOT_TELEGRAM_SECRET_TOKEN")?.takeIf { it.isNotBlank() },
+        slackSigningSecret = env("BERTBOT_SLACK_SIGNING_SECRET")?.takeIf { it.isNotBlank() },
+        slackMaxRequestAgeSeconds = env("BERTBOT_SLACK_MAX_REQUEST_AGE_SECONDS")?.toLongOrNull()?.coerceAtLeast(30) ?: 300,
+        whatsAppAppSecret = env("BERTBOT_WHATSAPP_APP_SECRET")?.takeIf { it.isNotBlank() },
+        whatsAppVerifyToken = env("BERTBOT_WHATSAPP_VERIFY_TOKEN")?.takeIf { it.isNotBlank() },
+        rateLimitWindowSeconds = env("BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS")?.toLongOrNull()?.coerceAtLeast(1) ?: 60,
+        rateLimitMaxRequests = env("BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS")?.toIntOrNull()?.coerceAtLeast(1) ?: 120,
     )
 }
 
 internal fun resolveWebhookAgentConfig(
     environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): BertBotAgentConfig {
-    val enableTelegram = environment["BERTBOT_TELEGRAM_ENABLED"].toBooleanEnv(defaultValue = true)
-    val enableSlack = environment["BERTBOT_SLACK_ENABLED"].toBooleanEnv(defaultValue = true)
-    val enableWhatsApp = environment["BERTBOT_WHATSAPP_ENABLED"].toBooleanEnv(defaultValue = true)
+    fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
+    val enableTelegram = env("BERTBOT_TELEGRAM_ENABLED").toBooleanEnv(defaultValue = true)
+    val enableSlack = env("BERTBOT_SLACK_ENABLED").toBooleanEnv(defaultValue = true)
+    val enableWhatsApp = env("BERTBOT_WHATSAPP_ENABLED").toBooleanEnv(defaultValue = true)
 
     val ingestionEnabled = enableTelegram || enableSlack || enableWhatsApp
     return BertBotAgentConfig(
@@ -54,18 +60,18 @@ internal fun resolveWebhookAgentConfig(
                     IngestionPolicyConfig(
                         enabled = ingestionEnabled,
                         storeImageReferencesOnly = true,
-                        requireApproval = environment["BERTBOT_INGESTION_REQUIRE_APPROVAL"].toBooleanEnv(defaultValue = true),
+                        requireApproval = env("BERTBOT_INGESTION_REQUIRE_APPROVAL").toBooleanEnv(defaultValue = true),
                     ),
                 telegram = TelegramIntegrationConfig(connector = ConnectorConfig(enabled = enableTelegram, approvalScope = "chat")),
                 slack =
                     SlackIntegrationConfig(
                         connector = ConnectorConfig(enabled = enableSlack, approvalScope = "channel"),
-                        workspaceId = environment["BERTBOT_SLACK_WORKSPACE_ID"]?.trim()?.takeIf { it.isNotBlank() },
+                        workspaceId = env("BERTBOT_SLACK_WORKSPACE_ID")?.takeIf { it.isNotBlank() },
                     ),
                 whatsapp =
                     WhatsAppIntegrationConfig(
                         connector = ConnectorConfig(enabled = enableWhatsApp, approvalScope = "conversation"),
-                        businessPhoneNumberId = environment["BERTBOT_WHATSAPP_BUSINESS_PHONE_ID"]?.trim()?.takeIf { it.isNotBlank() },
+                        businessPhoneNumberId = env("BERTBOT_WHATSAPP_BUSINESS_PHONE_ID")?.takeIf { it.isNotBlank() },
                     ),
             ),
     )

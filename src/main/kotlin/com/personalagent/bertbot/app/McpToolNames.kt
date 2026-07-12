@@ -44,6 +44,7 @@ internal fun buildToolsListResultPayload(
     includeIngestionTools: Boolean,
     toolNames: McpToolNames,
     macrofactorToolDefinitions: List<JsonObject> = emptyList(),
+    googleWorkspaceToolDefinitions: List<JsonObject> = emptyList(),
     continuousResearchToolDefinitions: List<JsonObject> = emptyList(),
 ): JsonObject {
     val result = JsonObject()
@@ -54,6 +55,7 @@ internal fun buildToolsListResultPayload(
     }
 
     macrofactorToolDefinitions.forEach { tool -> tools.add(tool) }
+    googleWorkspaceToolDefinitions.forEach { tool -> tools.add(tool) }
     continuousResearchToolDefinitions.forEach { tool -> tools.add(tool) }
 
     result.add("tools", tools)

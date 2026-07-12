@@ -22,7 +22,7 @@ interface MemoryStore {
 }
 
 class EpisodicMemory(
-    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-memory.txt")),
+    private val backing: BertBotMemoryStore = BertBotMemory(File("state/bertbot-memory.txt")),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)
@@ -45,7 +45,7 @@ class EpisodicMemory(
 }
 
 class SemanticMemory(
-    private val backing: BertBotMemoryStore = BertBotMemory(File("bertbot-semantic-memory.txt")),
+    private val backing: BertBotMemoryStore = BertBotMemory(File("state/bertbot-semantic-memory.txt")),
 ) : MemoryStore {
     override fun append(text: String) {
         backing.remember(text)

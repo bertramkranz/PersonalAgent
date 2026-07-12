@@ -6,6 +6,7 @@ internal object McpServerBootstrap {
     data class DispatcherContextInput(
         val aiRuntimeConfiguration: AiRuntimeConfiguration,
         val macrofactorRuntimeConfiguration: MacrofactorRuntimeConfiguration,
+        val googleWorkspaceRuntimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
         val workspaceRoot: File,
         val toolNames: McpToolNames,
     )
@@ -23,6 +24,12 @@ internal object McpServerBootstrap {
             } else {
                 null
             }
+        val googleWorkspaceToolRouter =
+            if (input.googleWorkspaceRuntimeConfiguration.enabled) {
+                GoogleWorkspaceToolRouter(input.googleWorkspaceRuntimeConfiguration)
+            } else {
+                null
+            }
         val continuousResearchToolRouter =
             startup.runtime
                 ?.researchService()
@@ -35,6 +42,7 @@ internal object McpServerBootstrap {
                     workspaceRoot = input.workspaceRoot,
                     aiRuntimeConfiguration = input.aiRuntimeConfiguration,
                     macrofactorToolRouter = macrofactorToolRouter,
+                    googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                     continuousResearchToolRouter = continuousResearchToolRouter,
                     toolNames = input.toolNames,
                 ),
@@ -55,6 +63,7 @@ internal object McpServerBootstrap {
                 },
                 workspaceRoot = input.workspaceRoot,
                 macrofactorToolRouter = macrofactorToolRouter,
+                googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                 polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
                 continuousResearchToolRouter = continuousResearchToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
