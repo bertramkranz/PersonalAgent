@@ -86,34 +86,74 @@ internal object BertBotGraphFactory {
 }
 
 internal object BertBotRuntimeDependenciesFactory {
-    private val jdbcBackends = setOf("jdbc", "postgres", "postgresql")
-
     fun createStateStore(
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
-    ): BertBotStateStore {
-        val normalizedBackend = persistenceConfiguration.backend.lowercase()
-        return when (normalizedBackend) {
-            "file" -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
-            "jdbc", "postgres", "postgresql" -> {
-                val jdbcUrl =
-                    requireNotNull(persistenceConfiguration.jdbcUrl) {
-                        "BERTBOT_STATE_JDBC_URL must be set when BERTBOT_STATE_STORE is '$normalizedBackend'."
-                    }
-                JdbcBertBotStateStore(
-                    jdbcUrl = jdbcUrl,
-                    username = persistenceConfiguration.jdbcUser,
-                    password = persistenceConfiguration.jdbcPassword,
-                    tableName = persistenceConfiguration.jdbcTable,
-                )
-            }
-            else -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
-        }
-    }
+    ): BertBotStateStore = BertBotStateStoreFactory.create(persistenceConfiguration)
 
     fun createMemoryRuntime(
         config: BertBotAgentConfig,
         llmGateway: LlmGateway,
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): BertBotMemoryRuntime = BertBotMemoryRuntimeFactory.create(config, llmGateway, persistenceConfiguration)
+
+    fun createIngestionRuntime(
+        config: BertBotAgentConfig,
+        memoryRuntime: BertBotMemoryRuntime,
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): BertBotIngestionRuntime? = BertBotIngestionRuntimeFactory.create(config, memoryRuntime, persistenceConfiguration)
+
+    fun createResearchRuntime(
+        config: BertBotAgentConfig,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+        workspaceRoot: File,
+        enablePeriodicScheduler: Boolean,
+        llmGateway: LlmGateway? = null,
+    ): BertBotResearchRuntime? =
+        BertBotResearchRuntimeFactory.create(
+            config = config,
+            persistenceConfiguration = persistenceConfiguration,
+            workspaceRoot = workspaceRoot,
+            enablePeriodicScheduler = enablePeriodicScheduler,
+            llmGateway = llmGateway,
+        )
+}
+
+private object BertBotJdbcBackend {
+    private val jdbcBackends = setOf("jdbc", "postgres", "postgresql")
+
+    fun isJdbcBackend(backend: String): Boolean = backend in jdbcBackends
+
+    fun requireJdbcUrl(
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+        normalizedBackend: String,
+    ): String =
+        requireNotNull(persistenceConfiguration.jdbcUrl) {
+            "BERTBOT_STATE_JDBC_URL must be set when BERTBOT_STATE_STORE is '$normalizedBackend'."
+        }
+}
+
+private object BertBotStateStoreFactory {
+    fun create(persistenceConfiguration: PersistenceRuntimeConfiguration): BertBotStateStore {
+        val normalizedBackend = persistenceConfiguration.backend.lowercase()
+        return when (normalizedBackend) {
+            "file" -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+            "jdbc", "postgres", "postgresql" ->
+                JdbcBertBotStateStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.jdbcTable,
+                )
+            else -> FileBertBotStateStore(File(persistenceConfiguration.stateFilePath))
+        }
+    }
+}
+
+private object BertBotMemoryRuntimeFactory {
+    fun create(
+        config: BertBotAgentConfig,
+        llmGateway: LlmGateway,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
     ): BertBotMemoryRuntime {
         val normalizedBackend = persistenceConfiguration.backend.lowercase()
         val episodicMemory = createEpisodicMemory(normalizedBackend, persistenceConfiguration)
@@ -139,10 +179,66 @@ internal object BertBotRuntimeDependenciesFactory {
         )
     }
 
-    fun createIngestionRuntime(
+    private fun createEpisodicMemory(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): EpisodicMemory {
+        if (BertBotJdbcBackend.isJdbcBackend(normalizedBackend)) {
+            return EpisodicMemory(
+                JdbcBertBotMemoryStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.episodicMemoryJdbcTable,
+                ),
+            )
+        }
+
+        return EpisodicMemory(BertBotMemory(File(persistenceConfiguration.episodicMemoryFilePath)))
+    }
+
+    private fun createSemanticMemory(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): SemanticMemory {
+        if (BertBotJdbcBackend.isJdbcBackend(normalizedBackend)) {
+            return SemanticMemory(
+                JdbcBertBotMemoryStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.semanticMemoryJdbcTable,
+                ),
+            )
+        }
+
+        return SemanticMemory(BertBotMemory(File(persistenceConfiguration.semanticMemoryFilePath)))
+    }
+
+    private fun createUserProfileStore(
+        normalizedBackend: String,
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
+    ): UserProfileStore {
+        if (BertBotJdbcBackend.isJdbcBackend(normalizedBackend)) {
+            return UserProfileStore(
+                JdbcUserProfileStore(
+                    jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                    username = persistenceConfiguration.jdbcUser,
+                    password = persistenceConfiguration.jdbcPassword,
+                    tableName = persistenceConfiguration.profileJdbcTable,
+                ),
+            )
+        }
+
+        return UserProfileStore(File(persistenceConfiguration.profileFilePath))
+    }
+}
+
+private object BertBotIngestionRuntimeFactory {
+    fun create(
         config: BertBotAgentConfig,
         memoryRuntime: BertBotMemoryRuntime,
-        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+        persistenceConfiguration: PersistenceRuntimeConfiguration,
     ): BertBotIngestionRuntime? {
         if (!config.ingestion.policy.enabled) {
             return null
@@ -165,67 +261,13 @@ internal object BertBotRuntimeDependenciesFactory {
         return BertBotIngestionRuntime(controlPlane = service)
     }
 
-    private fun createEpisodicMemory(
-        normalizedBackend: String,
-        persistenceConfiguration: PersistenceRuntimeConfiguration,
-    ): EpisodicMemory {
-        if (normalizedBackend in jdbcBackends) {
-            return EpisodicMemory(
-                JdbcBertBotMemoryStore(
-                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
-                    username = persistenceConfiguration.jdbcUser,
-                    password = persistenceConfiguration.jdbcPassword,
-                    tableName = persistenceConfiguration.episodicMemoryJdbcTable,
-                ),
-            )
-        }
-
-        return EpisodicMemory(BertBotMemory(File(persistenceConfiguration.episodicMemoryFilePath)))
-    }
-
-    private fun createSemanticMemory(
-        normalizedBackend: String,
-        persistenceConfiguration: PersistenceRuntimeConfiguration,
-    ): SemanticMemory {
-        if (normalizedBackend in jdbcBackends) {
-            return SemanticMemory(
-                JdbcBertBotMemoryStore(
-                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
-                    username = persistenceConfiguration.jdbcUser,
-                    password = persistenceConfiguration.jdbcPassword,
-                    tableName = persistenceConfiguration.semanticMemoryJdbcTable,
-                ),
-            )
-        }
-
-        return SemanticMemory(BertBotMemory(File(persistenceConfiguration.semanticMemoryFilePath)))
-    }
-
-    private fun createUserProfileStore(
-        normalizedBackend: String,
-        persistenceConfiguration: PersistenceRuntimeConfiguration,
-    ): UserProfileStore {
-        if (normalizedBackend in jdbcBackends) {
-            return UserProfileStore(
-                JdbcUserProfileStore(
-                    jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
-                    username = persistenceConfiguration.jdbcUser,
-                    password = persistenceConfiguration.jdbcPassword,
-                    tableName = persistenceConfiguration.profileJdbcTable,
-                ),
-            )
-        }
-
-        return UserProfileStore(File(persistenceConfiguration.profileFilePath))
-    }
-
     private fun createConsentStore(
         normalizedBackend: String,
         persistenceConfiguration: PersistenceRuntimeConfiguration,
     ) =
-        if (normalizedBackend in jdbcBackends) {
+        if (BertBotJdbcBackend.isJdbcBackend(normalizedBackend)) {
             JdbcConsentStore(
-                jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
                 username = persistenceConfiguration.jdbcUser,
                 password = persistenceConfiguration.jdbcPassword,
                 tableName = persistenceConfiguration.ingestionConsentJdbcTable,
@@ -238,9 +280,9 @@ internal object BertBotRuntimeDependenciesFactory {
         normalizedBackend: String,
         persistenceConfiguration: PersistenceRuntimeConfiguration,
     ) =
-        if (normalizedBackend in jdbcBackends) {
+        if (BertBotJdbcBackend.isJdbcBackend(normalizedBackend)) {
             JdbcSourceStateStore(
-                jdbcUrl = requireJdbcUrl(persistenceConfiguration, normalizedBackend),
+                jdbcUrl = BertBotJdbcBackend.requireJdbcUrl(persistenceConfiguration, normalizedBackend),
                 username = persistenceConfiguration.jdbcUser,
                 password = persistenceConfiguration.jdbcPassword,
                 tableName = persistenceConfiguration.ingestionSourceStateJdbcTable,
@@ -248,14 +290,31 @@ internal object BertBotRuntimeDependenciesFactory {
         } else {
             FileSourceStateStore(File(persistenceConfiguration.ingestionSourceStateFilePath))
         }
+}
 
-    private fun requireJdbcUrl(
+private object BertBotResearchRuntimeFactory {
+    fun create(
+        config: BertBotAgentConfig,
         persistenceConfiguration: PersistenceRuntimeConfiguration,
-        normalizedBackend: String,
-    ): String =
-        requireNotNull(persistenceConfiguration.jdbcUrl) {
-            "BERTBOT_STATE_JDBC_URL must be set when BERTBOT_STATE_STORE is '$normalizedBackend'."
+        workspaceRoot: File,
+        enablePeriodicScheduler: Boolean,
+        llmGateway: LlmGateway? = null,
+    ): BertBotResearchRuntime? {
+        if (!config.research.enabled) {
+            return null
         }
+
+        val store = FileImprovementRecommendationStore(File(persistenceConfiguration.researchRecommendationsFilePath))
+        val service = ContinuousImprovementResearchService(config = config, workspaceRoot = workspaceRoot, store = store, llmGateway = llmGateway)
+        val scheduler =
+            if (enablePeriodicScheduler && config.research.periodicEnabled) {
+                ContinuousImprovementResearchScheduler(service, intervalSeconds = config.research.periodicIntervalSeconds)
+            } else {
+                null
+            }
+
+        return BertBotResearchRuntime(service = service, scheduler = scheduler)
+    }
 }
 
 internal data class BertBotRequestContext(

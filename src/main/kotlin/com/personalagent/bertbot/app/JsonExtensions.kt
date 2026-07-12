@@ -11,3 +11,5 @@ internal fun JsonObject.stringValue(name: String): String? =
 
 internal fun JsonObject.objectValue(name: String): JsonObject? =
     get(name)?.takeIf { it.isJsonObject }?.asJsonObject
+
+internal fun JsonObject.argumentsOrSelf(): JsonObject = objectValue("arguments") ?: this

@@ -57,12 +57,25 @@ data class IngestionConfig(
     val whatsapp: WhatsAppIntegrationConfig = WhatsAppIntegrationConfig(),
 )
 
+data class ContinuousImprovementResearchConfig(
+    val enabled: Boolean = true,
+    val eventDrivenEnabled: Boolean = true,
+    val periodicEnabled: Boolean = true,
+    val llmAssistedEnabled: Boolean = false,
+    val includeExternalSignals: Boolean = false,
+    val periodicIntervalSeconds: Long = 1800,
+    val minIntervalBetweenRunsSeconds: Long = 300,
+    val maxRecommendationsPerCycle: Int = 8,
+    val failureCooldownSeconds: Long = 600,
+)
+
 data class BertBotAgentConfig(
     val name: String = "BertBot",
     val maxSemanticContextEntries: Int = 5,
     val maxEpisodicContextEntries: Int = 10,
     val memorySummarizationThreshold: Int = 15,
     val memorySummarizationBatchSize: Int = 10,
+    val research: ContinuousImprovementResearchConfig = ContinuousImprovementResearchConfig(),
     val ingestion: IngestionConfig = IngestionConfig(),
     val nonActionableMessages: Set<String> =
         setOf(
@@ -224,6 +237,24 @@ data class BertBotAgentConfig(
                 description = "Supports behavior insight, emotional framing, and communication dynamics",
                 skills = setOf("psychology", "behavior", "emotion", "mindset", "communication"),
             ),
+            SubAgentConfigDefinition(
+                id = "repo_improvement_researcher",
+                name = "Repo Improvement Researcher",
+                description = "Continuously researches repository and ecosystem improvements with Kotlin, MCP, AI, security, productivity, and performance focus",
+                skills =
+                    setOf(
+                        "research",
+                        "kotlin",
+                        "mcp",
+                        "ai",
+                        "security",
+                        "productivity",
+                        "performance",
+                        "cost",
+                        "optimization",
+                    ),
+                enabled = false,
+            ),
         ),
 ) {
     init {
@@ -253,6 +284,18 @@ data class BertBotAgentConfig(
         }
         require(memorySummarizationBatchSize <= memorySummarizationThreshold) {
             "memorySummarizationBatchSize must be less than or equal to memorySummarizationThreshold"
+        }
+        require(research.periodicIntervalSeconds > 0) {
+            "research.periodicIntervalSeconds must be greater than 0"
+        }
+        require(research.minIntervalBetweenRunsSeconds >= 0) {
+            "research.minIntervalBetweenRunsSeconds must be greater than or equal to 0"
+        }
+        require(research.maxRecommendationsPerCycle > 0) {
+            "research.maxRecommendationsPerCycle must be greater than 0"
+        }
+        require(research.failureCooldownSeconds >= 0) {
+            "research.failureCooldownSeconds must be greater than or equal to 0"
         }
         require(nonActionableMessages.none { it.isBlank() }) {
             "nonActionableMessages must not contain blank values"

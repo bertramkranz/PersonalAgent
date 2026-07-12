@@ -29,6 +29,7 @@ internal class BertBotRuntime(
     private val assistantResponseSkill: SelfCorrectingSkill<AssistantResponseEnvelope>,
     private val memoryRuntime: BertBotMemoryRuntime,
     private val ingestionRuntime: BertBotIngestionRuntime? = null,
+    private val researchRuntime: BertBotResearchRuntime? = null,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
     private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
@@ -88,6 +89,9 @@ internal class BertBotRuntime(
 
             memoryRuntime.episodicMemory.append("ASSISTANT: $response")
             memoryRuntime.memoryWorker.scheduleIfNeeded()
+            runCatching {
+                researchRuntime?.service?.submitEventAsync(reason = "respond_to")
+            }
             response
         }
     }
@@ -142,6 +146,8 @@ internal class BertBotRuntime(
 
     fun ingestionControlPlane(): IngestionControlPlane? = ingestionRuntime?.controlPlane
 
+    fun researchService(): ContinuousImprovementResearchService? = researchRuntime?.service
+
     fun externalChatResponder(): (NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome =
         { message, dryRun -> chatFromExternalMessage(message, dryRun) }
 
@@ -164,6 +170,8 @@ internal class BertBotRuntime(
     override fun close() {
         memoryRuntime.memoryWorker.close()
         ingestionRuntime?.scheduler?.close()
+        researchRuntime?.scheduler?.close()
+        researchRuntime?.service?.close()
     }
 
     private fun <T> withPersistenceScope(
@@ -216,16 +224,29 @@ internal data class BertBotIngestionRuntime(
     val scheduler: AutoCloseable? = null,
 )
 
+internal data class BertBotResearchRuntime(
+    val service: ContinuousImprovementResearchService,
+    val scheduler: AutoCloseable? = null,
+)
+
 internal object BertBotRuntimeFactory {
     fun create(
         config: BertBotAgentConfig = BertBotAgentConfig(),
         aiRuntimeConfiguration: AiRuntimeConfiguration = resolveAiRuntimeConfiguration(),
+        workspaceRoot: java.io.File = resolveWorkspaceRoot(),
+        enablePeriodicResearchScheduler: Boolean = false,
     ): BertBotRuntime? {
+        val runtimeConfig =
+            applyResearchRuntimeOverrides(
+                config = config,
+                environment = System.getenv(),
+                dotEnvValues = loadDotEnvValues(),
+            )
         val normalizedProvider = aiRuntimeConfiguration.provider.lowercase()
 
         val persistenceConfiguration = resolvePersistenceRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
-        val graph = BertBotApplication.createGraph(stateStore, config)
+        val graph = BertBotApplication.createGraph(stateStore, runtimeConfig)
         val llmGateway =
             when (normalizedProvider) {
                 "openai" -> {
@@ -243,25 +264,34 @@ internal object BertBotRuntimeFactory {
                         "Unsupported AI provider '${aiRuntimeConfiguration.provider}'. Supported providers: openai, ollama.",
                     )
             }
-        val memoryRuntime = BertBotRuntimeDependenciesFactory.createMemoryRuntime(config, llmGateway, persistenceConfiguration)
+        val memoryRuntime = BertBotRuntimeDependenciesFactory.createMemoryRuntime(runtimeConfig, llmGateway, persistenceConfiguration)
         val ingestionRuntime =
             BertBotRuntimeDependenciesFactory.createIngestionRuntime(
-                config,
+                runtimeConfig,
                 memoryRuntime,
                 persistenceConfiguration,
+            )
+        val researchRuntime =
+            BertBotRuntimeDependenciesFactory.createResearchRuntime(
+                config = runtimeConfig,
+                persistenceConfiguration = persistenceConfiguration,
+                workspaceRoot = workspaceRoot,
+                enablePeriodicScheduler = enablePeriodicResearchScheduler,
+                llmGateway = llmGateway,
             )
 
         val runtime =
             BertBotRuntime(
-                config = config,
+                config = runtimeConfig,
                 aiRuntimeConfiguration = aiRuntimeConfiguration,
                 stateStore = stateStore,
                 graph = graph,
                 assistantResponseSkill = createAssistantResponseSkill(llmGateway),
                 memoryRuntime = memoryRuntime,
                 ingestionRuntime = ingestionRuntime,
+                researchRuntime = researchRuntime,
             )
-        val connectorRuntime = BertBotConnectorRuntimeFactory.create(config, runtime)
+        val connectorRuntime = BertBotConnectorRuntimeFactory.create(runtimeConfig, runtime)
         runtime.attachConnectorRuntime(connectorRuntime)
         return runtime
     }

@@ -18,14 +18,10 @@ flowchart TD
     end
 
     %% ── Review ────────────────────────────────────────────────────────────────
-    COPILOT_REQ["copilot-review.yml\nRequests Copilot review\n(on open / sync / ready)"]
     COPILOT_BOT([copilot-pull-request-reviewer bot\nreviews the PR])
 
-    %% ── Approval ──────────────────────────────────────────────────────────────
-    AUTO_APPROVE["auto-approve-copilot-reviewed-prs.yml\nApproves PR with AUTOMATION_PAT\nonly when Copilot submits APPROVED"]
-
     %% ── Merge ─────────────────────────────────────────────────────────────────
-    MERGE["merge-generated-prs-on-green.yml\nApproves + squash-merges eligible PRs\n\nEligible if:\n  • Trusted generated PR (github-actions[bot]\n    + title 'chore: merge …') — auto-approved\n  • OR labelled 'auto-merge'\n\nTriggered by:\n  • check_suite completed ✅ (replaces workflow_run)\n  • pull_request_review: approved\n  • pull_request: labeled / synchronize\n  • workflow_dispatch"]
+    MERGE["merge-generated-prs-on-green.yml\nApproves + squash-merges eligible PRs\n\nEligible if:\n  • Trusted generated PR (github-actions[bot]\n    + title 'chore: merge …') — auto-approved\n  • OR labelled 'auto-merge'\n\nTriggered by:\n  • schedule: every 5 minutes\n  • workflow_dispatch"]
 
     %% ── CD ────────────────────────────────────────────────────────────────────
     MAIN([main branch])
@@ -37,17 +33,9 @@ flowchart TD
     DEP -->|PR already open| CI
 
     AUTO_PR -->|PR opened| CI
-    AUTO_PR -->|PR opened| COPILOT_REQ
-
     CI --> COPILOT_BOT
-    COPILOT_REQ --> COPILOT_BOT
 
-    COPILOT_BOT -->|APPROVED review| AUTO_APPROVE
     COPILOT_BOT -->|APPROVED review| MERGE
-
-    AUTO_APPROVE -->|second approval on PR| MERGE
-
-    CI -->|check_suite: completed| MERGE
 
     MERGE -->|squash merge| MAIN
 
@@ -59,7 +47,7 @@ flowchart TD
     classDef actor    fill:#161b22,stroke:#30363d,color:#79c0ff,shape:stadium
     classDef external fill:#161b22,stroke:#238636,color:#3fb950,shape:stadium
 
-    class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,COPILOT_REQ,AUTO_APPROVE,MERGE,CD workflow
+    class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,CD workflow
     class DEV,DEP,COPILOT_BOT actor
     class MAIN,RELEASE external
 ```

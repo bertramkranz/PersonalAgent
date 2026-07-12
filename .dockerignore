@@ -5,6 +5,7 @@ build
 out
 .idea
 .vscode
+.tools
 *.iml
 *.log
 .env
@@ -13,5 +14,8 @@ bertbot-state.json
 bertbot-memory.txt
 bertbot-semantic-memory.txt
 bertbot-profile.json
+bertbot-ingestion-consent.json
+bertbot-ingestion-source-state.json
+bertbot-research-recommendations.json
 bertbot-trace.jsonl
 bertbot-interactions.mmd

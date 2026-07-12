@@ -17,6 +17,13 @@ The project is organized around a small set of focused packages:
 - `com.personalagent.bertbot.ingestion` - external chat ingestion control plane, source approval, and connector adapters.
 - `com.personalagent.bertbot.agents` - sub-agent registry and capability matching.
 
+This structure follows Koog-style example conventions by grouping code by capability boundary (runtime, tools, graph, persistence, connectors) instead of by technical layer only. In practice:
+
+- Transport surfaces (`cli`, `mcp`, `webhook`) stay in `app` entrypoint wiring.
+- Tool routers are isolated by integration domain (for example Polymarket and MacroFactor).
+- Graph contracts remain split across `graph.model`, `graph.nodes`, `graph.runtime`, and `graph.store`.
+- Runtime configuration is driven by environment variables with explicit defaults.
+
 ## Runtime Flow
 
 BertBot runs as a graph of named nodes:
@@ -68,6 +75,7 @@ The current configuration variables are:
 - `BERTBOT_AI_API_KEY` - OpenAI API key (required when `BERTBOT_AI_PROVIDER=openai`).
 - `BERTBOT_OLLAMA_BASE_URL` - Ollama server base URL (used when `BERTBOT_AI_PROVIDER=ollama`). Default: `http://localhost:11434`.
 - `BERTBOT_OLLAMA_TIMEOUT_SECONDS` - Ollama request timeout in seconds. Default: `120`.
+- `BERTBOT_WORKSPACE_ROOT` - optional MCP workspace root override used by workspace tool routes.
 
 MacroFactor MCP proxy variables:
 
@@ -78,6 +86,11 @@ MacroFactor MCP proxy variables:
 - `BERTBOT_MACROFACTOR_PASSWORD` - MacroFactor account password.
 - `BERTBOT_MACROFACTOR_TIMEOUT_SECONDS` - timeout for upstream MacroFactor MCP responses. Default: `45`.
 - `BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX` - proxy tool name prefix exposed by BertBot. Default: `macrofactor_`.
+- `BERTBOT_MACROFACTOR_LIVE_TEST` - enable live integration tests for MacroFactor proxy.
+- `BERTBOT_MACROFACTOR_LIVE_TOOL` - optional upstream tool name used by live integration tests.
+- `BERTBOT_MACROFACTOR_LIVE_ARGS_JSON` - optional JSON arguments for the live test tool call.
+- `BERTBOT_MACROFACTOR_EXPECTED_TOOL` - optional tool expected in `tools/list` assertions.
+- `BERTBOT_MACROFACTOR_EXPECTED_ARG` - optional expected argument key for schema assertions.
 
 State persistence backend variables:
 
@@ -88,6 +101,7 @@ State persistence backend variables:
 - `BERTBOT_PROFILE_FILE_PATH` - user profile file path when file backend is used. Default: `bertbot-profile.json`.
 - `BERTBOT_INGESTION_CONSENT_FILE_PATH` - ingestion consent file path when file backend is used. Default: `bertbot-ingestion-consent.json`.
 - `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` - ingestion source-state file path when file backend is used. Default: `bertbot-ingestion-source-state.json`.
+- `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` - continuous-improvement recommendations file path for file backend. Default: `bertbot-research-recommendations.json`.
 - `BERTBOT_STATE_JDBC_URL` - JDBC connection URL when JDBC/PostgreSQL backend is used.
 - `BERTBOT_STATE_JDBC_USER` - optional JDBC username.
 - `BERTBOT_STATE_JDBC_PASSWORD` - optional JDBC password.
@@ -97,6 +111,24 @@ State persistence backend variables:
 - `BERTBOT_PROFILE_JDBC_TABLE` - user profile snapshot table name. Default: `bertbot_profile_snapshot`.
 - `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` - ingestion consent snapshot table name. Default: `bertbot_ingestion_consent_snapshot`.
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` - ingestion source-state snapshot table name. Default: `bertbot_ingestion_source_state_snapshot`.
+
+Continuous improvement research overrides:
+
+- `BERTBOT_RESEARCH_ENABLED` - global research pipeline switch.
+- `BERTBOT_RESEARCH_EVENT_DRIVEN_ENABLED` - enable event-triggered research runs.
+- `BERTBOT_RESEARCH_PERIODIC_ENABLED` - enable periodic scheduler-triggered runs.
+- `BERTBOT_RESEARCH_LLM_ASSISTED_ENABLED` - enable LLM-assisted recommendation scoring.
+- `BERTBOT_RESEARCH_INCLUDE_EXTERNAL_SIGNALS` - include external signals in recommendation generation.
+- `BERTBOT_RESEARCH_PERIODIC_INTERVAL_SECONDS` - periodic scheduler interval in seconds.
+- `BERTBOT_RESEARCH_MIN_INTERVAL_SECONDS` - minimum cool-off between research runs.
+- `BERTBOT_RESEARCH_MAX_RECOMMENDATIONS_PER_CYCLE` - max recommendations emitted per cycle.
+- `BERTBOT_RESEARCH_FAILURE_COOLDOWN_SECONDS` - cool-off after failed research cycles.
+
+Polymarket endpoint overrides:
+
+- `BERTBOT_POLYMARKET_GAMMA_BASE_URL` - Gamma API base URL.
+- `BERTBOT_POLYMARKET_CLOB_BASE_URL` - CLOB API base URL.
+- `BERTBOT_POLYMARKET_DATA_BASE_URL` - Data API base URL.
 
 Webhook server and connector variables:
 
@@ -352,6 +384,7 @@ When `BERTBOT_AI_PROVIDER=ollama`, set `BERTBOT_AI_MODEL` to a model present in 
 
 - App listens on `0.0.0.0:8088` inside the container.
 - Host port mapping: `8088:8088`.
+- Container startup mode defaults to `BERTBOT_RUN_MODE=webhook`.
 - Persistence backend is configured to PostgreSQL in compose:
 	- `BERTBOT_STATE_STORE=postgres`
 	- `BERTBOT_STATE_JDBC_URL=jdbc:postgresql://postgres:5432/bertbot`
@@ -434,13 +467,9 @@ This repository includes GitHub Actions workflows:
 	- Opens a pull request into the repository default branch when one is not already open.
 
 - Merge generated PRs workflow: `.github/workflows/merge-generated-prs-on-green.yml`
-	- Triggers on generated PR activity, check-suite completions, approval review submissions, and manual dispatch.
+	- Triggers every 5 minutes on a schedule and via manual dispatch.
 	- Applies guardrails for trusted generated PRs and `auto-merge`-labeled PRs, re-runs action-required checks, auto-approves when possible, and merges once all required checks pass.
 	- Uses `AUTOMATION_PAT` when configured, with fallback to `github.token`.
-
-- Copilot review workflow: `.github/workflows/copilot-review.yml`
-	- Requests GitHub Copilot as a reviewer when a pull request is opened or updated.
-	- Re-requests review on new pushes to the pull request branch.
 
 - Secret scan workflow: `.github/workflows/secret-scan.yml`
 	- Triggers on pushes, pull requests into `main`, and manual dispatch.

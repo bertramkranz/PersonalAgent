@@ -1,6 +1,7 @@
 package com.personalagent.bertbot.app
 
 import com.openai.models.ChatModel
+import com.personalagent.bertbot.config.BertBotAgentConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -95,6 +96,7 @@ class AiRuntimeConfigurationTest {
         assertEquals(DEFAULT_PROFILE_FILE_PATH, configuration.profileFilePath)
         assertEquals(DEFAULT_INGESTION_CONSENT_FILE_PATH, configuration.ingestionConsentFilePath)
         assertEquals(DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH, configuration.ingestionSourceStateFilePath)
+        assertEquals(DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH, configuration.researchRecommendationsFilePath)
         assertEquals(DEFAULT_STATE_JDBC_TABLE, configuration.jdbcTable)
         assertEquals(DEFAULT_EPISODIC_MEMORY_JDBC_TABLE, configuration.episodicMemoryJdbcTable)
         assertEquals(DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE, configuration.semanticMemoryJdbcTable)
@@ -121,6 +123,7 @@ class AiRuntimeConfigurationTest {
                         "BERTBOT_PROFILE_FILE_PATH" to "profile-from-env.json",
                         "BERTBOT_INGESTION_CONSENT_FILE_PATH" to "consent-from-env.json",
                         "BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH" to "source-state-from-env.json",
+                        "BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH" to "research-from-env.json",
                         "BERTBOT_MEMORY_EPISODIC_JDBC_TABLE" to "episodic_table",
                         "BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE" to "semantic_table",
                         "BERTBOT_PROFILE_JDBC_TABLE" to "profile_table",
@@ -141,6 +144,7 @@ class AiRuntimeConfigurationTest {
         assertEquals("profile-from-env.json", configuration.profileFilePath)
         assertEquals("consent-from-env.json", configuration.ingestionConsentFilePath)
         assertEquals("source-state-from-env.json", configuration.ingestionSourceStateFilePath)
+        assertEquals("research-from-env.json", configuration.researchRecommendationsFilePath)
         assertEquals("jdbc:postgresql://localhost:5432/bertbot", configuration.jdbcUrl)
         assertEquals("env-user", configuration.jdbcUser)
         assertEquals("env-pass", configuration.jdbcPassword)
@@ -199,5 +203,58 @@ class AiRuntimeConfigurationTest {
         assertEquals(90, configuration.timeoutSeconds)
         assertEquals("mf_", configuration.toolNamePrefix)
         assertEquals(true, configuration.isConfigured)
+    }
+
+    @Test
+    fun `research runtime overrides prefer environment values`() {
+        val config =
+            applyResearchRuntimeOverrides(
+                config = BertBotAgentConfig(),
+                environment =
+                    mapOf(
+                        "BERTBOT_RESEARCH_ENABLED" to "false",
+                        "BERTBOT_RESEARCH_EVENT_DRIVEN_ENABLED" to "false",
+                        "BERTBOT_RESEARCH_PERIODIC_ENABLED" to "true",
+                        "BERTBOT_RESEARCH_LLM_ASSISTED_ENABLED" to "true",
+                        "BERTBOT_RESEARCH_INCLUDE_EXTERNAL_SIGNALS" to "true",
+                        "BERTBOT_RESEARCH_PERIODIC_INTERVAL_SECONDS" to "120",
+                        "BERTBOT_RESEARCH_MIN_INTERVAL_SECONDS" to "45",
+                        "BERTBOT_RESEARCH_MAX_RECOMMENDATIONS_PER_CYCLE" to "12",
+                        "BERTBOT_RESEARCH_FAILURE_COOLDOWN_SECONDS" to "90",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(false, config.research.enabled)
+        assertEquals(false, config.research.eventDrivenEnabled)
+        assertEquals(true, config.research.periodicEnabled)
+        assertEquals(true, config.research.llmAssistedEnabled)
+        assertEquals(true, config.research.includeExternalSignals)
+        assertEquals(120, config.research.periodicIntervalSeconds)
+        assertEquals(45, config.research.minIntervalBetweenRunsSeconds)
+        assertEquals(12, config.research.maxRecommendationsPerCycle)
+        assertEquals(90, config.research.failureCooldownSeconds)
+    }
+
+    @Test
+    fun `research runtime overrides fall back to defaults when invalid`() {
+        val base = BertBotAgentConfig()
+        val config =
+            applyResearchRuntimeOverrides(
+                config = base,
+                environment =
+                    mapOf(
+                        "BERTBOT_RESEARCH_ENABLED" to "maybe",
+                        "BERTBOT_RESEARCH_PERIODIC_INTERVAL_SECONDS" to "oops",
+                        "BERTBOT_RESEARCH_MIN_INTERVAL_SECONDS" to "",
+                        "BERTBOT_RESEARCH_MAX_RECOMMENDATIONS_PER_CYCLE" to "nan",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(base.research.enabled, config.research.enabled)
+        assertEquals(base.research.periodicIntervalSeconds, config.research.periodicIntervalSeconds)
+        assertEquals(base.research.minIntervalBetweenRunsSeconds, config.research.minIntervalBetweenRunsSeconds)
+        assertEquals(base.research.maxRecommendationsPerCycle, config.research.maxRecommendationsPerCycle)
     }
 }

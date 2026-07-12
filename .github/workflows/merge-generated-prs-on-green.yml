@@ -1,18 +1,8 @@
 name: Merge Generated PRs On Green
 
 on:
-  check_suite:
-    types:
-      - completed
-  pull_request:
-    types:
-      - opened
-      - labeled
-      - review_requested
-      - synchronize
-  pull_request_review:
-    types:
-      - submitted
+  schedule:
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,18 +12,16 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: auto-merge-${{ github.event.check_suite.head_branch || github.event.pull_request.head.ref || github.event.pull_request.number || github.run_id }}
+  group: auto-merge-${{ github.run_id }}
   cancel-in-progress: true
 
 jobs:
   merge-generated-pr:
     runs-on: ubuntu-latest
-    # Skip check_suite events that didn't pass; skip pull_request_review unless it's an approval
+    # Run on schedule or when dispatched manually.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
-      (github.event_name == 'check_suite' && contains(fromJSON('["success","neutral","skipped"]'), github.event.check_suite.conclusion))
+      github.event_name == 'schedule'
 
     steps:
       - name: Approve and merge trusted generated PR when ready
@@ -64,43 +52,7 @@ jobs:
             }
 
             async function resolveCandidatePullNumbers() {
-              if (context.eventName === 'check_suite') {
-                const cs = context.payload.check_suite;
-
-                // Only process check suites from GitHub Actions
-                if (cs.app?.slug !== 'github-actions') {
-                  core.info(`Skipping check_suite from app '${cs.app?.slug}'.`);
-                  return [];
-                }
-
-                // Prefer the PR list embedded in the check suite payload
-                const fromPayload = (cs.pull_requests || []).map((pr) => pr.number).filter(Boolean);
-                if (fromPayload.length > 0) return fromPayload;
-
-                // Fall back: search open PRs for the head branch
-                if (cs.head_branch) {
-                  const { data: branchPullRequests } = await github.rest.pulls.list({
-                    owner,
-                    repo,
-                    state: 'open',
-                    head: `${owner}:${cs.head_branch}`,
-                    base: defaultBranch,
-                  });
-                  return branchPullRequests.map((pr) => pr.number);
-                }
-
-                return [];
-              }
-
-              if (context.eventName === 'pull_request_review') {
-                return [context.payload.pull_request.number];
-              }
-
-              if (context.eventName === 'pull_request') {
-                return [context.payload.pull_request.number];
-              }
-
-              // workflow_dispatch: scan all open PRs targeting the default branch
+              // schedule/workflow_dispatch: scan all open PRs targeting the default branch
               const { data: openPullRequests } = await github.rest.pulls.list({
                 owner,
                 repo,
