@@ -6,7 +6,8 @@ param(
 $ErrorActionPreference = 'SilentlyContinue'
 
 # Target only this repo's BertBot MCP server processes.
-$repoMarker = 'VSCodeProjects\\PersonalAgent'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$repoMarker = [regex]::Escape($repoRoot)
 $patterns = @(
     'runMcpServer',
     'McpServerMainKt',

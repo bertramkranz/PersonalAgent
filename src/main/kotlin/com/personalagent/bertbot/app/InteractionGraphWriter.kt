@@ -24,6 +24,7 @@ internal class InteractionGraphWriter(
         state: BertBotState,
         events: List<TraceEventRecord>,
     ) {
+        outputFile.parentFile?.mkdirs()
         outputFile.writeText(buildMermaid(traceId, state, events))
     }
 
