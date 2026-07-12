@@ -204,16 +204,33 @@ internal class McpRequestDispatcher(
             McpConstants.INGESTION_LIST_APPROVED_SOURCES_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.listApprovedSources())
             McpConstants.INGESTION_INGEST_MANUAL_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.manualIngest(params))
             McpConstants.INGESTION_CHAT_MANUAL_TOOL_NAME -> toolResultResponseFromOutcome(requestId, ingestionToolHandler.manualChat(params))
-            McpConstants.CHECKPOINT_LIST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.list(params) }
-            McpConstants.CHECKPOINT_LATEST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.latest(params) }
-            McpConstants.CHECKPOINT_GET_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.get(params) }
-            McpConstants.CHECKPOINT_ROLLBACK_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.rollback(params) }
-            McpConstants.CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.rollbackLatest(params) }
-            McpConstants.CHECKPOINT_POLICY_TOOL_NAME -> checkpointToolResult(requestId) { handler -> handler.policy() }
+            McpConstants.CHECKPOINT_LIST_TOOL_NAME,
+            McpConstants.CHECKPOINT_LATEST_TOOL_NAME,
+            McpConstants.CHECKPOINT_GET_TOOL_NAME,
+            McpConstants.CHECKPOINT_ROLLBACK_TOOL_NAME,
+            McpConstants.CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME,
+            McpConstants.CHECKPOINT_POLICY_TOOL_NAME,
+            -> handleCheckpointToolCall(toolName, requestId, params)
             else -> null
         }
     }
 
+    private fun handleCheckpointToolCall(
+        toolName: String?,
+        requestId: JsonElement,
+        params: JsonObject,
+    ): String =
+        checkpointToolResult(requestId) { handler ->
+            when (toolName) {
+                McpConstants.CHECKPOINT_LIST_TOOL_NAME -> handler.list(params)
+                McpConstants.CHECKPOINT_LATEST_TOOL_NAME -> handler.latest(params)
+                McpConstants.CHECKPOINT_GET_TOOL_NAME -> handler.get(params)
+                McpConstants.CHECKPOINT_ROLLBACK_TOOL_NAME -> handler.rollback(params)
+                McpConstants.CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME -> handler.rollbackLatest(params)
+                McpConstants.CHECKPOINT_POLICY_TOOL_NAME -> handler.policy()
+                else -> true to "Unsupported checkpoint tool: ${toolName ?: "<missing>"}"
+            }
+        }
     private fun hasCheckpointToolFunctions(): Boolean =
         listCheckpoints != null &&
             latestCheckpoint != null &&
