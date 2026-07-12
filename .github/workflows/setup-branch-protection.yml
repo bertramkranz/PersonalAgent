@@ -23,7 +23,7 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            const branch = '${{ inputs.branch }}';
+            const branch = ${{ toJSON(inputs.branch) }};
 
             // Ensure the auto-merge label exists
             try {
