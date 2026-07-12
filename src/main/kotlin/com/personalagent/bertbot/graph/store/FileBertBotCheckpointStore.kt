@@ -21,6 +21,7 @@ internal class FileBertBotCheckpointStore(
     override fun save(checkpoint: BertBotCheckpoint) {
         synchronized(lock) {
             val payload = loadPayloadInternal().toMutableList()
+            payload.removeIf { it.scopeKey == checkpoint.scopeKey && it.checkpointId == checkpoint.checkpointId }
             payload.add(PersistedCheckpoint.fromDomain(checkpoint))
             val persisted = PersistedCheckpointEnvelope(checkpoints = payload)
             file.parentFile?.mkdirs()
