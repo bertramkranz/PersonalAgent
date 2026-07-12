@@ -1,18 +1,16 @@
 name: Merge Generated PRs On Green
 
 on:
+  check_suite:
+    types:
+      - completed
   pull_request:
     types:
       - labeled
-  workflow_run:
-    workflows:
-      - CI
-      - CodeQL
-      - Dependency Review
-      - Secret Scan
-      - Actionlint
+      - synchronize
+  pull_request_review:
     types:
-      - completed
+      - submitted
   workflow_dispatch:
 
 permissions:
@@ -20,15 +18,20 @@ permissions:
   checks: read
   contents: write
   pull-requests: write
-  statuses: read
 
 concurrency:
-  group: merge-generated-pr-${{ github.event.workflow_run.head_branch || github.ref || github.run_id }}
+  group: auto-merge-${{ github.event.check_suite.head_branch || github.event.pull_request.head.ref || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   merge-generated-pr:
     runs-on: ubuntu-latest
+    # Skip check_suite events that didn't pass; skip pull_request_review unless it's an approval
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
+      (github.event_name == 'check_suite' && contains(fromJSON('["success","neutral","skipped"]'), github.event.check_suite.conclusion))
 
     steps:
       - name: Approve and merge trusted generated PR when ready
@@ -40,17 +43,9 @@ jobs:
             const repo = context.repo.repo;
             const trustedAuthors = new Set(['github-actions[bot]', 'app/github-actions']);
             const defaultBranch = context.payload.repository.default_branch;
-            const requiredWorkflowNames = new Set([
-              'CI',
-              'CodeQL',
-              'Dependency Review',
-              'Secret Scan',
-              'Actionlint',
-            ]);
-            const baseRequiredStatusContexts = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
+            const baseRequiredCheckNames = ['quality-and-test', 'analyze', 'dependency-review', 'gitleaks'];
             const acceptedCheckConclusions = new Set(['success', 'neutral', 'skipped']);
             const autoMergeLabel = 'auto-merge';
-            const ignoredStatusContexts = new Set(['merge-generated-pr', 'open-pr']);
 
             function isAcceptedCheckConclusion(conclusion) {
               return acceptedCheckConclusions.has(conclusion || '');
@@ -66,37 +61,43 @@ jobs:
             }
 
             async function resolveCandidatePullNumbers() {
-              if (context.eventName === 'workflow_run') {
-                const workflowRun = context.payload.workflow_run;
-                if (workflowRun.event !== 'pull_request') {
-                  core.info(`Skipping workflow_run triggered by '${workflowRun.event}'.`);
+              if (context.eventName === 'check_suite') {
+                const cs = context.payload.check_suite;
+
+                // Only process check suites from GitHub Actions
+                if (cs.app?.slug !== 'github-actions') {
+                  core.info(`Skipping check_suite from app '${cs.app?.slug}'.`);
                   return [];
                 }
 
-                if (!['success', 'neutral', 'skipped', 'action_required'].includes(workflowRun.conclusion || '')) {
-                  core.info(`Skipping workflow_run with conclusion '${workflowRun.conclusion}'.`);
-                  return [];
-                }
+                // Prefer the PR list embedded in the check suite payload
+                const fromPayload = (cs.pull_requests || []).map((pr) => pr.number).filter(Boolean);
+                if (fromPayload.length > 0) return fromPayload;
 
-                const pullNumbers = new Set((workflowRun.pull_requests || []).map((pr) => pr.number).filter(Boolean));
-
-                if (pullNumbers.size === 0 && workflowRun.head_branch) {
+                // Fall back: search open PRs for the head branch
+                if (cs.head_branch) {
                   const { data: branchPullRequests } = await github.rest.pulls.list({
                     owner,
                     repo,
                     state: 'open',
-                    head: `${owner}:${workflowRun.head_branch}`,
+                    head: `${owner}:${cs.head_branch}`,
                     base: defaultBranch,
                   });
-
-                  for (const pullRequest of branchPullRequests) {
-                    pullNumbers.add(pullRequest.number);
-                  }
+                  return branchPullRequests.map((pr) => pr.number);
                 }
 
-                return [...pullNumbers];
+                return [];
               }
 
+              if (context.eventName === 'pull_request_review') {
+                return [context.payload.pull_request.number];
+              }
+
+              if (context.eventName === 'pull_request') {
+                return [context.payload.pull_request.number];
+              }
+
+              // workflow_dispatch: scan all open PRs targeting the default branch
               const { data: openPullRequests } = await github.rest.pulls.list({
                 owner,
                 repo,
@@ -134,15 +135,15 @@ jobs:
               });
             }
 
-            async function requiredStatusContextsForPr(pr) {
-              const changedFiles = await listChangedFiles(pr);
-              const requiredContexts = new Set(baseRequiredStatusContexts);
+            async function requiredCheckNamesForPr(pr) {
+              const required = new Set(baseRequiredCheckNames);
 
+              const changedFiles = await listChangedFiles(pr);
               if (changedFiles.some((file) => (file.filename || '').startsWith('.github/workflows/'))) {
-                requiredContexts.add('lint-workflows');
+                required.add('lint-workflows');
               }
 
-              return [...requiredContexts];
+              return [...required];
             }
 
             async function listAllCheckRunsForRef(ref) {
@@ -160,17 +161,35 @@ jobs:
               return checkRuns.filter(Boolean);
             }
 
-            async function listRelevantCommitStatusesForRef(ref) {
-              const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
-                owner,
-                repo,
-                ref,
-                per_page: 100,
-              });
+            async function checksAreGreen(pr) {
+              const required = await requiredCheckNamesForPr(pr);
+              const allRuns = await listAllCheckRunsForRef(pr.head.sha);
 
-              return statuses.filter(
-                (status) => status && !ignoredStatusContexts.has(status.context || '')
-              );
+              for (const name of required) {
+                const matching = allRuns.filter((r) => r?.name === name);
+
+                if (matching.length === 0) {
+                  core.info(`PR #${pr.number}: waiting for check '${name}' to appear.`);
+                  return false;
+                }
+
+                // Use the most recently completed run for this check name
+                const latest = matching
+                  .filter((r) => r.status === 'completed')
+                  .sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0))[0];
+
+                if (!latest) {
+                  core.info(`PR #${pr.number}: check '${name}' is still in progress.`);
+                  return false;
+                }
+
+                if (!isAcceptedCheckConclusion(latest.conclusion)) {
+                  core.info(`PR #${pr.number}: check '${name}' concluded with '${latest.conclusion}'.`);
+                  return false;
+                }
+              }
+
+              return true;
             }
 
             async function rerunActionRequiredChecks(pr) {
@@ -202,79 +221,6 @@ jobs:
               }
             }
 
-            async function rerunActionRequiredWorkflowRuns(pr) {
-              const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner,
-                repo,
-                event: 'pull_request',
-                branch: pr.head.ref,
-                per_page: 100,
-              });
-
-              const workflowRuns = Array.isArray(runs?.workflow_runs) ? runs.workflow_runs.filter(Boolean) : [];
-
-              for (const run of workflowRuns) {
-                if (!requiredWorkflowNames.has(run?.name || '') || run?.conclusion !== 'action_required') {
-                  continue;
-                }
-
-                try {
-                  await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/rerun', {
-                    owner,
-                    repo,
-                    run_id: run.id,
-                  });
-                  core.info(`Requested rerun for action_required workflow run ${run.id} on PR #${pr.number}.`);
-                } catch (error) {
-                  core.info(`Unable to rerun workflow run ${run.id} on PR #${pr.number}: ${error.message}`);
-                }
-              }
-            }
-
-            async function checksAreGreen(pr) {
-              const requiredContexts = await requiredStatusContextsForPr(pr);
-              const statuses = await listRelevantCommitStatusesForRef(pr.head.sha);
-              const observedContexts = new Set(statuses.map((status) => status.context || '').filter(Boolean));
-              const missingContexts = requiredContexts.filter((contextName) => !observedContexts.has(contextName));
-
-              if (missingContexts.length > 0) {
-                core.info(`PR #${pr.number} is still waiting for statuses: ${missingContexts.join(', ')}`);
-                return false;
-              }
-
-              const blockingStatuses = statuses.filter(
-                (status) => requiredContexts.includes(status.context || '') && status.state !== 'success'
-              );
-
-              if (blockingStatuses.length > 0) {
-                core.info(
-                  `PR #${pr.number} has blocking statuses: ${blockingStatuses
-                    .map((status) => `${status.context}:${status.state}`)
-                    .join(', ')}`
-                );
-                return false;
-              }
-
-              const checks = await listAllCheckRunsForRef(pr.head.sha);
-              const relevantChecks = checks.filter((checkRun) => requiredContexts.includes(checkRun?.name || ''));
-              const blockingChecks = relevantChecks.filter(
-                (checkRun) =>
-                  checkRun?.status !== 'completed' ||
-                  !isAcceptedCheckConclusion(checkRun?.conclusion)
-              );
-
-              if (blockingChecks.length > 0) {
-                core.info(
-                  `PR #${pr.number} has blocking checks: ${blockingChecks
-                    .map((checkRun) => `${checkRun.name}:${checkRun.status}/${checkRun.conclusion}`)
-                    .join(', ')}`
-                );
-                return false;
-              }
-
-              return true;
-            }
-
             const candidatePullNumbers = await resolveCandidatePullNumbers();
             if (candidatePullNumbers.length === 0) {
               core.info('No candidate pull requests found for this event.');
@@ -299,19 +245,10 @@ jobs:
               }
 
               await rerunActionRequiredChecks(pr);
-              await rerunActionRequiredWorkflowRuns(pr);
 
-              let checksGreen = await checksAreGreen(pr);
+              const checksGreen = await checksAreGreen(pr);
               if (!checksGreen) {
-                const deadline = Date.now() + 5 * 60 * 1000;
-                while (!checksGreen && Date.now() < deadline) {
-                  core.info(`Waiting 30s for PR #${pr.number} checks to turn green.`);
-                  await new Promise((resolve) => setTimeout(resolve, 30_000));
-                  checksGreen = await checksAreGreen(pr);
-                }
-              }
-
-              if (!checksGreen) {
+                core.info(`PR #${pullNumber}: checks not yet green — will retry on the next trigger.`);
                 continue;
               }
 
