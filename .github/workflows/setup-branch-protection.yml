@@ -44,7 +44,9 @@ jobs:
               }
             }
 
-            // Configure branch protection
+            // Configure branch protection.
+            // Keep these check names in sync with baseRequiredCheckNames in
+            // .github/workflows/merge-generated-prs-on-green.yml.
             await github.rest.repos.updateBranchProtection({
               owner,
               repo,
