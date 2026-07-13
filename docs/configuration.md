@@ -4,6 +4,15 @@ BertBot reads configuration from process environment variables first and then fa
 
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
+Template defaults in [../.env.example](../.env.example) are intentionally conservative:
+
+- `BERTBOT_GOOGLE_WORKSPACE_ENABLED=false`
+- `BERTBOT_SLACK_ENABLED=false`
+- `BERTBOT_WHATSAPP_ENABLED=false`
+- `BERTBOT_INGESTION_REQUIRE_APPROVAL=false`
+
+This keeps local startup simple while still allowing immediate Telegram webhook replies when enabled.
+
 See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
 
 ## Minimal Local Setup
