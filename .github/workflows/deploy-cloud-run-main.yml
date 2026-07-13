@@ -35,11 +35,12 @@ jobs:
       SLACK_SIGNING_SECRET_NAME: ${{ vars.SLACK_SIGNING_SECRET_NAME || '' }}
       WHATSAPP_APP_SECRET_NAME: ${{ vars.WHATSAPP_APP_SECRET_NAME || '' }}
       WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars.WHATSAPP_VERIFY_TOKEN_SECRET_NAME || '' }}
-      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: ''
-      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ''
+      GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME || '' }}
+      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME || '' }}
+      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME || '' }}
       CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
       CLOUD_RUN_ALLOW_UNAUTHENTICATED: 'true'
-      BERTBOT_GOOGLE_WORKSPACE_ENABLED: 'true'
+      BERTBOT_GOOGLE_WORKSPACE_ENABLED: ${{ vars.BERTBOT_GOOGLE_WORKSPACE_ENABLED || 'true' }}
 
     steps:
       - name: Validate required deployment vars
@@ -68,6 +69,60 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Validate optional secret and service-account references
+        run: |
+          set -euo pipefail
+
+          optional_secret_vars=(
+            SLACK_SIGNING_SECRET_NAME
+            WHATSAPP_APP_SECRET_NAME
+            WHATSAPP_VERIFY_TOKEN_SECRET_NAME
+            GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME
+            GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME
+            GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME
+          )
+
+          for key in "${optional_secret_vars[@]}"; do
+            value="${!key:-}"
+            if [ -z "$value" ]; then
+              continue
+            fi
+            if ! gcloud secrets describe "$value" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+              echo "Repository variable ${key} points to missing Secret Manager secret: ${value}" >&2
+              exit 1
+            fi
+          done
+
+          if [ -n "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT:-}" ]; then
+            if ! gcloud iam service-accounts describe "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT}" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+              echo "Repository variable CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT references a missing service account: ${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT}" >&2
+              exit 1
+            fi
+          fi
+
+          gw_enabled="${BERTBOT_GOOGLE_WORKSPACE_ENABLED,,}"
+          if [ "$gw_enabled" = "true" ]; then
+            has_oauth_json="false"
+            has_token_pair="false"
+
+            if [ -n "${GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME:-}" ]; then
+              has_oauth_json="true"
+            fi
+
+            if [ -n "${GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME:-}" ] || [ -n "${GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME:-}" ]; then
+              if [ -z "${GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME:-}" ] || [ -z "${GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME:-}" ]; then
+                echo "Google Workspace enabled, but token bootstrap requires BOTH GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME and GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME." >&2
+                exit 1
+              fi
+              has_token_pair="true"
+            fi
+
+            if [ "$has_oauth_json" = "false" ] && [ "$has_token_pair" = "false" ]; then
+              echo "Google Workspace enabled, but no OAuth bootstrap secrets are configured. Set GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME OR both GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME and GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME." >&2
+              exit 1
+            fi
+          fi
 
       - name: Configure Docker auth for Artifact Registry
         run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
@@ -114,6 +169,10 @@ jobs:
 
           if [ -n "${GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME:-}" ]; then
             secret_mappings+=("BERTBOT_GOOGLE_WORKSPACE_MASTER_KEY_B64=${GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME}:latest")
+          fi
+
+          if [ -n "${GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME:-}" ]; then
+            secret_mappings+=("BERTBOT_GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64=${GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME}:latest")
           fi
 
           env_vars=(

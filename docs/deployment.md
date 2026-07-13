@@ -90,17 +90,55 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
+- `SLACK_SIGNING_SECRET_NAME` (default empty; set only when Slack integration is enabled)
+- `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
+- `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
+- `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` (default empty; when set, deploy uses this identity)
 - `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
+- `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME` (default empty, recommended single-secret bootstrap for Cloud Run)
 - `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
 - `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME` (default empty, must be paired with token secret)
 
-The workflow currently uses these built-in defaults for optional integration wiring:
+The workflow fails fast if an optional secret variable points to a missing secret, or if `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` points to a missing service account.
 
-- `SLACK_SIGNING_SECRET_NAME=bertbot-slack-signing-secret`
-- `WHATSAPP_APP_SECRET_NAME=bertbot-whatsapp-app-secret`
-- `WHATSAPP_VERIFY_TOKEN_SECRET_NAME=bertbot-whatsapp-verify-token`
-- `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` unset
-- `CLOUD_RUN_ALLOW_UNAUTHENTICATED=true`
+### Optional Hardening: Dedicated Runtime Service Account
+
+Use a dedicated runtime identity instead of the Compute Engine default service account.
+
+Create the account:
+
+```bash
+gcloud iam service-accounts create bertbot-webhook-runtime \
+  --project=YOUR_PROJECT_ID \
+  --display-name="BertBot Cloud Run Runtime"
+```
+
+Grant minimum required project-level role for Cloud SQL connectivity:
+
+```bash
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:bertbot-webhook-runtime@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/cloudsql.client"
+```
+
+Grant Secret Manager accessor on runtime secrets actually used by the service:
+
+```bash
+for secret in bertbot-ai-api-key bertbot-db-password bertbot-telegram-secret-token; do
+  gcloud secrets add-iam-policy-binding "$secret" \
+    --project=YOUR_PROJECT_ID \
+    --member="serviceAccount:bertbot-webhook-runtime@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+done
+```
+
+Set the GitHub repository variable used by the deploy workflow:
+
+```bash
+gh variable set CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT \
+  --repo OWNER/REPO \
+  --body "bertbot-webhook-runtime@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+```
 
 If you need different secret names or a runtime service account, update [../.github/workflows/deploy-cloud-run-main.yml](../.github/workflows/deploy-cloud-run-main.yml) directly or add a follow-up workflow input/variable path.
 
@@ -121,10 +159,27 @@ node dist/headless-login.js
 - `/opt/google-workspace-extension/.gemini-cli-workspace-master-key`
 
 3. Store each base64 output in Secret Manager (for example `bertbot-google-workspace-token-b64` and `bertbot-google-workspace-master-key-b64`).
+
+You can automate this with [../scripts/store-google-workspace-oauth-secrets.ps1](../scripts/store-google-workspace-oauth-secrets.ps1):
+
+```powershell
+.\scripts\store-google-workspace-oauth-secrets.ps1 `
+  -ProjectId "personal-agent-502221" `
+  -GoogleWorkspaceTokenPath "/opt/google-workspace-extension/gemini-cli-workspace-token.json" `
+  -GoogleWorkspaceMasterKeyPath "/opt/google-workspace-extension/.gemini-cli-workspace-master-key"
+```
+
+If you have an OAuth credential bootstrap JSON file from the workspace extension, you can store that single artifact instead:
+
+```powershell
+.\scripts\store-google-workspace-oauth-secrets.ps1 `
+  -ProjectId "personal-agent-502221" `
+  -GoogleWorkspaceOauthCredentialsJsonPath "C:\path\to\oauth-credentials.json"
+```
 4. Wire secret names into deploy paths:
 
 - Manual script: pass `-GoogleWorkspaceTokenB64Secret` and `-GoogleWorkspaceMasterKeyB64Secret` to [../scripts/deploy-cloud-run.ps1](../scripts/deploy-cloud-run.ps1) or [../scripts/bootstrap-cloud-run.ps1](../scripts/bootstrap-cloud-run.ps1).
-- GitHub Actions: set repository variables `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` and `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME`.
+- GitHub Actions: set either `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME`, or both `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` and `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME`.
 
 At container startup, [../docker/entrypoint.sh](../docker/entrypoint.sh) decodes these secrets to the expected workspace extension file paths and forces file-based token storage for headless operation.
 
