@@ -2,6 +2,7 @@
 
 package com.personalagent.bertbot.app
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
@@ -386,7 +387,7 @@ internal object BertBotRuntimeFactory {
                 enablePeriodicScheduler = enablePeriodicResearchScheduler,
                 llmGateway = llmGateway,
             )
-        val polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
+        val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
         val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
         val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, polymarketToolRouter, llmGateway, runtimeConfig)
         val runtimeCapabilitySnapshot =
@@ -515,6 +516,12 @@ internal fun buildRuntimeToolIntegrations(
     return integrations
 }
 
+internal fun createPolymarketToolRouterOrNull(config: BertBotAgentConfig): PolymarketToolRouter? {
+    val polymarketEnabled = config.enabledSubAgents().any { definition -> definition.id == "polymarket_analyst" }
+    if (!polymarketEnabled) return null
+    return PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
+}
+
 internal fun validateToolBackedSubAgentCoverage(
     config: BertBotAgentConfig,
     integrations: List<RuntimeToolIntegration>,
@@ -566,6 +573,32 @@ private fun polymarketToolDefinition(
     JsonObject().apply {
         addProperty("name", name)
         addProperty("description", description)
+        add(
+            "inputSchema",
+            JsonObject().apply {
+                addProperty("type", "object")
+                add(
+                    "properties",
+                    JsonObject().apply {
+                        add(
+                            "operation",
+                            JsonObject().apply {
+                                addProperty("type", "string")
+                                addProperty("description", "Operation name for the selected Polymarket API.")
+                            },
+                        )
+                        add(
+                            "params",
+                            JsonObject().apply {
+                                addProperty("type", "object")
+                                addProperty("description", "Optional operation-specific arguments.")
+                            },
+                        )
+                    },
+                )
+                add("required", JsonArray().apply { add("operation") })
+            },
+        )
     }
 
 internal fun extractDisplayNameFromMessage(message: String): String? {
