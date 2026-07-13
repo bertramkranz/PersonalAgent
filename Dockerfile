@@ -23,6 +23,7 @@ RUN apt-get update \
  && cd /opt/google-workspace-extension \
  && npm install --no-audit --no-fund \
  && npm run build --prefix workspace-server \
+ && npm run build:auth-utils --prefix workspace-server \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib

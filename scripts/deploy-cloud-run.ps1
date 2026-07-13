@@ -22,6 +22,9 @@ param(
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
     [bool]$GoogleWorkspaceEnabled = $true,
+    [string]$GoogleWorkspaceOauthCredentialsJsonB64Secret,
+    [string]$GoogleWorkspaceTokenB64Secret,
+    [string]$GoogleWorkspaceMasterKeyB64Secret,
     [string]$TelegramSecretTokenSecret,
     [string]$SlackSigningSecret,
     [string]$WhatsAppAppSecret,
@@ -71,7 +74,7 @@ $deployArgs = @(
     "--concurrency", "1",
     "--min-instances", "1",
     "--add-cloudsql-instances", $cloudSqlConnection,
-    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_INGESTION_REQUIRE_APPROVAL=false,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser,BERTBOT_GOOGLE_WORKSPACE_ENABLED=$($GoogleWorkspaceEnabled.ToString().ToLowerInvariant()),BERTBOT_GOOGLE_WORKSPACE_COMMAND=node,BERTBOT_GOOGLE_WORKSPACE_ARGS=/opt/google-workspace-extension/workspace-server/dist/index.js,BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120"
+    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_INGESTION_REQUIRE_APPROVAL=false,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser,BERTBOT_GOOGLE_WORKSPACE_ENABLED=$($GoogleWorkspaceEnabled.ToString().ToLowerInvariant()),BERTBOT_GOOGLE_WORKSPACE_COMMAND=node,BERTBOT_GOOGLE_WORKSPACE_ARGS=/opt/google-workspace-extension/workspace-server/dist/index.js,BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120,GEMINI_CLI_WORKSPACE_FORCE_FILE_STORAGE=true"
 )
 
 if ($AllowUnauthenticated) {
@@ -103,6 +106,18 @@ if ($WhatsAppAppSecret) {
 
 if ($WhatsAppVerifyTokenSecret) {
     $secretMappings += "BERTBOT_WHATSAPP_VERIFY_TOKEN=${WhatsAppVerifyTokenSecret}:latest"
+}
+
+if ($GoogleWorkspaceTokenB64Secret) {
+    $secretMappings += "BERTBOT_GOOGLE_WORKSPACE_TOKEN_B64=${GoogleWorkspaceTokenB64Secret}:latest"
+}
+
+if ($GoogleWorkspaceMasterKeyB64Secret) {
+    $secretMappings += "BERTBOT_GOOGLE_WORKSPACE_MASTER_KEY_B64=${GoogleWorkspaceMasterKeyB64Secret}:latest"
+}
+
+if ($GoogleWorkspaceOauthCredentialsJsonB64Secret) {
+    $secretMappings += "BERTBOT_GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64=${GoogleWorkspaceOauthCredentialsJsonB64Secret}:latest"
 }
 
 if ($secretMappings.Count -gt 0) {

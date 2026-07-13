@@ -46,7 +46,13 @@ internal class ToolCallingSkill(
             TraceLogger.skillInvoked(tracingContext, "skill=tool_calling iteration=$iteration")
             val raw =
                 llmGateway.complete(augmentedSystemPrompt, buildUserPrompt(userPrompt, toolResults))
-            val action = parseActionResponse(raw)
+            val action =
+                parseActionResponse(raw)
+                    ?: recoverActionResponse(
+                        augmentedSystemPrompt = augmentedSystemPrompt,
+                        userPrompt = userPrompt,
+                        toolResults = toolResults,
+                    )
 
             when {
                 action == null -> {
@@ -68,7 +74,7 @@ internal class ToolCallingSkill(
                     TraceLogger.info(
                         tracingContext,
                         "tool_result",
-                        "tool=$toolName result_length=${result.length}",
+                        "tool=$toolName result_length=${result.length} preview=${sanitizeResultPreview(result)}",
                     )
                     toolResults.add(toolName to result)
                 }
@@ -80,6 +86,34 @@ internal class ToolCallingSkill(
         TraceLogger.warn(tracingContext, "tool_calling_max_iterations", "iterations=$maxIterations")
         val finalResponse = llmGateway.complete(systemPrompt, buildUserPrompt(userPrompt, toolResults))
         return formatFinalResponse(finalResponse, toolResults)
+    }
+
+    private fun recoverActionResponse(
+        augmentedSystemPrompt: String,
+        userPrompt: String,
+        toolResults: List<Pair<String, String>>,
+    ): ToolAction? {
+        val recoveryPrompt =
+            buildString {
+                appendLine(buildUserPrompt(userPrompt, toolResults))
+                appendLine()
+                appendLine("Your previous reply was invalid.")
+                appendLine("Return ONLY valid JSON using one of these exact shapes:")
+                appendLine("{\"action\":\"call_tool\",\"tool\":\"<tool_name>\",\"arguments\":{...}}")
+                appendLine("{\"action\":\"respond\",\"response\":\"<your answer>\"}")
+            }
+
+        val retryRaw = llmGateway.complete(augmentedSystemPrompt, recoveryPrompt)
+        return parseActionResponse(retryRaw)
+    }
+
+    private fun sanitizeResultPreview(result: String): String {
+        val collapsed = result.replace("\n", " ").replace(Regex("\\s+"), " ").trim()
+        val redacted =
+            collapsed
+                .replace(Regex("(?i)(access_token|refresh_token)\\\"?\\s*[:=]\\s*\\\"[^\\\"]+\\\""), "$1=\"[REDACTED]\"")
+                .replace(Regex("(?i)(access_token|refresh_token)\\s*[:=]\\s*[^,\\s]+"), "$1=[REDACTED]")
+        return redacted.take(420)
     }
 
     private fun buildAugmentedSystemPrompt(
