@@ -44,7 +44,7 @@ If you decide SonarQube should become a required branch-protection check after v
 You can validate the Gradle integration locally with:
 
 ```bash
-.\gradlew.bat help --task sonar --no-daemon
+./gradlew help --task sonar --no-daemon
 ```
 
 ## CI-Native DoD Enforcement
