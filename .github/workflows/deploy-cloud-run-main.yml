@@ -88,8 +88,20 @@ jobs:
             if [ -z "$value" ]; then
               continue
             fi
-            if ! gcloud secrets describe "$value" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
-              echo "Repository variable ${key} points to missing Secret Manager secret: ${value}" >&2
+            describe_output="$(gcloud secrets describe "$value" --project "${GCP_PROJECT_ID}" 2>&1 || true)"
+            if [ -n "$describe_output" ]; then
+              if echo "$describe_output" | grep -Eq "NOT_FOUND|Secret .* not found"; then
+                echo "Repository variable ${key} points to missing Secret Manager secret: ${value}" >&2
+                exit 1
+              fi
+
+              if echo "$describe_output" | grep -Eq "PERMISSION_DENIED|Permission denied|does not have permission"; then
+                echo "Warning: unable to verify existence of secret '${value}' due to permissions. Continuing deploy." >&2
+                continue
+              fi
+
+              echo "Unexpected error while validating secret '${value}':" >&2
+              echo "$describe_output" >&2
               exit 1
             fi
           done
