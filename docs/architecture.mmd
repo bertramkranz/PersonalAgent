@@ -70,6 +70,7 @@ flowchart TD
     subgraph McpHandlers
         CheckpointHandler[McpCheckpointToolHandler]
         IngestionHandler[McpIngestionToolHandler]
+        StatusProvider[McpStatusProviderFactory]
     end
 
     subgraph PolymarketBridge
@@ -115,6 +116,7 @@ flowchart TD
     RuntimeFactory --> RuntimeFlags
     RuntimeFactory --> Control
     RuntimeFactory --> Config
+    RuntimeFactory --> StatusProvider
     RuntimeCore --> KoogIntegration
     KoogIntegration --> Episodic
     ResearchFactory --> ResearchService
@@ -169,6 +171,7 @@ flowchart TD
 
     MCP --> CheckpointHandler
     MCP --> IngestionHandler
+    MCP --> StatusProvider
     CheckpointHandler --> CompensatingRollback
     IngestionHandler --> Control
 
