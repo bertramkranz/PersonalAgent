@@ -765,7 +765,7 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
 
 internal data class RuntimeCapabilitySnapshot(
     val googleWorkspaceConfigured: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
-    val googleWorkspaceToolAccessAvailable: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
+    val googleWorkspaceToolAccessAvailable: Boolean = false,
 )
 
 internal fun summarizeMacrofactorAvailability(
