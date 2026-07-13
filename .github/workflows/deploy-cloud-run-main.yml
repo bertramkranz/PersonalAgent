@@ -32,11 +32,11 @@ jobs:
       AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
       DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
       TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
-      SLACK_SIGNING_SECRET_NAME: bertbot-slack-signing-secret
-      WHATSAPP_APP_SECRET_NAME: bertbot-whatsapp-app-secret
-      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: bertbot-whatsapp-verify-token
-      CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ''
-      CLOUD_RUN_ALLOW_UNAUTHENTICATED: 'true'
+      SLACK_SIGNING_SECRET_NAME: ${{ vars.SLACK_SIGNING_SECRET_NAME || 'bertbot-slack-signing-secret' }}
+      WHATSAPP_APP_SECRET_NAME: ${{ vars.WHATSAPP_APP_SECRET_NAME || 'bertbot-whatsapp-app-secret' }}
+      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars.WHATSAPP_VERIFY_TOKEN_SECRET_NAME || 'bertbot-whatsapp-verify-token' }}
+      CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
+      CLOUD_RUN_ALLOW_UNAUTHENTICATED: ${{ vars.CLOUD_RUN_ALLOW_UNAUTHENTICATED || 'true' }}
 
     steps:
       - name: Validate required deployment vars
