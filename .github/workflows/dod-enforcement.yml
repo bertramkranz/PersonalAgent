@@ -1,0 +1,85 @@
+name: DoD Enforcement
+
+on:
+  push:
+    branches-ignore:
+      - main
+    tags-ignore:
+      - "**"
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dod-enforcement-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dod-enforcement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            graph_store:
+              - 'src/main/kotlin/com/personalagent/bertbot/graph/store/**'
+            graph_store_tests:
+              - 'src/test/kotlin/**/graph/store/**'
+            koog_runtime:
+              - 'src/main/kotlin/com/personalagent/bertbot/app/KoogRuntimeIntegration.kt'
+              - 'src/main/kotlin/com/personalagent/bertbot/app/BertBotSupport.kt'
+            koog_tests:
+              - 'src/test/kotlin/com/personalagent/bertbot/app/Koog*Test.kt'
+              - 'src/test/kotlin/com/personalagent/bertbot/app/AiRuntimeConfigurationTest.kt'
+
+      - name: Enforce path-coupled quality rules
+        env:
+          GRAPH_STORE_CHANGED: ${{ steps.changes.outputs.graph_store }}
+          GRAPH_STORE_TESTS_CHANGED: ${{ steps.changes.outputs.graph_store_tests }}
+          KOOG_RUNTIME_CHANGED: ${{ steps.changes.outputs.koog_runtime }}
+          KOOG_TESTS_CHANGED: ${{ steps.changes.outputs.koog_tests }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GRAPH_STORE_CHANGED" == "true" && "$GRAPH_STORE_TESTS_CHANGED" != "true" ]]; then
+            echo "graph/store changed without matching graph/store tests update."
+            echo "Update tests under src/test/kotlin/**/graph/store/** or adjust the change."
+            exit 1
+          fi
+
+          if [[ "$KOOG_RUNTIME_CHANGED" == "true" && "$KOOG_TESTS_CHANGED" != "true" ]]; then
+            echo "Koog runtime/config changed without matching Koog integration/config tests update."
+            echo "Update Koog tests (Koog*Test or AiRuntimeConfigurationTest) or adjust the change."
+            exit 1
+          fi
+
+      - name: Run changed-file doc guardrails for pull requests
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          bash .github/scripts/changed-file-guardrails.sh "$BASE_SHA" "$HEAD_SHA"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Enforce quality gate
+        run: ./gradlew --no-daemon check

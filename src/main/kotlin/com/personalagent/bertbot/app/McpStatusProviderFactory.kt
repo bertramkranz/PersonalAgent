@@ -61,8 +61,8 @@ internal object McpStatusProviderFactory {
             Runtime provider: ${input.aiRuntimeConfiguration.provider}
             Runtime model: ${input.aiRuntimeConfiguration.model}
             Runtime error: ${input.startup.errorMessage ?: "none"}
-            MacroFactor MCP: ${macrofactorStatus}
-            Google Workspace MCP: ${googleWorkspaceStatus}
+            MacroFactor MCP: $macrofactorStatus
+            Google Workspace MCP: $googleWorkspaceStatus
                         Checkpoint rollback policy:
                             environment=${input.checkpointRollbackPolicy.environment}
                             protectedEnvironment=${input.checkpointRollbackPolicy.isProtectedEnvironment}
