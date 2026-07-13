@@ -2,6 +2,7 @@
 
 package com.personalagent.bertbot.app
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
@@ -386,8 +387,9 @@ internal object BertBotRuntimeFactory {
                 enablePeriodicScheduler = enablePeriodicResearchScheduler,
                 llmGateway = llmGateway,
             )
+        val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
         val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
-        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, llmGateway)
+        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, polymarketToolRouter, llmGateway, runtimeConfig)
         val runtimeCapabilitySnapshot =
             RuntimeCapabilitySnapshot(
                 googleWorkspaceConfigured = googleWorkspaceRouter != null,
@@ -433,22 +435,171 @@ internal object BertBotRuntimeFactory {
     }
 }
 
+internal data class RuntimeToolIntegration(
+    val id: String,
+    val toolDefinitionsProvider: () -> List<JsonObject>,
+    val toolExecutor: (toolName: String, params: JsonObject) -> Pair<Boolean, String>?,
+)
+
+internal data class ToolBackedSubAgentRequirement(
+    val subAgentId: String,
+    val integrationId: String,
+    val required: Boolean,
+)
+
+internal val TOOL_BACKED_SUB_AGENT_REQUIREMENTS: List<ToolBackedSubAgentRequirement> =
+    listOf(
+        ToolBackedSubAgentRequirement(
+            subAgentId = "polymarket_analyst",
+            integrationId = "polymarket",
+            required = true,
+        ),
+        ToolBackedSubAgentRequirement(
+            subAgentId = "google_workspace_operator",
+            integrationId = "google_workspace",
+            required = false,
+        ),
+    )
+
 private fun buildToolCallingSkillOrNull(
     googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
+    polymarketToolRouter: PolymarketToolRouter?,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
+    config: BertBotAgentConfig,
 ): ToolCallingSkill? {
-    if (googleWorkspaceRouter == null) return null
+    val integrations = buildRuntimeToolIntegrations(googleWorkspaceRouter, polymarketToolRouter)
+    validateToolBackedSubAgentCoverage(config, integrations)
+    if (integrations.isEmpty()) return null
 
     return ToolCallingSkill(
         llmGateway = llmGateway,
-        toolDefinitionsProvider = googleWorkspaceRouter::toolDefinitions,
+        toolDefinitionsProvider = {
+            integrations.flatMap { integration -> integration.toolDefinitionsProvider.invoke() }
+        },
         toolExecutor = { name, args ->
             val params = JsonObject()
             params.add("arguments", args)
-            googleWorkspaceRouter.handle(name, params)?.second ?: "Tool '$name' not found"
+
+            integrations
+                .firstNotNullOfOrNull { integration ->
+                    integration.toolExecutor(name, params)?.second
+                } ?: "Tool '$name' not found"
         },
     )
 }
+
+internal fun buildRuntimeToolIntegrations(
+    googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
+    polymarketToolRouter: PolymarketToolRouter?,
+): List<RuntimeToolIntegration> {
+    val integrations = mutableListOf<RuntimeToolIntegration>()
+
+    if (googleWorkspaceRouter != null) {
+        integrations +=
+            RuntimeToolIntegration(
+                id = "google_workspace",
+                toolDefinitionsProvider = googleWorkspaceRouter::toolDefinitions,
+                toolExecutor = { toolName, params -> googleWorkspaceRouter.handle(toolName, params) },
+            )
+    }
+
+    if (polymarketToolRouter != null) {
+        val definitions = polymarketToolDefinitions(polymarketToolRouter)
+        integrations +=
+            RuntimeToolIntegration(
+                id = "polymarket",
+                toolDefinitionsProvider = { definitions },
+                toolExecutor = { toolName, params -> polymarketToolRouter.handle(toolName, params) },
+            )
+    }
+
+    return integrations
+}
+
+internal fun createPolymarketToolRouterOrNull(config: BertBotAgentConfig): PolymarketToolRouter? {
+    val polymarketEnabled = config.enabledSubAgents().any { definition -> definition.id == "polymarket_analyst" }
+    if (!polymarketEnabled) return null
+    return PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
+}
+
+internal fun validateToolBackedSubAgentCoverage(
+    config: BertBotAgentConfig,
+    integrations: List<RuntimeToolIntegration>,
+) {
+    val enabledSubAgentIds = config.enabledSubAgents().map { definition -> definition.id }.toSet()
+    val availableIntegrationIds = integrations.map { integration -> integration.id }.toSet()
+
+    val missingRequired =
+        TOOL_BACKED_SUB_AGENT_REQUIREMENTS.filter { requirement ->
+            requirement.required &&
+                requirement.subAgentId in enabledSubAgentIds &&
+                requirement.integrationId !in availableIntegrationIds
+        }
+
+    if (missingRequired.isNotEmpty()) {
+        val details =
+            missingRequired.joinToString(separator = ", ") { requirement ->
+                "${requirement.subAgentId}->${requirement.integrationId}"
+            }
+        check(false) {
+            "Missing required runtime tool integrations for enabled sub-agents: $details"
+        }
+    }
+}
+
+internal fun polymarketToolDefinitions(polymarketToolRouter: PolymarketToolRouter?): List<JsonObject> {
+    if (polymarketToolRouter == null) return emptyList()
+
+    return listOf(
+        polymarketToolDefinition(
+            McpConstants.POLYMARKET_GAMMA_TOOL_NAME,
+            "Query Polymarket Gamma API public endpoints (markets, events, search).",
+        ),
+        polymarketToolDefinition(
+            McpConstants.POLYMARKET_CLOB_TOOL_NAME,
+            "Query Polymarket public CLOB market-data endpoints (book, prices, spreads, history).",
+        ),
+        polymarketToolDefinition(
+            McpConstants.POLYMARKET_DATA_TOOL_NAME,
+            "Query Polymarket Data API public analytics endpoints (trades, activity, positions, value, holders, OI, leaderboards).",
+        ),
+    )
+}
+
+private fun polymarketToolDefinition(
+    name: String,
+    description: String,
+): JsonObject =
+    JsonObject().apply {
+        addProperty("name", name)
+        addProperty("description", description)
+        add(
+            "inputSchema",
+            JsonObject().apply {
+                addProperty("type", "object")
+                add(
+                    "properties",
+                    JsonObject().apply {
+                        add(
+                            "operation",
+                            JsonObject().apply {
+                                addProperty("type", "string")
+                                addProperty("description", "Operation name for the selected Polymarket API.")
+                            },
+                        )
+                        add(
+                            "params",
+                            JsonObject().apply {
+                                addProperty("type", "object")
+                                addProperty("description", "Optional operation-specific arguments.")
+                            },
+                        )
+                    },
+                )
+                add("required", JsonArray().apply { add("operation") })
+            },
+        )
+    }
 
 internal fun extractDisplayNameFromMessage(message: String): String? {
     val pattern = Regex("""(?i)\bmy\s+name\s+is\s+([A-Za-z][A-Za-z .'-]{0,80})""")

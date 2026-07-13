@@ -32,15 +32,15 @@ jobs:
       AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
       DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
       TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
-      SLACK_SIGNING_SECRET_NAME: ${{ vars.SLACK_SIGNING_SECRET_NAME || '' }}
-      WHATSAPP_APP_SECRET_NAME: ${{ vars.WHATSAPP_APP_SECRET_NAME || '' }}
-      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars.WHATSAPP_VERIFY_TOKEN_SECRET_NAME || '' }}
-      GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME || '' }}
-      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME || '' }}
-      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ${{ vars.GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME || '' }}
+      SLACK_SIGNING_SECRET_NAME: ${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}
+      WHATSAPP_APP_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}
+      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}
+      GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME'] || '' }}
+      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME'] || '' }}
+      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME'] || '' }}
       CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
       CLOUD_RUN_ALLOW_UNAUTHENTICATED: 'true'
-      BERTBOT_GOOGLE_WORKSPACE_ENABLED: ${{ vars.BERTBOT_GOOGLE_WORKSPACE_ENABLED || 'true' }}
+      BERTBOT_GOOGLE_WORKSPACE_ENABLED: ${{ vars[format('{0}', 'BERTBOT_GOOGLE_WORKSPACE_ENABLED')] || 'true' }}
 
     steps:
       - name: Validate required deployment vars
@@ -85,6 +85,10 @@ jobs:
 
           for key in "${optional_secret_vars[@]}"; do
             value="${!key:-}"
+            value_lower="${value,,}"
+            if [ "$value_lower" = "disabled" ]; then
+              value=""
+            fi
             if [ -z "$value" ]; then
               continue
             fi
@@ -164,15 +168,21 @@ jobs:
           )
 
           if [ -n "${SLACK_SIGNING_SECRET_NAME:-}" ]; then
-            secret_mappings+=("BERTBOT_SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET_NAME}:latest")
+            if [ "${SLACK_SIGNING_SECRET_NAME,,}" != "disabled" ]; then
+              secret_mappings+=("BERTBOT_SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET_NAME}:latest")
+            fi
           fi
 
           if [ -n "${WHATSAPP_APP_SECRET_NAME:-}" ]; then
-            secret_mappings+=("BERTBOT_WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET_NAME}:latest")
+            if [ "${WHATSAPP_APP_SECRET_NAME,,}" != "disabled" ]; then
+              secret_mappings+=("BERTBOT_WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET_NAME}:latest")
+            fi
           fi
 
           if [ -n "${WHATSAPP_VERIFY_TOKEN_SECRET_NAME:-}" ]; then
-            secret_mappings+=("BERTBOT_WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN_SECRET_NAME}:latest")
+            if [ "${WHATSAPP_VERIFY_TOKEN_SECRET_NAME,,}" != "disabled" ]; then
+              secret_mappings+=("BERTBOT_WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN_SECRET_NAME}:latest")
+            fi
           fi
 
           if [ -n "${GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME:-}" ]; then

@@ -3,6 +3,7 @@ flowchart TD
     %% 2026-07-13: deploy-cloud-run-main workflow now builds Cloud Run env vars via shell arrays for safer YAML maintenance.
     %% 2026-07-13: Slack/WhatsApp secrets are optional and only injected when corresponding repo vars are set.
     %% 2026-07-13: deploy workflow now preflights optional secret names and runtime service account references before build/deploy.
+    %% 2026-07-13: Optional secret-name vars support a 'disabled' sentinel to intentionally skip validation and secret injection.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
     DEP([Dependabot opens\na dependency PR])
