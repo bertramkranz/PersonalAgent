@@ -91,6 +91,8 @@ Optional GitHub repository variables:
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
 - `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
+- `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
+- `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME` (default empty, must be paired with token secret)
 
 The workflow currently uses these built-in defaults for optional integration wiring:
 
@@ -101,6 +103,30 @@ The workflow currently uses these built-in defaults for optional integration wir
 - `CLOUD_RUN_ALLOW_UNAUTHENTICATED=true`
 
 If you need different secret names or a runtime service account, update [../.github/workflows/deploy-cloud-run-main.yml](../.github/workflows/deploy-cloud-run-main.yml) directly or add a follow-up workflow input/variable path.
+
+### Google Workspace OAuth In Cloud Run
+
+Google Workspace tools need OAuth credentials even when the MCP server itself is running. In Cloud Run, browser-based login is unavailable, so you must preload OAuth token storage files via Secret Manager.
+
+1. Generate credentials once in an interactive environment:
+
+```bash
+cd /opt/google-workspace-extension/workspace-server
+node dist/headless-login.js
+```
+
+2. Base64-encode both generated files:
+
+- `/opt/google-workspace-extension/gemini-cli-workspace-token.json`
+- `/opt/google-workspace-extension/.gemini-cli-workspace-master-key`
+
+3. Store each base64 output in Secret Manager (for example `bertbot-google-workspace-token-b64` and `bertbot-google-workspace-master-key-b64`).
+4. Wire secret names into deploy paths:
+
+- Manual script: pass `-GoogleWorkspaceTokenB64Secret` and `-GoogleWorkspaceMasterKeyB64Secret` to [../scripts/deploy-cloud-run.ps1](../scripts/deploy-cloud-run.ps1) or [../scripts/bootstrap-cloud-run.ps1](../scripts/bootstrap-cloud-run.ps1).
+- GitHub Actions: set repository variables `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` and `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME`.
+
+At container startup, [../docker/entrypoint.sh](../docker/entrypoint.sh) decodes these secrets to the expected workspace extension file paths and forces file-based token storage for headless operation.
 
 The deployer identity (configured in `GCP_DEPLOYER_SERVICE_ACCOUNT`) needs IAM permissions for Artifact Registry push, Cloud Run deploy/update, and service usage needed by the deployment command. The Cloud Run runtime service account needs Secret Manager accessor and Cloud SQL client permissions for runtime access.
 
@@ -190,6 +216,59 @@ docker compose --profile ollama up --build -d
 ```
 
 When using Ollama in containers, set `BERTBOT_AI_PROVIDER=ollama` and choose a model that already exists in the Ollama instance.
+
+### Local SonarQube Community (Docker Compose)
+
+Use [../docker-compose.sonarqube.yml](../docker-compose.sonarqube.yml) to run SonarQube Community Edition locally with a dedicated PostgreSQL backend.
+
+Start SonarQube:
+
+```bash
+docker compose -f docker-compose.sonarqube.yml up -d
+```
+
+Open the UI:
+
+```text
+http://localhost:9000
+```
+
+Run local analysis against this SonarQube instance:
+
+```bash
+export SONAR_HOST_URL=http://localhost:9000
+export SONAR_TOKEN=<your-sonar-token>
+./gradlew --no-daemon check sonar
+```
+
+If you run this from PowerShell, use:
+
+```powershell
+$env:SONAR_HOST_URL = "http://localhost:9000"
+$env:SONAR_TOKEN = "<your-sonar-token>"
+.\gradlew.bat --no-daemon check sonar
+```
+
+Stop the local SonarQube stack:
+
+```bash
+docker compose -f docker-compose.sonarqube.yml down
+```
+
+To remove SonarQube data volumes as well:
+
+```bash
+docker compose -f docker-compose.sonarqube.yml down -v
+```
+
+You can also use the helper script [../scripts/sonarqube-local.ps1](../scripts/sonarqube-local.ps1):
+
+```powershell
+.\scripts\sonarqube-local.ps1 -Action start
+.\scripts\sonarqube-local.ps1 -Action status
+.\scripts\sonarqube-local.ps1 -Action analyze -SonarToken "<your-sonar-token>"
+.\scripts\sonarqube-local.ps1 -Action stop
+```
 
 ### Webhook And MCP Service Variants
 

@@ -126,6 +126,21 @@ To generate local coverage reports:
 
 JaCoCo HTML and XML reports are written under `build/reports/jacoco/` and are included in CI report artifacts.
 
+To run SonarQube Community locally for repository analysis:
+
+```bash
+docker compose -f docker-compose.sonarqube.yml up -d
+```
+
+Then set `SONAR_HOST_URL=http://localhost:9000` and `SONAR_TOKEN=<your-token>` before running `./gradlew --no-daemon check sonar`.
+
+PowerShell helper script:
+
+```powershell
+.\scripts\sonarqube-local.ps1 -Action start
+.\scripts\sonarqube-local.ps1 -Action analyze -SonarToken "<your-token>"
+```
+
 ## Extending BertBot
 
 To add a new capability:

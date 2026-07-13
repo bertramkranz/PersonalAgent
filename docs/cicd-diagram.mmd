@@ -12,7 +12,6 @@ flowchart TD
     subgraph CI ["CI checks (parallel; actionlint is path-filtered)"]
         direction LR
         CI_JOB["ci.yml\nquality-and-test\n(detekt · ktlint · tests)"]
-        SONAR["sonarqube.yml\nSonarQube Community analysis\n(uses JaCoCo + Detekt reports when secrets exist)"]
         MAAT["code-maat-hotspots.yml\nMonthly churn + coupling report\n(repository mining artifact)"]
         DOD["dod-enforcement.yml\nDoD policy checks\n(path-coupled tests + gradle check)"]
         CODEQL["codeql.yml\nanalyze\n(PR: acknowledge repo default setup;\nmain/schedule: custom CodeQL SAST)"]
@@ -52,7 +51,7 @@ flowchart TD
     classDef actor    fill:#161b22,stroke:#30363d,color:#79c0ff,shape:stadium
     classDef external fill:#161b22,stroke:#238636,color:#3fb950,shape:stadium
 
-    class AUTO_PR,AUTOFIX,CI_JOB,SONAR,MAAT,DOD,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,AUTO_TAG,CD workflow
+    class AUTO_PR,AUTOFIX,CI_JOB,MAAT,DOD,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,AUTO_TAG,CD workflow
     class DEV,DEP actor
     class MAIN,RELEASE external
 ```

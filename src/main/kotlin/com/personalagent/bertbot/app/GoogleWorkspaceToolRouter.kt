@@ -125,6 +125,12 @@ private class StdioGoogleWorkspaceMcpTransport(
                     ?: return@runSession true to "Google Workspace call failed: missing result"
             val isError = result.googleWorkspaceBooleanValue("isError") ?: false
             val text = result.googleWorkspaceTextContentOrJson(gson)
+            if (isError) {
+                logger.log(
+                    Level.WARNING,
+                    "Google Workspace MCP tools/call error for '$toolName': ${text.take(800)}"
+                )
+            }
             isError to text
         } ?: (true to "Google Workspace MCP process did not return a response.")
     }

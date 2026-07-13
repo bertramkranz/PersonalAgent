@@ -9,7 +9,10 @@ param(
     [string]$DatabaseName = "bertbot",
     [string]$DatabaseUser = "bertbot",
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
-    [string]$DatabasePasswordSecret = "bertbot-db-password",
+    [string]$DatabasePasswordSecretName = "bertbot-db-password",
+    [string]$GoogleWorkspaceOauthCredentialsJsonB64Secret,
+    [string]$GoogleWorkspaceTokenB64Secret,
+    [string]$GoogleWorkspaceMasterKeyB64Secret,
     [string]$TelegramSecretTokenSecret,
     [string]$SlackSigningSecret,
     [string]$WhatsAppAppSecret,
@@ -72,7 +75,7 @@ function Read-RequiredSecret {
     }
 }
 
-function Upsert-SecretValue {
+function Set-SecretValue {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Name,
@@ -156,38 +159,38 @@ if (-not $userExists) {
     $dbPassword = Read-RequiredSecret -Prompt "Enter password for Cloud SQL user '$DatabaseUser'"
     Invoke-NativeCommand -FilePath "gcloud" -Arguments @("sql", "users", "create", $DatabaseUser, "--instance", $CloudSqlInstance, "--password", $dbPassword)
     if ($CreateSecrets) {
-        Upsert-SecretValue -Name $DatabasePasswordSecret -Value $dbPassword
+        Set-SecretValue -Name $DatabasePasswordSecretName -Value $dbPassword
     }
 } else {
     Write-Host "Cloud SQL user '$DatabaseUser' already exists."
-    if ($CreateSecrets -and -not (Test-GcloudResourceExists -DescribeArgs @("secrets", "describe", $DatabasePasswordSecret))) {
-        $dbPassword = Read-RequiredSecret -Prompt "Enter existing password for Cloud SQL user '$DatabaseUser' (to store in secret '$DatabasePasswordSecret')"
-        Upsert-SecretValue -Name $DatabasePasswordSecret -Value $dbPassword
+    if ($CreateSecrets -and -not (Test-GcloudResourceExists -DescribeArgs @("secrets", "describe", $DatabasePasswordSecretName))) {
+        $dbPassword = Read-RequiredSecret -Prompt "Enter existing password for Cloud SQL user '$DatabaseUser' (to store in secret '$DatabasePasswordSecretName')"
+        Set-SecretValue -Name $DatabasePasswordSecretName -Value $dbPassword
     }
 }
 
 if ($CreateSecrets) {
     $aiKey = Read-RequiredSecret -Prompt "Enter BERTBOT AI API key"
-    Upsert-SecretValue -Name $AiApiKeySecret -Value $aiKey
+    Set-SecretValue -Name $AiApiKeySecret -Value $aiKey
 
     if ($TelegramSecretTokenSecret) {
         $value = Read-RequiredSecret -Prompt "Enter Telegram secret token"
-        Upsert-SecretValue -Name $TelegramSecretTokenSecret -Value $value
+        Set-SecretValue -Name $TelegramSecretTokenSecret -Value $value
     }
 
     if ($SlackSigningSecret) {
         $value = Read-RequiredSecret -Prompt "Enter Slack signing secret"
-        Upsert-SecretValue -Name $SlackSigningSecret -Value $value
+        Set-SecretValue -Name $SlackSigningSecret -Value $value
     }
 
     if ($WhatsAppAppSecret) {
         $value = Read-RequiredSecret -Prompt "Enter WhatsApp app secret"
-        Upsert-SecretValue -Name $WhatsAppAppSecret -Value $value
+        Set-SecretValue -Name $WhatsAppAppSecret -Value $value
     }
 
     if ($WhatsAppVerifyTokenSecret) {
         $value = Read-RequiredSecret -Prompt "Enter WhatsApp verify token"
-        Upsert-SecretValue -Name $WhatsAppVerifyTokenSecret -Value $value
+        Set-SecretValue -Name $WhatsAppVerifyTokenSecret -Value $value
     }
 }
 
@@ -210,7 +213,7 @@ if ($Deploy) {
         DatabaseName = $DatabaseName
         DatabaseUser = $DatabaseUser
         AiApiKeySecret = $AiApiKeySecret
-        DatabasePasswordSecret = $DatabasePasswordSecret
+        DatabasePasswordSecret = $DatabasePasswordSecretName
     }
 
     if ($AllowUnauthenticated) {
@@ -219,6 +222,18 @@ if ($Deploy) {
 
     if ($TelegramSecretTokenSecret) {
         $deployParams.TelegramSecretTokenSecret = $TelegramSecretTokenSecret
+    }
+
+    if ($GoogleWorkspaceTokenB64Secret) {
+        $deployParams.GoogleWorkspaceTokenB64Secret = $GoogleWorkspaceTokenB64Secret
+    }
+
+    if ($GoogleWorkspaceMasterKeyB64Secret) {
+        $deployParams.GoogleWorkspaceMasterKeyB64Secret = $GoogleWorkspaceMasterKeyB64Secret
+    }
+
+    if ($GoogleWorkspaceOauthCredentialsJsonB64Secret) {
+        $deployParams.GoogleWorkspaceOauthCredentialsJsonB64Secret = $GoogleWorkspaceOauthCredentialsJsonB64Secret
     }
 
     if ($SlackSigningSecret) {
