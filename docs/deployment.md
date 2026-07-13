@@ -90,11 +90,16 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
-- `SLACK_SIGNING_SECRET_NAME`
-- `WHATSAPP_APP_SECRET_NAME`
-- `WHATSAPP_VERIFY_TOKEN_SECRET_NAME`
-- `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT`
-- `CLOUD_RUN_ALLOW_UNAUTHENTICATED` (default `true`)
+
+The workflow currently uses these built-in defaults for optional integration wiring:
+
+- `SLACK_SIGNING_SECRET_NAME=bertbot-slack-signing-secret`
+- `WHATSAPP_APP_SECRET_NAME=bertbot-whatsapp-app-secret`
+- `WHATSAPP_VERIFY_TOKEN_SECRET_NAME=bertbot-whatsapp-verify-token`
+- `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` unset
+- `CLOUD_RUN_ALLOW_UNAUTHENTICATED=true`
+
+If you need different secret names or a runtime service account, update [../.github/workflows/deploy-cloud-run-main.yml](../.github/workflows/deploy-cloud-run-main.yml) directly or add a follow-up workflow input/variable path.
 
 The deployer identity (configured in `GCP_DEPLOYER_SERVICE_ACCOUNT`) needs IAM permissions for Artifact Registry push, Cloud Run deploy/update, and service usage needed by the deployment command. The Cloud Run runtime service account needs Secret Manager accessor and Cloud SQL client permissions for runtime access.
 

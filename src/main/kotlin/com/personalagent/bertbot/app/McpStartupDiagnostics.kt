@@ -7,9 +7,8 @@ internal data class McpStartupDiagnostics(
     val workspaceRootPath: String,
     val provider: String,
     val model: String,
-    val macrofactorEnabled: Boolean,
-    val macrofactorConfigured: Boolean,
-    val googleWorkspaceEnabled: Boolean,
+    val macrofactorStatus: String,
+    val googleWorkspaceStatus: String,
     val runtimeReady: Boolean,
     val runtimeError: String,
 )
@@ -24,9 +23,8 @@ internal fun logMcpStartupDiagnostics(input: McpStartupDiagnostics) {
         Workspace root: ${input.workspaceRootPath}
         Provider: ${input.provider}
         Model: ${input.model}
-        MacroFactor enabled: ${input.macrofactorEnabled}
-        MacroFactor configured: ${input.macrofactorConfigured}
-        Google Workspace MCP enabled: ${input.googleWorkspaceEnabled}
+        MacroFactor MCP: ${input.macrofactorStatus}
+        Google Workspace MCP: ${input.googleWorkspaceStatus}
         Runtime ready: ${input.runtimeReady}
         Runtime error: ${input.runtimeError}
         """.trimIndent(),

@@ -15,6 +15,8 @@ internal object McpServerBootstrap {
     data class DispatcherContext(
         val startup: McpStartupState,
         val dispatcher: McpRequestDispatcher,
+        val macrofactorToolRouter: MacrofactorToolRouter?,
+        val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     )
 
     @Suppress("CyclomaticComplexMethod")
@@ -44,6 +46,8 @@ internal object McpServerBootstrap {
                     startup = startup,
                     workspaceRoot = input.workspaceRoot,
                     aiRuntimeConfiguration = input.aiRuntimeConfiguration,
+                    macrofactorRuntimeConfiguration = input.macrofactorRuntimeConfiguration,
+                    googleWorkspaceRuntimeConfiguration = input.googleWorkspaceRuntimeConfiguration,
                     macrofactorToolRouter = macrofactorToolRouter,
                     googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                     continuousResearchToolRouter = continuousResearchToolRouter,
@@ -80,7 +84,12 @@ internal object McpServerBootstrap {
                 statusProvider = statusProvider,
             )
 
-        return DispatcherContext(startup = startup, dispatcher = dispatcher)
+        return DispatcherContext(
+            startup = startup,
+            dispatcher = dispatcher,
+            macrofactorToolRouter = macrofactorToolRouter,
+            googleWorkspaceToolRouter = googleWorkspaceToolRouter,
+        )
     }
 
     private fun createStartupState(
