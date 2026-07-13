@@ -46,6 +46,7 @@ internal class BertBotRuntime(
     private val stateReplayService: StateReplayService? = null,
     private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
+    private val runtimeCapabilitySnapshotProvider: (() -> RuntimeCapabilitySnapshot)? = null,
     private val telemetry: RuntimeTelemetry = NoOpRuntimeTelemetry,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
@@ -91,10 +92,15 @@ internal class BertBotRuntime(
                     return@withPersistenceScope promptInjectionRefusalMessage()
                 }
 
-                buildCapabilityStatusResponse(config, userMessage, runtimeCapabilitySnapshot)?.let { capabilityStatus ->
+                val effectiveRuntimeCapabilitySnapshot =
+                    runCatching { runtimeCapabilitySnapshotProvider?.invoke() }
+                        .getOrNull()
+                        ?: runtimeCapabilitySnapshot
+
+                buildCapabilityStatusResponse(config, userMessage, effectiveRuntimeCapabilitySnapshot)?.let { capabilityStatus ->
                     return@withPersistenceScope capabilityStatus
                 }
-                buildGoogleWorkspaceUnavailableResponse(userMessage, runtimeCapabilitySnapshot)?.let { unavailableResponse ->
+                buildGoogleWorkspaceUnavailableResponse(userMessage, effectiveRuntimeCapabilitySnapshot)?.let { unavailableResponse ->
                     return@withPersistenceScope unavailableResponse
                 }
 
@@ -116,7 +122,7 @@ internal class BertBotRuntime(
 
                 val koogPromptContext = koogMemory.buildPromptContext(persistenceScopeKey, userMessage)
                 val systemPrompt =
-                    buildSystemPrompt(config, state, runtimeCapabilitySnapshot).let { base ->
+                    buildSystemPrompt(config, state, effectiveRuntimeCapabilitySnapshot).let { base ->
                         if (koogPromptContext.isBlank()) {
                             base
                         } else {
@@ -381,12 +387,22 @@ internal object BertBotRuntimeFactory {
                 llmGateway = llmGateway,
             )
         val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
-        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, googleWorkspaceToolDefinitions, llmGateway)
+        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, llmGateway)
         val runtimeCapabilitySnapshot =
             RuntimeCapabilitySnapshot(
                 googleWorkspaceConfigured = googleWorkspaceRouter != null,
                 googleWorkspaceToolAccessAvailable = googleWorkspaceToolDefinitions.isNotEmpty(),
             )
+        val runtimeCapabilitySnapshotProvider =
+            googleWorkspaceRouter?.let { router ->
+                {
+                    val definitions = router.toolDefinitions()
+                    RuntimeCapabilitySnapshot(
+                        googleWorkspaceConfigured = true,
+                        googleWorkspaceToolAccessAvailable = definitions.isNotEmpty(),
+                    )
+                }
+            }
         val koogConfiguration = resolveKoogFeatureRuntimeConfiguration()
         val koogMemory = KoogRuntimeIntegrationFactory.createMemory(koogConfiguration, memoryRuntime)
         val telemetry = KoogRuntimeIntegrationFactory.createTelemetry(koogConfiguration)
@@ -408,6 +424,7 @@ internal object BertBotRuntimeFactory {
                 stateReplayService = stateReplayService,
                 koogMemory = koogMemory,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,
+                runtimeCapabilitySnapshotProvider = runtimeCapabilitySnapshotProvider,
                 telemetry = telemetry,
             )
         val connectorRuntime = BertBotConnectorRuntimeFactory.create(runtimeConfig, runtime)
@@ -418,15 +435,13 @@ internal object BertBotRuntimeFactory {
 
 private fun buildToolCallingSkillOrNull(
     googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
-    toolDefinitions: List<JsonObject>,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
 ): ToolCallingSkill? {
     if (googleWorkspaceRouter == null) return null
-    if (toolDefinitions.isEmpty()) return null
 
     return ToolCallingSkill(
         llmGateway = llmGateway,
-        toolDefinitions = toolDefinitions,
+        toolDefinitionsProvider = googleWorkspaceRouter::toolDefinitions,
         toolExecutor = { name, args ->
             val params = JsonObject()
             params.add("arguments", args)

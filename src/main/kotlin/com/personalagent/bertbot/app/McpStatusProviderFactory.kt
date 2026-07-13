@@ -5,25 +5,27 @@ import java.time.Instant
 
 internal object McpStatusProviderFactory {
     fun create(input: McpStatusProviderInput): () -> String {
-        val macrofactorStatus = summarizeMacrofactorAvailability(input.macrofactorRuntimeConfiguration, input.macrofactorToolRouter)
-        val googleWorkspaceStatus = summarizeGoogleWorkspaceAvailability(input.googleWorkspaceRuntimeConfiguration, input.googleWorkspaceToolRouter)
-        val macrofactorToolNames =
-            input.macrofactorToolRouter
-                ?.toolDefinitions()
-                ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                ?: emptyList()
-        val researchToolNames =
-            input.continuousResearchToolRouter
-                ?.toolDefinitions()
-                ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                ?: emptyList()
-        val googleWorkspaceToolNames =
-            input.googleWorkspaceToolRouter
-                ?.toolDefinitions()
-                ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                ?: emptyList()
-
         return {
+            val macrofactorStatus =
+                summarizeMacrofactorAvailability(input.macrofactorRuntimeConfiguration, input.macrofactorToolRouter)
+            val googleWorkspaceStatus =
+                summarizeGoogleWorkspaceAvailability(input.googleWorkspaceRuntimeConfiguration, input.googleWorkspaceToolRouter)
+            val macrofactorToolNames =
+                input.macrofactorToolRouter
+                    ?.toolDefinitions()
+                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                    ?: emptyList()
+            val researchToolNames =
+                input.continuousResearchToolRouter
+                    ?.toolDefinitions()
+                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                    ?: emptyList()
+            val googleWorkspaceToolNames =
+                input.googleWorkspaceToolRouter
+                    ?.toolDefinitions()
+                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                    ?: emptyList()
+
             val baseTools =
                 mutableListOf(
                     input.toolNames.askBertBot,

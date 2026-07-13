@@ -11,18 +11,34 @@ import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 
 internal class ToolCallingSkill(
     private val llmGateway: LlmGateway,
-    private val toolDefinitions: List<JsonObject>,
+    private val toolDefinitionsProvider: () -> List<JsonObject>,
     private val toolExecutor: (name: String, args: JsonObject) -> String,
     private val maxIterations: Int = 5,
     private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
     private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
 ) {
+    constructor(
+        llmGateway: LlmGateway,
+        toolDefinitions: List<JsonObject>,
+        toolExecutor: (name: String, args: JsonObject) -> String,
+        maxIterations: Int = 5,
+        codec: AgentJsonCodec = GsonAgentJsonCodec(),
+        structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+    ) : this(
+        llmGateway = llmGateway,
+        toolDefinitionsProvider = { toolDefinitions },
+        toolExecutor = toolExecutor,
+        maxIterations = maxIterations,
+        codec = codec,
+        structuredOutputGateway = structuredOutputGateway,
+    )
+
     fun invoke(
         systemPrompt: String,
         userPrompt: String,
         tracingContext: TracingContext,
     ): String {
-        val augmentedSystemPrompt = buildAugmentedSystemPrompt(systemPrompt)
+        val augmentedSystemPrompt = buildAugmentedSystemPrompt(systemPrompt, toolDefinitionsProvider())
         val toolResults = mutableListOf<Pair<String, String>>()
         var iteration = 1
 
@@ -66,7 +82,10 @@ internal class ToolCallingSkill(
         return formatFinalResponse(finalResponse, toolResults)
     }
 
-    private fun buildAugmentedSystemPrompt(base: String): String {
+    private fun buildAugmentedSystemPrompt(
+        base: String,
+        toolDefinitions: List<JsonObject>,
+    ): String {
         if (toolDefinitions.isEmpty()) return base
         val toolList =
             toolDefinitions

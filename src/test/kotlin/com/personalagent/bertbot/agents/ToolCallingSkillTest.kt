@@ -159,6 +159,24 @@ class ToolCallingSkillTest {
         assertContains(response, "Primary")
     }
 
+    @Test
+    fun `uses latest tool definitions from provider at invoke time`() {
+        val gateway = SequenceLlmGateway(listOf("""{"action":"respond","response":"Hello!"}"""))
+        val dynamicDefinitions = mutableListOf<JsonObject>()
+        val skill =
+            ToolCallingSkill(
+                llmGateway = gateway,
+                toolDefinitionsProvider = { dynamicDefinitions.toList() },
+                toolExecutor = { _, _ -> "unused" },
+            )
+
+        dynamicDefinitions.add(toolDef("google_workspace_calendar_listEvents"))
+        val response = skill.invoke("System", "User question", TracingContext())
+
+        assertEquals("Hello!", response)
+        assertEquals(1, gateway.callCount)
+    }
+
     private fun toolDef(name: String): JsonObject {
         val obj = JsonObject()
         obj.addProperty("name", name)
