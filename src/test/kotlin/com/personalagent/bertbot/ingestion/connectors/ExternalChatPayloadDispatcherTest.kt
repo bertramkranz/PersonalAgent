@@ -54,8 +54,8 @@ class ExternalChatPayloadDispatcherTest {
         val parsed = JsonParser.parseString(replyJson).asJsonObject
         assertEquals("sendMessage", parsed.get("method").asString)
         assertEquals("chat-9", parsed.get("chat_id").asString)
-        assertEquals("Markdown", parsed.get("parse_mode").asString)
-        assertEquals("*hi telegram* [View Event](https://example.com)", parsed.get("text").asString)
+        assertNull(parsed.get("parse_mode"))
+        assertEquals("**hi telegram** [View Event](https://example.com)", parsed.get("text").asString)
         val replyContext = parsed.get("reply_to_message_id")
         if (replyContext != null && !replyContext.isJsonNull) {
             assertTrue(replyContext.asString.isNotBlank())
@@ -63,7 +63,7 @@ class ExternalChatPayloadDispatcherTest {
     }
 
     @Test
-    fun `dispatcher normalizes telegram heading and indented list markdown`() {
+    fun `dispatcher passes telegram text through without markdown transformation`() {
         val telegramAdapter =
             TelegramConnectorAdapter(
                 TelegramChatBridge { inbound, _ ->
@@ -100,8 +100,8 @@ class ExternalChatPayloadDispatcherTest {
 
         assertNotNull(replyJson)
         val parsed = JsonParser.parseString(replyJson).asJsonObject
-        assertEquals("Markdown", parsed.get("parse_mode").asString)
-        assertEquals("*Upcoming*\n- First\n- Nested\n1. Ordered", parsed.get("text").asString)
+        assertNull(parsed.get("parse_mode"))
+        assertEquals("# Upcoming\n  - First\n    - Nested\n  1. Ordered", parsed.get("text").asString)
     }
 
     @Test

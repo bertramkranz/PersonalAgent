@@ -14,7 +14,7 @@ flowchart TD
         GraphFactory[BertBotGraphFactory]
         ConnectorFactory[BertBotConnectorRuntimeFactory]
         ResearchFactory[BertBotRuntimeDependenciesFactory]
-        PayloadDispatcher[ExternalChatPayloadDispatcher]
+        PayloadDispatcher[ExternalChatPayloadDispatcher\n(outbound payload + text normalization)]
         KoogIntegration[KoogRuntimeIntegration]
     end
 
