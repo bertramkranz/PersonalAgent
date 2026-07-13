@@ -69,6 +69,36 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Validate optional secret and service-account references
+        run: |
+          set -euo pipefail
+
+          optional_secret_vars=(
+            SLACK_SIGNING_SECRET_NAME
+            WHATSAPP_APP_SECRET_NAME
+            WHATSAPP_VERIFY_TOKEN_SECRET_NAME
+            GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME
+            GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME
+          )
+
+          for key in "${optional_secret_vars[@]}"; do
+            value="${!key:-}"
+            if [ -z "$value" ]; then
+              continue
+            fi
+            if ! gcloud secrets describe "$value" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+              echo "Repository variable ${key} points to missing Secret Manager secret: ${value}" >&2
+              exit 1
+            fi
+          done
+
+          if [ -n "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT:-}" ]; then
+            if ! gcloud iam service-accounts describe "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT}" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+              echo "Repository variable CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT references a missing service account: ${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT}" >&2
+              exit 1
+            fi
+          fi
+
       - name: Configure Docker auth for Artifact Registry
         run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
 
