@@ -27,6 +27,10 @@ class SystemPromptBuilderTest {
         assertTrue(prompt.contains("memory: [\"prefers concise answers\"]"))
         assertTrue(prompt.contains("profile: [\"Known user name: Bertram Kranz\"]"))
         assertTrue(prompt.contains("selected sub-agent: \"Planner\""))
+        assertTrue(prompt.contains("enabled tools:"))
+        assertTrue(prompt.contains("enabled sub-agents:"))
+        assertTrue(prompt.contains("configured but disabled sub-agents: [\"repo_improvement_researcher\"]"))
+        assertTrue(prompt.contains("google workspace mcp enabled:"))
     }
 
     @Test

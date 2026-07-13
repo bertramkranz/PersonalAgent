@@ -18,13 +18,13 @@ param(
     [string]$ServiceName = "bertbot-webhook",
     [string]$DatabaseName = "bertbot",
     [string]$DatabaseUser = "bertbot",
-    [string]$DatabasePasswordSecret,
+    [string]$DatabasePasswordSecret = "bertbot-db-password",
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
     [string]$TelegramSecretTokenSecret,
-    [string]$SlackSigningSecretSecret,
-    [string]$WhatsAppAppSecretSecret,
-    [string]$WhatsAppVerifyToken,
+    [string]$SlackSigningSecret,
+    [string]$WhatsAppAppSecret,
+    [string]$WhatsAppVerifyTokenSecret,
     [switch]$AllowUnauthenticated
 )
 
@@ -82,26 +82,26 @@ if ($ServiceAccount) {
 }
 
 $secretMappings = @()
-$secretMappings += "BERTBOT_AI_API_KEY=$AiApiKeySecret:latest"
+$secretMappings += "BERTBOT_AI_API_KEY=${AiApiKeySecret}:latest"
 
 if ($DatabasePasswordSecret) {
-    $secretMappings += "BERTBOT_STATE_JDBC_PASSWORD=$DatabasePasswordSecret:latest"
+    $secretMappings += "BERTBOT_STATE_JDBC_PASSWORD=${DatabasePasswordSecret}:latest"
 }
 
 if ($TelegramSecretTokenSecret) {
-    $secretMappings += "BERTBOT_TELEGRAM_SECRET_TOKEN=$TelegramSecretTokenSecret:latest"
+    $secretMappings += "BERTBOT_TELEGRAM_SECRET_TOKEN=${TelegramSecretTokenSecret}:latest"
 }
 
-if ($SlackSigningSecretSecret) {
-    $secretMappings += "BERTBOT_SLACK_SIGNING_SECRET=$SlackSigningSecretSecret:latest"
+if ($SlackSigningSecret) {
+    $secretMappings += "BERTBOT_SLACK_SIGNING_SECRET=${SlackSigningSecret}:latest"
 }
 
-if ($WhatsAppAppSecretSecret) {
-    $secretMappings += "BERTBOT_WHATSAPP_APP_SECRET=$WhatsAppAppSecretSecret:latest"
+if ($WhatsAppAppSecret) {
+    $secretMappings += "BERTBOT_WHATSAPP_APP_SECRET=${WhatsAppAppSecret}:latest"
 }
 
-if ($WhatsAppVerifyToken) {
-    $secretMappings += "BERTBOT_WHATSAPP_VERIFY_TOKEN=$WhatsAppVerifyToken:latest"
+if ($WhatsAppVerifyTokenSecret) {
+    $secretMappings += "BERTBOT_WHATSAPP_VERIFY_TOKEN=${WhatsAppVerifyTokenSecret}:latest"
 }
 
 if ($secretMappings.Count -gt 0) {
