@@ -26,7 +26,7 @@ flowchart TD
     MAIN([main branch])
     DEPLOY_MAIN["deploy-cloud-run-main.yml\nBuild + push image\nDeploy Cloud Run webhook\n\nTrigger:\n  • workflow_run: CI completed on main (success)\n  • workflow_dispatch"]
     AUTO_TAG["auto-version-tag.yml\nIncrement semantic patch tag\nPush next v* tag\n\nTrigger:\n  • push to main\n  • workflow_dispatch"]
-    CD["cd.yml\nBuilds distZip / distTar\nPublishes GitHub Release\n(using tag_name from tag_ref on dispatch)\n\nTrigger:\n  • workflow_dispatch (from auto-version-tag)\n  • manual or direct v* tag push"]
+    CD["cd.yml\nBuilds distZip / distTar\nPublishes GitHub Release\n(tag_name · name · target_commitish\nresolved from event.inputs or ref)\n\nTrigger:\n  • workflow_dispatch (from auto-version-tag)\n  • manual or direct v* tag push"]
     RELEASE([GitHub Release\nwith build artifacts])
 
     %% ── Flow ──────────────────────────────────────────────────────────────────

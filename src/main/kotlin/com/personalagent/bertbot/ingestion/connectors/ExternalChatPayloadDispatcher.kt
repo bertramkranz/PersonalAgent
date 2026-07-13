@@ -61,22 +61,13 @@ private fun buildTelegramInlineReply(reply: TelegramReplyPayload): String {
     val obj = JsonObject()
     obj.addProperty("method", "sendMessage")
     obj.addProperty("chat_id", reply.chatId)
-    obj.addProperty("text", normalizeTelegramMarkdown(reply.text))
+    obj.addProperty("text", normalizeOutboundText(reply.text))
     reply.replyToMessageId?.let { obj.addProperty("reply_to_message_id", it) }
     return obj.toString()
 }
 
-private fun normalizeTelegramMarkdown(text: String): String =
-    text
-        .replace("\r\n", "\n")
-        // Telegram Markdown does not support heading markers; map them to bold lines.
-        .replace(Regex("(?m)^#{1,6}\\s+(.+)$"), "*$1*")
-        // Flatten indented bullets so they render as normal list items.
-        .replace(Regex("(?m)^[ \\t]{2,}[-*]\\s+"), "- ")
-        // Flatten indented ordered list items for consistent Telegram rendering.
-        .replace(Regex("(?m)^[ \\t]{2,}(\\d+\\.)\\s+"), "$1 ")
-        // Telegram Markdown expects *bold* while LLM output often uses **bold**.
-        .replace(Regex("\\*\\*([^*\\n]+)\\*\\*"), "*$1*")
+private fun normalizeOutboundText(text: String): String =
+    text.replace("\r\n", "\n")
 
 private fun parseTelegramUpdate(rawJson: String): TelegramUpdatePayload? {
     val root = rawJson.toJsonObjectOrNull() ?: return null

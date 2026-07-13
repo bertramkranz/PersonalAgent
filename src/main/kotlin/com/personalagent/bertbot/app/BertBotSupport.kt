@@ -686,16 +686,15 @@ internal fun buildCapabilityStatusResponse(
 ): String? {
     val normalized = userMessage.lowercase()
     val isCapabilityQuestion =
-        listOf(
-            "sub agent",
-            "sub-agent",
-            "subagents",
-            "capabilities",
-            "what can you access",
-            "playwright",
-            "google workspace",
-            "documents",
-        ).any { token -> normalized.contains(token) }
+        normalized.contains("capabilit") ||
+            normalized.contains("what can you access") ||
+            normalized.contains("sub-agent") ||
+            normalized.contains("sub agent") ||
+            normalized.contains("subagents") ||
+            (
+                listOf("playwright", "google workspace", "documents").any { token -> normalized.contains(token) } &&
+                    listOf("can you", "do you", "access", "enabled", "disabled").any { token -> normalized.contains(token) }
+            )
 
     if (!isCapabilityQuestion) {
         return null
@@ -743,18 +742,14 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
     val normalized = userMessage.lowercase()
     val looksLikeGoogleWorkspaceRequest =
         listOf(
+            "google workspace",
             "calendar",
-            "event",
-            "meeting",
-            "schedule",
             "gmail",
-            "email",
             "drive",
+            "google chat",
             "docs",
-            "documents",
             "sheets",
             "slides",
-            "google chat",
         ).any { token -> normalized.contains(token) }
 
     if (!looksLikeGoogleWorkspaceRequest) {
@@ -766,7 +761,7 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
 
 internal data class RuntimeCapabilitySnapshot(
     val googleWorkspaceConfigured: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
-    val googleWorkspaceToolAccessAvailable: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
+    val googleWorkspaceToolAccessAvailable: Boolean = false,
 )
 
 internal fun summarizeMacrofactorAvailability(
