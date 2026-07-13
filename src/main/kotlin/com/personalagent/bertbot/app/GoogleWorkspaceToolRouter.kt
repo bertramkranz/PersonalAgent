@@ -12,6 +12,8 @@ import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.logging.Level
+import java.util.logging.Logger
 
 internal class GoogleWorkspaceToolRouter(
     private val runtimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
@@ -80,9 +82,10 @@ private class StdioGoogleWorkspaceMcpTransport(
     private val runtimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
 ) : GoogleWorkspaceMcpTransport {
     private val gson = GsonBuilder().disableHtmlEscaping().create()
+    private val logger = Logger.getLogger(StdioGoogleWorkspaceMcpTransport::class.java.name)
 
     override fun listTools(): List<GoogleWorkspaceDiscoveredTool>? {
-        return runSession {
+        return runSession(operationName = "tools/list") {
             initializeSession()
             val response = request(method = "tools/list", id = 2, params = JsonObject())
             val result = response.googleWorkspaceObjectValue("result") ?: return@runSession null
@@ -103,7 +106,7 @@ private class StdioGoogleWorkspaceMcpTransport(
         toolName: String,
         arguments: JsonObject,
     ): Pair<Boolean, String> {
-        return runSession {
+        return runSession(operationName = "tools/call:$toolName") {
             initializeSession()
             val params = JsonObject()
             params.addProperty("name", toolName)
@@ -124,9 +127,13 @@ private class StdioGoogleWorkspaceMcpTransport(
         } ?: (true to "Google Workspace MCP process did not return a response.")
     }
 
-    private fun <T> runSession(block: SessionContext.() -> T?): T? {
+    private fun <T> runSession(
+        operationName: String,
+        block: SessionContext.() -> T?,
+    ): T? {
+        val command = googleWorkspaceCommand(runtimeConfiguration)
         return runCatching {
-            val processBuilder = ProcessBuilder(googleWorkspaceCommand(runtimeConfiguration)).redirectErrorStream(true)
+            val processBuilder = ProcessBuilder(command).redirectErrorStream(true)
             val process = processBuilder.start()
             try {
                 val writer = BufferedWriter(OutputStreamWriter(process.outputStream))
@@ -139,6 +146,12 @@ private class StdioGoogleWorkspaceMcpTransport(
                     process.destroyForcibly()
                 }
             }
+        }.onFailure { throwable ->
+            logger.log(
+                Level.WARNING,
+                "Google Workspace MCP $operationName failed (command='${runtimeConfiguration.command}', argsCount=${runtimeConfiguration.args.size}).",
+                throwable,
+            )
         }.getOrNull()
     }
 
@@ -167,6 +180,8 @@ private class StdioGoogleWorkspaceMcpTransport(
         val gson: com.google.gson.Gson,
         val timeoutSeconds: Long,
     ) {
+        private val nonJsonOutputLines = ArrayDeque<String>()
+
         fun initializeSession() {
             val params = JsonObject()
             params.addProperty("protocolVersion", "2024-11-05")
@@ -208,7 +223,12 @@ private class StdioGoogleWorkspaceMcpTransport(
                 executor
                     .submit<JsonObject> {
                         while (true) {
-                            val line = reader.readLine() ?: error("Google Workspace MCP process terminated before responding.")
+                            val line = reader.readLine()
+                            if (line == null) {
+                                error(
+                                    "Google Workspace MCP process terminated before responding. recentOutput=${formatRecentOutput()}"
+                                )
+                            }
                             val json = parseJsonObject(line) ?: continue
                             val id = json.get("id")
                             if (id != null && id.isJsonPrimitive && id.asInt == requestId) {
@@ -218,7 +238,7 @@ private class StdioGoogleWorkspaceMcpTransport(
                         error("Google Workspace MCP response loop ended unexpectedly.")
                     }.get(timeoutSeconds, TimeUnit.SECONDS)
             } catch (_: TimeoutException) {
-                error("Timed out waiting for Google Workspace MCP response.")
+                error("Timed out waiting for Google Workspace MCP response. recentOutput=${formatRecentOutput()}")
             } finally {
                 executor.shutdownNow()
             }
@@ -228,6 +248,27 @@ private class StdioGoogleWorkspaceMcpTransport(
             return runCatching { JsonParser.parseString(line) }
                 .getOrNull()
                 ?.googleWorkspaceAsJsonObjectOrNull()
+                ?: run {
+                    recordNonJsonOutput(line)
+                    null
+                }
+        }
+
+        private fun recordNonJsonOutput(line: String) {
+            if (line.isBlank()) {
+                return
+            }
+            if (nonJsonOutputLines.size >= 6) {
+                nonJsonOutputLines.removeFirst()
+            }
+            nonJsonOutputLines.addLast(line.trim())
+        }
+
+        private fun formatRecentOutput(): String {
+            if (nonJsonOutputLines.isEmpty()) {
+                return "none"
+            }
+            return nonJsonOutputLines.joinToString(separator = " | ")
         }
     }
 }
