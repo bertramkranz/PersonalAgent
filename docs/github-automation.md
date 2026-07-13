@@ -73,7 +73,8 @@ GitHub Copilot can suggest changes and draft implementations, but auto-applying 
 Releases are tag-driven through `.github/workflows/cd.yml`:
 
 - `auto-version-tag.yml` runs on `main` and pushes the next `v*` tag.
-- `cd.yml` triggers on that `v*` tag push.
+- `auto-version-tag.yml` then dispatches `cd.yml` with `tag_ref` so release build/publish always runs for the new tag.
+- `cd.yml` also supports direct `v*` tag push triggers and manual dispatch fallback.
 
 Manual fallback:
 
