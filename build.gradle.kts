@@ -3,6 +3,8 @@ plugins {
     kotlin("plugin.serialization") version "2.3.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("org.sonarqube") version "6.1.0.5360"
+    jacoco
     application
 }
 
@@ -58,6 +60,31 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+
+    reports {
+        xml.required.set(true)
+        csv.required.set(false)
+        html.required.set(true)
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.projectKey", "bertramkranz_PersonalAgent")
+        property("sonar.projectName", "PersonalAgent")
+        property("sonar.coverage.jacoco.xmlReportPaths", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath)
+        property("sonar.junit.reportPaths", layout.buildDirectory.dir("test-results/test").get().asFile.absolutePath)
+        property("sonar.kotlin.detekt.reportPaths", layout.buildDirectory.file("reports/detekt/detekt.xml").get().asFile.absolutePath)
+    }
 }
 
 detekt {
@@ -120,5 +147,5 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 }
 
 tasks.named("check") {
-    dependsOn("detekt", "ktlintCheck")
+    dependsOn("detekt", "ktlintCheck", "jacocoTestReport")
 }

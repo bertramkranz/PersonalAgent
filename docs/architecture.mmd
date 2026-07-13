@@ -1,3 +1,4 @@
+%% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -98,6 +99,12 @@ flowchart TD
         GoogleWorkspaceMcp[(Google Workspace MCP Server)]
     end
 
+    subgraph BuildQuality
+        JaCoCo[JaCoCo Coverage Report\n(build/reports/jacoco)]
+        SonarQube[SonarQube Community\n(sonarqube.yml)]
+        DetektReport[Detekt XML Report\n(build/reports/detekt)]
+    end
+
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
@@ -189,3 +196,6 @@ flowchart TD
 
     MCP --> GoogleWorkspaceToolRouter
     GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
+
+    JaCoCo --> SonarQube
+    DetektReport --> SonarQube
