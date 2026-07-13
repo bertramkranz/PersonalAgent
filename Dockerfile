@@ -16,6 +16,10 @@ RUN sed -i 's/\r$//' ./gradlew \
 FROM eclipse-temurin:17-jre
 WORKDIR /opt/bertbot
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends nodejs npm \
+ && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib
 COPY docker/entrypoint.sh /entrypoint.sh
 
