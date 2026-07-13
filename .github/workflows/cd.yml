@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_ref || github.ref }}
+          ref: ${{ github.event.inputs.tag_ref || github.ref }}
 
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
@@ -43,7 +43,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_ref || github.ref_name }}
+          tag_name: ${{ github.event.inputs.tag_ref || github.ref_name }}
+          name: ${{ github.event.inputs.tag_ref || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: |
             build/distributions/*.zip
             build/distributions/*.tar

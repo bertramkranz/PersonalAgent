@@ -1,4 +1,3 @@
-```mermaid
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -15,7 +14,7 @@ flowchart TD
         GraphFactory[BertBotGraphFactory]
         ConnectorFactory[BertBotConnectorRuntimeFactory]
         ResearchFactory[BertBotRuntimeDependenciesFactory]
-        PayloadDispatcher[ExternalChatPayloadDispatcher]
+        PayloadDispatcher[ExternalChatPayloadDispatcher\n(outbound payload + text normalization)]
         KoogIntegration[KoogRuntimeIntegration]
     end
 
@@ -44,7 +43,7 @@ flowchart TD
         Config[BertBotAgentConfig]
         RuntimeFlags[Runtime Capability Snapshot\n(BertBotSupport)]
         PromptBuilder[buildSystemPrompt]
-        CapabilityResponder[buildCapabilityStatusResponse]
+        CapabilityResponder[buildCapabilityStatusResponse\n(keyword-based capability detection)]
         Registry[SubAgentRegistry]
         Skill[SelfCorrectingSkill]
         StructuredOutput[StructuredOutputGateway]
@@ -187,4 +186,3 @@ flowchart TD
 
     MCP --> GoogleWorkspaceToolRouter
     GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
-```
