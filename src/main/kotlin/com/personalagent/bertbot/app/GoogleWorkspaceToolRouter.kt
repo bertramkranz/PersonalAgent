@@ -9,6 +9,8 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -134,6 +136,7 @@ private class StdioGoogleWorkspaceMcpTransport(
         val command = googleWorkspaceCommand(runtimeConfiguration)
         return runCatching {
             val processBuilder = ProcessBuilder(command).redirectErrorStream(true)
+            configureNodePackageManagerEnvironment(processBuilder, command)
             val process = processBuilder.start()
             try {
                 val writer = BufferedWriter(OutputStreamWriter(process.outputStream))
@@ -153,6 +156,19 @@ private class StdioGoogleWorkspaceMcpTransport(
                 throwable,
             )
         }.getOrNull()
+    }
+
+    private fun configureNodePackageManagerEnvironment(
+        processBuilder: ProcessBuilder,
+        command: List<String>,
+    ) {
+        if (command.none { it.equals("npx", ignoreCase = true) }) {
+            return
+        }
+
+        val cacheDirectory = Paths.get(System.getProperty("java.io.tmpdir"), "bertbot-npm-cache", System.nanoTime().toString())
+        runCatching { Files.createDirectories(cacheDirectory) }
+        processBuilder.environment()["NPM_CONFIG_CACHE"] = cacheDirectory.toString()
     }
 
     private fun googleWorkspaceCommand(configuration: GoogleWorkspaceRuntimeConfiguration): List<String> {
