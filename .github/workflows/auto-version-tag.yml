@@ -1,0 +1,59 @@
+name: Auto Version Tag
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-version-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine next tag
+        id: version
+        run: |
+          set -euo pipefail
+
+          latest_tag="$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+
+          if [ -z "$latest_tag" ]; then
+            next_tag="v0.1.0"
+          else
+            version="${latest_tag#v}"
+            IFS='.' read -r major minor patch <<< "$version"
+            next_tag="v${major}.${minor}.$((patch + 1))"
+          fi
+
+          if git rev-parse "$next_tag" >/dev/null 2>&1; then
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "next_tag=$next_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        if: steps.version.outputs.tag_exists == 'false'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.next_tag }}"
+          git push origin "${{ steps.version.outputs.next_tag }}"
+
+      - name: Summary
+        run: |
+          echo "Created or verified tag: ${{ steps.version.outputs.next_tag }}"

@@ -44,6 +44,7 @@ flowchart TD
         Config[BertBotAgentConfig]
         RuntimeFlags[Runtime Capability Snapshot\n(BertBotSupport)]
         PromptBuilder[buildSystemPrompt]
+        CapabilityResponder[buildCapabilityStatusResponse]
         Registry[SubAgentRegistry]
         Skill[SelfCorrectingSkill]
         StructuredOutput[StructuredOutputGateway]
@@ -144,6 +145,9 @@ flowchart TD
     Config --> PromptBuilder
     RuntimeFlags --> PromptBuilder
     RuntimeCore --> PromptBuilder
+    Config --> CapabilityResponder
+    RuntimeFlags --> CapabilityResponder
+    RuntimeCore --> CapabilityResponder
     Skill --> LLM
     Skill --> StructuredOutput
     RuntimeCore --> Skill

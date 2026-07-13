@@ -7,6 +7,7 @@ This repository includes GitHub workflow automation for merge guardrails, secret
 - `.github/workflows/bootstrap-repo-guardrails.yml`: ensures repository guardrails such as the `auto-merge` label exist.
 - `.github/workflows/merge-generated-prs-on-green.yml`: approves and enables GitHub native auto-merge for eligible pull requests when required checks pass.
 - `.github/workflows/deploy-cloud-run-main.yml`: builds and deploys the webhook service to Cloud Run after CI succeeds on `main` (also supports manual dispatch).
+- `.github/workflows/auto-version-tag.yml`: increments semantic patch tags on `main` and pushes the next `v*` tag.
 - `.github/workflows/secret-scan.yml`: scans pushes and pull requests for leaked secrets and uploads SARIF findings.
 
 ## Generated PR Merge Automation
@@ -69,7 +70,12 @@ GitHub Copilot can suggest changes and draft implementations, but auto-applying 
 
 ## Release Trigger
 
-To trigger a release after publishing:
+Releases are tag-driven through `.github/workflows/cd.yml`:
+
+- `auto-version-tag.yml` runs on `main` and pushes the next `v*` tag.
+- `cd.yml` triggers on that `v*` tag push.
+
+Manual fallback:
 
 ```bash
 git tag v1.0.0
@@ -82,6 +88,8 @@ Cloud deployment is now decoupled from release tagging:
 
 - Merge to `main` -> CI runs on the merge commit.
 - When CI completes successfully, `.github/workflows/deploy-cloud-run-main.yml` deploys Cloud Run from that same commit SHA.
+- In parallel, `.github/workflows/auto-version-tag.yml` bumps and pushes the next semantic patch tag.
+- The pushed `v*` tag triggers `.github/workflows/cd.yml` for GitHub Release artifact build/publish.
 - You can also run the deploy workflow manually with `workflow_dispatch`.
 
 This allows a standard branch -> PR -> merge -> deploy path while keeping tag-driven GitHub Releases in `.github/workflows/cd.yml`.

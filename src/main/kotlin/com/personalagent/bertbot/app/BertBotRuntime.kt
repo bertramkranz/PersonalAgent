@@ -90,6 +90,10 @@ internal class BertBotRuntime(
                     return@withPersistenceScope promptInjectionRefusalMessage()
                 }
 
+                buildCapabilityStatusResponse(config, userMessage)?.let { capabilityStatus ->
+                    return@withPersistenceScope capabilityStatus
+                }
+
                 val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
 
                 val state =
