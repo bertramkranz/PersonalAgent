@@ -27,4 +27,36 @@ class CapabilityStatusResponseTest {
         assertTrue(response.contains("workspace.read_file (repo documents): enabled"))
         assertTrue(response.contains("Playwright capability: enabled"))
     }
+
+    @Test
+    fun `capability response marks google workspace configured but unavailable`() {
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "What can you access in Google Workspace right now?",
+                RuntimeCapabilitySnapshot(
+                    googleWorkspaceConfigured = true,
+                    googleWorkspaceToolAccessAvailable = false,
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(response.contains("Google Workspace MCP: configured but unavailable"))
+    }
+
+    @Test
+    fun `google workspace unavailable response intercepts calendar request`() {
+        val response =
+            buildGoogleWorkspaceUnavailableResponse(
+                "What is upcoming in my calendar?",
+                RuntimeCapabilitySnapshot(
+                    googleWorkspaceConfigured = true,
+                    googleWorkspaceToolAccessAvailable = false,
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(response.contains("tool bridge is currently unavailable"))
+        assertTrue(response.contains("check your calendar"))
+    }
 }

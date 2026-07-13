@@ -56,7 +56,11 @@ jobs:
                 strict: true,
                 contexts: [
                   'quality-and-test',
+<<<<<<< HEAD
                   'sonarqube',
+=======
+                  'dod-enforcement',
+>>>>>>> origin/main
                   'analyze',
                   'dependency-review',
                   'gitleaks',

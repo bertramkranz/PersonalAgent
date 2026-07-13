@@ -26,6 +26,8 @@ fun main() {
         )
     val startup = dispatcherContext.startup
     val dispatcher = dispatcherContext.dispatcher
+    val macrofactorStatus = summarizeMacrofactorAvailability(macrofactorRuntimeConfiguration, dispatcherContext.macrofactorToolRouter)
+    val googleWorkspaceStatus = summarizeGoogleWorkspaceAvailability(googleWorkspaceRuntimeConfiguration, dispatcherContext.googleWorkspaceToolRouter)
 
     logMcpStartupDiagnostics(
         McpStartupDiagnostics(
@@ -35,9 +37,8 @@ fun main() {
             workspaceRootPath = workspaceRoot.absolutePath,
             provider = aiRuntimeConfiguration.provider,
             model = aiRuntimeConfiguration.model,
-            macrofactorEnabled = macrofactorRuntimeConfiguration.enabled,
-            macrofactorConfigured = macrofactorRuntimeConfiguration.isConfigured,
-            googleWorkspaceEnabled = googleWorkspaceRuntimeConfiguration.enabled,
+            macrofactorStatus = macrofactorStatus,
+            googleWorkspaceStatus = googleWorkspaceStatus,
             runtimeReady = startup.runtime != null,
             runtimeError = startup.errorMessage ?: "none",
         ),

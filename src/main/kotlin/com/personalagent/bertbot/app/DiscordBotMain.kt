@@ -56,6 +56,7 @@ fun main() {
 
     jda.awaitReady()
     println("BertBot Discord bot started as ${jda.selfUser.name} (${jda.selfUser.id})")
+    println("Google Workspace MCP: ${summarizeGoogleWorkspaceAvailability(googleWorkspaceRuntime, googleWorkspaceRouter)}")
 }
 
 private class DiscordMessageListener(
