@@ -42,6 +42,8 @@ flowchart TD
 
     subgraph PlanningAndLLM
         Config[BertBotAgentConfig]
+        RuntimeFlags[Runtime Capability Snapshot\n(BertBotSupport)]
+        PromptBuilder[buildSystemPrompt]
         Registry[SubAgentRegistry]
         Skill[SelfCorrectingSkill]
         StructuredOutput[StructuredOutputGateway]
@@ -110,6 +112,7 @@ flowchart TD
     RuntimeFactory --> GraphFactory
     RuntimeFactory --> Skill
     RuntimeFactory --> LLM
+    RuntimeFactory --> RuntimeFlags
     RuntimeFactory --> Control
     RuntimeFactory --> Config
     RuntimeCore --> KoogIntegration
@@ -138,6 +141,9 @@ flowchart TD
 
     Planner --> Registry
     Delegate --> Registry
+    Config --> PromptBuilder
+    RuntimeFlags --> PromptBuilder
+    RuntimeCore --> PromptBuilder
     Skill --> LLM
     Skill --> StructuredOutput
     RuntimeCore --> Skill
