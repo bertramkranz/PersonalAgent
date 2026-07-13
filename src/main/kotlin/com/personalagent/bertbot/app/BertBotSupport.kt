@@ -742,18 +742,14 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
     val normalized = userMessage.lowercase()
     val looksLikeGoogleWorkspaceRequest =
         listOf(
+            "google workspace",
             "calendar",
-            "event",
-            "meeting",
-            "schedule",
             "gmail",
-            "email",
             "drive",
+            "google chat",
             "docs",
-            "documents",
             "sheets",
             "slides",
-            "google chat",
         ).any { token -> normalized.contains(token) }
 
     if (!looksLikeGoogleWorkspaceRequest) {
