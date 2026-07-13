@@ -90,6 +90,7 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
+- `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
 
 The workflow currently uses these built-in defaults for optional integration wiring:
 

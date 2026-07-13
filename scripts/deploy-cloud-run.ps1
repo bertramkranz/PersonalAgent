@@ -21,6 +21,7 @@ param(
     [string]$DatabasePasswordSecret = "bertbot-db-password",
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
+    [bool]$GoogleWorkspaceEnabled = $true,
     [string]$TelegramSecretTokenSecret,
     [string]$SlackSigningSecret,
     [string]$WhatsAppAppSecret,
@@ -70,7 +71,7 @@ $deployArgs = @(
     "--concurrency", "1",
     "--min-instances", "1",
     "--add-cloudsql-instances", $cloudSqlConnection,
-    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser"
+    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser,BERTBOT_GOOGLE_WORKSPACE_ENABLED=$($GoogleWorkspaceEnabled.ToString().ToLowerInvariant()),BERTBOT_GOOGLE_WORKSPACE_COMMAND=gemini-workspace-server,BERTBOT_GOOGLE_WORKSPACE_ARGS=,BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120"
 )
 
 if ($AllowUnauthenticated) {

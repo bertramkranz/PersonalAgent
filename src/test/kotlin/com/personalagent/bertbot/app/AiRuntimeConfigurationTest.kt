@@ -226,6 +226,40 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `macrofactor configuration supports explicit empty args override`() {
+        val configuration =
+            resolveMacrofactorRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_MACROFACTOR_COMMAND" to "macrofactor-mcp",
+                        "BERTBOT_MACROFACTOR_ARGS" to "",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals("macrofactor-mcp", configuration.command)
+        assertEquals(emptyList(), configuration.args)
+    }
+
+    @Test
+    fun `google workspace configuration supports explicit empty args override`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_ENABLED" to "true",
+                        "BERTBOT_GOOGLE_WORKSPACE_COMMAND" to "gemini-workspace-server",
+                        "BERTBOT_GOOGLE_WORKSPACE_ARGS" to "",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals("gemini-workspace-server", configuration.command)
+        assertEquals(emptyList(), configuration.args)
+    }
+
+    @Test
     fun `research runtime overrides prefer environment values`() {
         val config =
             applyResearchRuntimeOverrides(

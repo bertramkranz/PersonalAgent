@@ -416,9 +416,8 @@ internal fun resolveMacrofactorRuntimeConfiguration(
             ?: DEFAULT_MACROFACTOR_COMMAND
 
     val args =
-        resolveRuntimeSetting("BERTBOT_MACROFACTOR_ARGS", environment, dotEnvValues)
+        resolveRuntimeSettingAllowBlank("BERTBOT_MACROFACTOR_ARGS", environment, dotEnvValues)
             ?.let { parseCommandArgs(it) }
-            ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_MACROFACTOR_ARGS
 
     val timeoutSeconds =
@@ -464,9 +463,8 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
             ?: DEFAULT_GOOGLE_WORKSPACE_COMMAND
 
     val args =
-        resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_ARGS", environment, dotEnvValues)
+        resolveRuntimeSettingAllowBlank("BERTBOT_GOOGLE_WORKSPACE_ARGS", environment, dotEnvValues)
             ?.let { parseCommandArgs(it) }
-            ?.takeIf { it.isNotEmpty() }
             ?: DEFAULT_GOOGLE_WORKSPACE_ARGS
 
     val timeoutSeconds =

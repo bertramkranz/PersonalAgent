@@ -18,6 +18,7 @@ WORKDIR /opt/bertbot
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends nodejs npm git \
+ && npm install -g github:gemini-cli-extensions/workspace#v0.0.8 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib

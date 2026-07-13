@@ -15,6 +15,22 @@ internal fun resolveRuntimeSetting(
     return dotEnvValues[name]?.trim()?.removeSurrounding("\"")
 }
 
+internal fun resolveRuntimeSettingAllowBlank(
+    name: String,
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String? {
+    if (environment.containsKey(name)) {
+        return environment[name]?.trim()?.removeSurrounding("\"") ?: ""
+    }
+
+    if (dotEnvValues.containsKey(name)) {
+        return dotEnvValues[name]?.trim()?.removeSurrounding("\"") ?: ""
+    }
+
+    return null
+}
+
 internal fun loadDotEnvValues(): Map<String, String> {
     val envFile = File(".env")
     if (!envFile.exists()) {
