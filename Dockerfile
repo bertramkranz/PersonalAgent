@@ -17,7 +17,7 @@ FROM eclipse-temurin:17-jre
 WORKDIR /opt/bertbot
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nodejs npm \
+ && apt-get install -y --no-install-recommends nodejs npm git \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib
