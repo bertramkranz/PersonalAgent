@@ -5,6 +5,8 @@ import java.time.Instant
 
 internal object McpStatusProviderFactory {
     fun create(input: McpStatusProviderInput): () -> String {
+        val macrofactorStatus = summarizeMacrofactorAvailability(input.macrofactorRuntimeConfiguration, input.macrofactorToolRouter)
+        val googleWorkspaceStatus = summarizeGoogleWorkspaceAvailability(input.googleWorkspaceRuntimeConfiguration, input.googleWorkspaceToolRouter)
         val macrofactorToolNames =
             input.macrofactorToolRouter
                 ?.toolDefinitions()
@@ -59,6 +61,8 @@ internal object McpStatusProviderFactory {
             Runtime provider: ${input.aiRuntimeConfiguration.provider}
             Runtime model: ${input.aiRuntimeConfiguration.model}
             Runtime error: ${input.startup.errorMessage ?: "none"}
+            MacroFactor MCP: $macrofactorStatus
+            Google Workspace MCP: $googleWorkspaceStatus
                         Checkpoint rollback policy:
                             environment=${input.checkpointRollbackPolicy.environment}
                             protectedEnvironment=${input.checkpointRollbackPolicy.isProtectedEnvironment}
@@ -75,6 +79,8 @@ internal data class McpStatusProviderInput(
     val startup: McpStartupState,
     val workspaceRoot: File,
     val aiRuntimeConfiguration: AiRuntimeConfiguration,
+    val macrofactorRuntimeConfiguration: MacrofactorRuntimeConfiguration,
+    val googleWorkspaceRuntimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
     val macrofactorToolRouter: MacrofactorToolRouter?,
     val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     val continuousResearchToolRouter: ContinuousResearchToolRouter?,

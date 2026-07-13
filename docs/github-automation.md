@@ -5,10 +5,30 @@ This repository includes GitHub workflow automation for merge guardrails, secret
 ## Workflow Overview
 
 - `.github/workflows/bootstrap-repo-guardrails.yml`: ensures repository guardrails such as the `auto-merge` label exist.
+- `.github/workflows/dod-enforcement.yml`: enforces Definition-of-Done style CI policy checks on pushes and pull requests, including path-coupled test expectations.
+- `.github/workflows/autofix-on-push.yml`: applies safe formatting auto-fixes (`ktlintFormat`) on non-main branch pushes and commits them back automatically.
 - `.github/workflows/merge-generated-prs-on-green.yml`: approves and enables GitHub native auto-merge for eligible pull requests when required checks pass.
 - `.github/workflows/deploy-cloud-run-main.yml`: builds and deploys the webhook service to Cloud Run after CI succeeds on `main` (also supports manual dispatch).
 - `.github/workflows/auto-version-tag.yml`: increments semantic patch tags on `main` and pushes the next `v*` tag.
 - `.github/workflows/secret-scan.yml`: scans pushes and pull requests for leaked secrets and uploads SARIF findings.
+
+## CI-Native DoD Enforcement
+
+This repository favors CI-native policy checks over manual pull-request templates.
+
+- `dod-enforcement.yml` runs on feature-branch pushes and pull requests.
+- It validates path-coupled quality rules (for example, `graph/store` code changes must include matching `graph/store` test updates).
+- It reuses the shared changed-file doc guardrail script to ensure architecture and CI/CD diagram updates are included when relevant.
+- It runs `./gradlew --no-daemon check` as the final quality gate.
+
+## Safe Auto-Fix Automation
+
+`autofix-on-push.yml` is intentionally conservative:
+
+- It only runs on non-main branch pushes.
+- It applies deterministic formatting fixes (`ktlintFormat`) and auto-commits if diffs exist.
+- It avoids looped reruns by skipping commits containing `[skip autofix]` and skipping bot-originated pushes.
+- It does not attempt semantic or behavior-changing auto-fixes.
 
 ## Generated PR Merge Automation
 
@@ -19,6 +39,22 @@ The merge workflow is designed for trusted generated pull requests.
 - It auto-approves when the configured automation identity is allowed to do so.
 - It enables GitHub native auto-merge after required checks are green.
 - It supports `AUTOMATION_PAT`, with fallback to `github.token` when applicable.
+
+## Apply Updated Required Checks
+
+After introducing new required workflows (for example `dod-enforcement`), re-apply branch protection contexts with the bootstrap workflow.
+
+Using GitHub CLI:
+
+```bash
+gh workflow run bootstrap-repo-guardrails.yml --repo bertramkranz/PersonalAgent --field branch=main
+```
+
+Then verify branch protection required contexts include `dod-enforcement`:
+
+```bash
+gh api repos/bertramkranz/PersonalAgent/branches/main/protection
+```
 
 ## Automation PAT Verification Runbook
 

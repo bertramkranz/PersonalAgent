@@ -124,7 +124,7 @@ fun main() {
     println("Proxy header trust enabled: ${securityConfig.trustProxyHeaders}")
     println("IP allowlist entries: ${securityConfig.allowedIpCidrs.size}")
     println("Rate limit: ${securityConfig.rateLimitMaxRequests} requests/${securityConfig.rateLimitWindowSeconds}s")
-    println("Google Workspace tools enabled: ${googleWorkspaceRouter != null}")
+    println("Google Workspace MCP: ${summarizeGoogleWorkspaceAvailability(googleWorkspaceRuntime, googleWorkspaceRouter)}")
 
     Runtime.getRuntime().addShutdownHook(
         Thread {

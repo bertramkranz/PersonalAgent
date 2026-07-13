@@ -6,11 +6,13 @@ flowchart TD
 
     %% ── Automation ────────────────────────────────────────────────────────────
     AUTO_PR["auto-pr.yml\nOpens 'chore: merge …' PR\nif none exists\n(skips dependabot branches)"]
+    AUTOFIX["autofix-on-push.yml\nApplies safe ktlint auto-fixes\non non-main pushes"]
 
     %% ── Required CI checks ────────────────────────────────────────────────────
     subgraph CI ["CI checks (parallel; actionlint is path-filtered)"]
         direction LR
         CI_JOB["ci.yml\nquality-and-test\n(detekt · ktlint · tests)"]
+        DOD["dod-enforcement.yml\nDoD policy checks\n(path-coupled tests + gradle check)"]
         CODEQL["codeql.yml\nanalyze\n(PR: acknowledge repo default setup;\nmain/schedule: custom CodeQL SAST)"]
         DEPREVIEW["dependency-review.yml\ndependency-review\n(CVE gate ≥ moderate)"]
         SECRET["secret-scan.yml\ngitleaks\n(secret detection)"]
@@ -28,6 +30,7 @@ flowchart TD
     RELEASE([GitHub Release\nwith build artifacts])
 
     %% ── Flow ──────────────────────────────────────────────────────────────────
+    DEV -->|branch push| AUTOFIX
     DEV -->|branch push| AUTO_PR
     DEP -->|PR already open| CI
 
@@ -47,7 +50,7 @@ flowchart TD
     classDef actor    fill:#161b22,stroke:#30363d,color:#79c0ff,shape:stadium
     classDef external fill:#161b22,stroke:#238636,color:#3fb950,shape:stadium
 
-    class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,AUTO_TAG,CD workflow
+    class AUTO_PR,AUTOFIX,CI_JOB,DOD,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,AUTO_TAG,CD workflow
     class DEV,DEP actor
     class MAIN,RELEASE external
 ```

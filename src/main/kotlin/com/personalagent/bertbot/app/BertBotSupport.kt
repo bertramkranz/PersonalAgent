@@ -646,6 +646,7 @@ internal fun printRuntimeStartupInfo(
 internal fun buildSystemPrompt(
     config: BertBotAgentConfig,
     state: BertBotState,
+    runtimeCapabilities: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
 ): String =
     """
     ${config.systemPrompt}
@@ -659,13 +660,15 @@ internal fun buildSystemPrompt(
     - enabled tools: ${renderStateListForSystemContext(config.enabledTools().map { definition -> definition.name })}
     - enabled sub-agents: ${renderStateListForSystemContext(config.enabledSubAgents().map { definition -> definition.id })}
     - configured but disabled sub-agents: ${renderStateListForSystemContext(config.subAgents.filterNot { definition -> definition.enabled }.map { definition -> definition.id })}
-    - google workspace mcp enabled: ${resolveGoogleWorkspaceRuntimeConfiguration().enabled}
+    - google workspace mcp configured: ${runtimeCapabilities.googleWorkspaceConfigured}
+    - google workspace mcp tool access available: ${runtimeCapabilities.googleWorkspaceToolAccessAvailable}
     - playwright capability advertised by enabled sub-agents: ${config.enabledSubAgents().any { definition -> definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) } }}
     - google workspace operator sub-agent enabled: ${config.enabledSubAgents().any { definition -> definition.id == "google_workspace_operator" }}
 
     Capability-answer policy:
     - If the user asks what you can access or do, answer from this runtime snapshot.
     - If a feature exists in config but is disabled, say it exists but is currently disabled.
+    - If Google Workspace is configured but tool access is unavailable, explicitly say the integration is currently unavailable and do not claim you can read calendar, Gmail, Drive, Docs, Sheets, Slides, or Chat right now.
     - Do not deny capabilities that are enabled in this snapshot.
 
     Graph state:
@@ -679,6 +682,7 @@ internal fun buildSystemPrompt(
 internal fun buildCapabilityStatusResponse(
     config: BertBotAgentConfig,
     userMessage: String,
+    runtimeCapabilities: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
 ): String? {
     val normalized = userMessage.lowercase()
     val isCapabilityQuestion =
@@ -696,7 +700,12 @@ internal fun buildCapabilityStatusResponse(
         return null
     }
 
-    val googleWorkspaceEnabled = resolveGoogleWorkspaceRuntimeConfiguration().enabled
+    val googleWorkspaceStatus =
+        when {
+            runtimeCapabilities.googleWorkspaceToolAccessAvailable -> "enabled"
+            runtimeCapabilities.googleWorkspaceConfigured -> "configured but unavailable"
+            else -> "disabled"
+        }
     val playwrightEnabled =
         config.enabledSubAgents().any { definition ->
             definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) }
@@ -714,13 +723,67 @@ internal fun buildCapabilityStatusResponse(
     return buildString {
         appendLine("Capability status snapshot:")
         appendLine("- workspace.read_file (repo documents): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
-        appendLine("- Google Workspace MCP: ${if (googleWorkspaceEnabled) "enabled" else "disabled"}")
+        appendLine("- Google Workspace MCP: $googleWorkspaceStatus")
         appendLine("- Playwright capability: ${if (playwrightEnabled) "enabled" else "disabled"}")
         appendLine()
         appendLine("Sub-agents:")
         append(subAgentLines)
     }.trim()
 }
+
+internal fun buildGoogleWorkspaceUnavailableResponse(
+    userMessage: String,
+    runtimeCapabilities: RuntimeCapabilitySnapshot,
+): String? {
+    if (!runtimeCapabilities.googleWorkspaceConfigured || runtimeCapabilities.googleWorkspaceToolAccessAvailable) {
+        return null
+    }
+
+    val normalized = userMessage.lowercase()
+    val looksLikeGoogleWorkspaceRequest =
+        listOf(
+            "google workspace",
+            "calendar",
+            "gmail",
+            "drive",
+            "google chat",
+            "docs",
+            "sheets",
+            "slides",
+        ).any { token -> normalized.contains(token) }
+
+    if (!looksLikeGoogleWorkspaceRequest) {
+        return null
+    }
+
+    return "Google Workspace is configured on this runtime, but the tool bridge is currently unavailable, so I can't access your Google Workspace data right now. Once that integration is available again, I can check your calendar or handle the related request."
+}
+
+internal data class RuntimeCapabilitySnapshot(
+    val googleWorkspaceConfigured: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
+    val googleWorkspaceToolAccessAvailable: Boolean = false,
+)
+
+internal fun summarizeMacrofactorAvailability(
+    configuration: MacrofactorRuntimeConfiguration,
+    router: MacrofactorToolRouter?,
+): String =
+    when {
+        !configuration.enabled -> "disabled"
+        !configuration.isConfigured -> "enabled but missing credentials"
+        router?.toolDefinitions()?.isNullOrEmpty() != false -> "configured but unavailable"
+        else -> "enabled"
+    }
+
+internal fun summarizeGoogleWorkspaceAvailability(
+    configuration: GoogleWorkspaceRuntimeConfiguration,
+    router: GoogleWorkspaceToolRouter?,
+): String =
+    when {
+        !configuration.enabled -> "disabled"
+        router?.toolDefinitions()?.isNullOrEmpty() != false -> "configured but unavailable"
+        else -> "enabled"
+    }
 
 internal data class AssistantResponseEnvelope(
     val response: String,
