@@ -19,6 +19,10 @@ WORKDIR /opt/bertbot
 RUN apt-get update \
  && apt-get install -y --no-install-recommends nodejs npm git \
  && npm install -g npm@11 \
+ && git clone --depth 1 --branch v0.0.8 https://github.com/gemini-cli-extensions/workspace.git /opt/google-workspace-extension \
+ && cd /opt/google-workspace-extension \
+ && npm install --no-audit --no-fund \
+ && npm run build --prefix workspace-server \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /workspace/build/install/PersonalAgent/lib ./lib

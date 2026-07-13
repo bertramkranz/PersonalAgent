@@ -71,7 +71,7 @@ $deployArgs = @(
     "--concurrency", "1",
     "--min-instances", "1",
     "--add-cloudsql-instances", $cloudSqlConnection,
-    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser,BERTBOT_GOOGLE_WORKSPACE_ENABLED=$($GoogleWorkspaceEnabled.ToString().ToLowerInvariant()),BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120"
+    "--set-env-vars", "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_STATE_JDBC_URL=$jdbcUrl,BERTBOT_STATE_JDBC_USER=$DatabaseUser,BERTBOT_GOOGLE_WORKSPACE_ENABLED=$($GoogleWorkspaceEnabled.ToString().ToLowerInvariant()),BERTBOT_GOOGLE_WORKSPACE_COMMAND=node,BERTBOT_GOOGLE_WORKSPACE_ARGS=/opt/google-workspace-extension/workspace-server/dist/index.js,BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120"
 )
 
 if ($AllowUnauthenticated) {
