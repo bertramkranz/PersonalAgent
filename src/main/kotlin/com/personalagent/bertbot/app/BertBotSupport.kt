@@ -682,16 +682,15 @@ internal fun buildCapabilityStatusResponse(
 ): String? {
     val normalized = userMessage.lowercase()
     val isCapabilityQuestion =
-        listOf(
-            "sub agent",
-            "sub-agent",
-            "subagents",
-            "capabilities",
-            "what can you access",
-            "playwright",
-            "google workspace",
-            "documents",
-        ).any { token -> normalized.contains(token) }
+        normalized.contains("capabilit") ||
+            normalized.contains("what can you access") ||
+            normalized.contains("sub-agent") ||
+            normalized.contains("sub agent") ||
+            normalized.contains("subagents") ||
+            (
+                listOf("playwright", "google workspace", "documents").any { token -> normalized.contains(token) } &&
+                    listOf("can you", "do you", "access", "enabled", "disabled").any { token -> normalized.contains(token) }
+            )
 
     if (!isCapabilityQuestion) {
         return null
