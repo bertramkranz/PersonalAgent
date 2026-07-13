@@ -29,10 +29,10 @@ naming:
 complexity:
   LongMethod:
     active: true
-    threshold: 80
+    threshold: 75
   TooManyFunctions:
     active: true
-    thresholdInFiles: 25
+    thresholdInFiles: 22
     thresholdInClasses: 20
     thresholdInInterfaces: 20
     thresholdInObjects: 20

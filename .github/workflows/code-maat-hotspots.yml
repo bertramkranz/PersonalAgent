@@ -1,0 +1,83 @@
+name: Code Maat Hotspots
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-maat-hotspots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code-maat-hotspots:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download Code Maat
+        run: |
+          curl -fsSL -o code-maat.jar "https://github.com/adamtornhill/code-maat/releases/download/v1.0.4/code-maat-1.0.4-standalone.jar"
+
+      - name: Generate repository log for analysis
+        run: |
+          set -euo pipefail
+          ANALYSIS_START="$(date -u -d '365 days ago' +%F)"
+          mkdir -p build/code-maat
+          git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' --no-renames --after="$ANALYSIS_START" -- src config build.gradle.kts settings.gradle.kts gradle.properties > build/code-maat/git-history.log
+          printf '%s' "$ANALYSIS_START" > build/code-maat/analysis-start.txt
+
+      - name: Run Code Maat analyses
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/reports/code-maat"
+          mkdir -p "$REPORT_DIR"
+
+          java -Djava.awt.headless=true -Xmx4g -jar code-maat.jar -l build/code-maat/git-history.log -c git2 -a summary > "$REPORT_DIR/summary.csv"
+          java -Djava.awt.headless=true -Xmx4g -jar code-maat.jar -l build/code-maat/git-history.log -c git2 -a entity-churn > "$REPORT_DIR/entity-churn.csv"
+          java -Djava.awt.headless=true -Xmx4g -jar code-maat.jar -l build/code-maat/git-history.log -c git2 -a coupling > "$REPORT_DIR/coupling.csv"
+          java -Djava.awt.headless=true -Xmx4g -jar code-maat.jar -l build/code-maat/git-history.log -c git2 -a authors > "$REPORT_DIR/authors.csv"
+
+      - name: Build hotspot summary
+        run: |
+          set -euo pipefail
+          REPORT_DIR="build/reports/code-maat"
+          ANALYSIS_START="$(cat build/code-maat/analysis-start.txt)"
+          {
+            echo "# Code Maat Hotspot Report"
+            echo
+            echo "Analysis window start: $ANALYSIS_START"
+            echo
+            echo "## Top Entity Churn"
+            echo
+            head -n 16 "$REPORT_DIR/entity-churn.csv"
+            echo
+            echo "## Top Logical Coupling"
+            echo
+            head -n 16 "$REPORT_DIR/coupling.csv"
+            echo
+            echo "## Summary"
+            echo
+            cat "$REPORT_DIR/summary.csv"
+          } > "$REPORT_DIR/README.md"
+
+      - name: Upload Code Maat reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: code-maat-hotspots
+          path: |
+            build/reports/code-maat/**
+          if-no-files-found: error

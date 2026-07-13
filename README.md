@@ -118,6 +118,14 @@ For the narrower test suite only:
 .\gradlew.bat test --no-daemon
 ```
 
+To generate local coverage reports:
+
+```bash
+.\gradlew.bat jacocoTestReport --no-daemon
+```
+
+JaCoCo HTML and XML reports are written under `build/reports/jacoco/` and are included in CI report artifacts.
+
 ## Extending BertBot
 
 To add a new capability:
