@@ -62,7 +62,6 @@ private fun buildTelegramInlineReply(reply: TelegramReplyPayload): String {
     obj.addProperty("method", "sendMessage")
     obj.addProperty("chat_id", reply.chatId)
     obj.addProperty("text", normalizeTelegramMarkdown(reply.text))
-    obj.addProperty("parse_mode", "Markdown")
     reply.replyToMessageId?.let { obj.addProperty("reply_to_message_id", it) }
     return obj.toString()
 }
