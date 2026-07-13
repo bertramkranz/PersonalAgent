@@ -1,0 +1,138 @@
+name: Deploy Cloud Run On Main
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-cloud-run-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build And Deploy Webhook
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_CLOUDSQL_INSTANCE: ${{ vars.GCP_CLOUDSQL_INSTANCE }}
+      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'bertbot-webhook' }}
+      BERTBOT_DB_NAME: ${{ vars.BERTBOT_DB_NAME || 'bertbot' }}
+      BERTBOT_DB_USER: ${{ vars.BERTBOT_DB_USER || 'bertbot' }}
+      AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
+      DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
+      TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
+      SLACK_SIGNING_SECRET_NAME: ${{ vars.SLACK_SIGNING_SECRET_NAME }}
+      WHATSAPP_APP_SECRET_NAME: ${{ vars.WHATSAPP_APP_SECRET_NAME }}
+      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars.WHATSAPP_VERIFY_TOKEN_SECRET_NAME }}
+      CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
+      CLOUD_RUN_ALLOW_UNAUTHENTICATED: ${{ vars.CLOUD_RUN_ALLOW_UNAUTHENTICATED || 'true' }}
+
+    steps:
+      - name: Validate required deployment vars
+        run: |
+          set -euo pipefail
+          required=(GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REGISTRY_REPO GCP_CLOUDSQL_INSTANCE)
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "Missing required repository variable: ${key}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push image
+        id: image
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${GITHUB_SHA}"
+          IMAGE_URI="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REGISTRY_REPO}/${CLOUD_RUN_SERVICE}:${IMAGE_TAG}"
+          docker build --tag "${IMAGE_URI}" .
+          docker push "${IMAGE_URI}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Cloud Run
+        run: |
+          set -euo pipefail
+
+          image_uri="${{ steps.image.outputs.image_uri }}"
+          cloudsql_conn="${GCP_PROJECT_ID}:${GCP_REGION}:${GCP_CLOUDSQL_INSTANCE}"
+          jdbc_url="jdbc:postgresql:///${BERTBOT_DB_NAME}?cloudSqlInstance=${cloudsql_conn}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+
+          secret_mappings=(
+            "BERTBOT_AI_API_KEY=${AI_API_KEY_SECRET_NAME}:latest"
+            "BERTBOT_STATE_JDBC_PASSWORD=${DB_PASSWORD_SECRET_NAME}:latest"
+            "BERTBOT_TELEGRAM_SECRET_TOKEN=${TELEGRAM_SECRET_TOKEN_SECRET_NAME}:latest"
+          )
+
+          if [ -n "${SLACK_SIGNING_SECRET_NAME:-}" ]; then
+            secret_mappings+=("BERTBOT_SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET_NAME}:latest")
+          fi
+
+          if [ -n "${WHATSAPP_APP_SECRET_NAME:-}" ]; then
+            secret_mappings+=("BERTBOT_WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET_NAME}:latest")
+          fi
+
+          if [ -n "${WHATSAPP_VERIFY_TOKEN_SECRET_NAME:-}" ]; then
+            secret_mappings+=("BERTBOT_WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN_SECRET_NAME}:latest")
+          fi
+
+          deploy_args=(
+            run deploy "${CLOUD_RUN_SERVICE}"
+            --image "${image_uri}"
+            --region "${GCP_REGION}"
+            --platform managed
+            --execution-environment gen2
+            --port 8088
+            --cpu 1
+            --memory 1Gi
+            --concurrency 1
+            --min-instances 1
+            --add-cloudsql-instances "${cloudsql_conn}"
+            --set-env-vars "BERTBOT_RUN_MODE=webhook,BERTBOT_STATE_STORE=postgres,BERTBOT_WEBHOOK_HOST=0.0.0.0,BERTBOT_WEBHOOK_PORT=8088,BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true,BERTBOT_INGESTION_REQUIRE_APPROVAL=false,BERTBOT_STATE_JDBC_URL=${jdbc_url},BERTBOT_STATE_JDBC_USER=${BERTBOT_DB_USER}"
+            --set-secrets "$(IFS=,; echo "${secret_mappings[*]}")"
+          )
+
+          if [ "${CLOUD_RUN_ALLOW_UNAUTHENTICATED}" = "true" ]; then
+            deploy_args+=(--allow-unauthenticated)
+          fi
+
+          if [ -n "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT:-}" ]; then
+            deploy_args+=(--service-account "${CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT}")
+          fi
+
+          gcloud "${deploy_args[@]}"
+
+      - name: Show deployed URL
+        run: |
+          gcloud run services describe "${CLOUD_RUN_SERVICE}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)'

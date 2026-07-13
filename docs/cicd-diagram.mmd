@@ -22,6 +22,7 @@ flowchart TD
 
     %% ── CD ────────────────────────────────────────────────────────────────────
     MAIN([main branch])
+    DEPLOY_MAIN["deploy-cloud-run-main.yml\nBuild + push image\nDeploy Cloud Run webhook\n\nTrigger:\n  • workflow_run: CI completed on main (success)\n  • workflow_dispatch"]
     CD["cd.yml\nBuilds distZip / distTar\nPublishes GitHub Release\n(triggered by 'v*' tag push)"]
     RELEASE([GitHub Release\nwith build artifacts])
 
@@ -34,6 +35,7 @@ flowchart TD
 
     MERGE -->|squash merge| MAIN
 
+    MAIN -->|CI success on merge commit| DEPLOY_MAIN
     MAIN -->|git tag v*| CD
     CD --> RELEASE
 
@@ -42,7 +44,7 @@ flowchart TD
     classDef actor    fill:#161b22,stroke:#30363d,color:#79c0ff,shape:stadium
     classDef external fill:#161b22,stroke:#238636,color:#3fb950,shape:stadium
 
-    class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,CD workflow
+    class AUTO_PR,CI_JOB,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,CD workflow
     class DEV,DEP actor
     class MAIN,RELEASE external
 ```

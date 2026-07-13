@@ -18,6 +18,22 @@ See [configuration.md](configuration.md) for environment-variable details and [r
 
 Use [../scripts/deploy-cloud-run.ps1](../scripts/deploy-cloud-run.ps1) to deploy the public webhook service.
 
+For automated deploys after a branch is merged to `main`, use [../.github/workflows/deploy-cloud-run-main.yml](../.github/workflows/deploy-cloud-run-main.yml).
+
+For a one-command idempotent setup (provision resources, optionally capture secrets, build image, and deploy), use [../scripts/bootstrap-cloud-run.ps1](../scripts/bootstrap-cloud-run.ps1).
+
+Example using this workspace's detected project and region:
+
+```powershell
+.\scripts\bootstrap-cloud-run.ps1 `
+  -ProjectId "personal-agent-502221" `
+  -Region "europe-west2" `
+  -ArtifactRegistryRepo "bertbot" `
+  -CloudSqlInstance "bertbot-postgres" `
+  -CreateSecrets `
+  -AllowUnauthenticated
+```
+
 Example:
 
 ```powershell
@@ -37,6 +53,50 @@ The script expects the image to already exist in Artifact Registry. It deploys w
 - `BERTBOT_WEBHOOK_HOST=0.0.0.0`
 - `BERTBOT_WEBHOOK_PORT=8088`
 - `BERTBOT_STATE_JDBC_URL=jdbc:postgresql:///bertbot?cloudSqlInstance=PROJECT:REGION:INSTANCE&socketFactory=com.google.cloud.sql.postgres.SocketFactory`
+
+### GitHub Actions Auto Deploy (Main -> Cloud Run)
+
+The workflow [../.github/workflows/deploy-cloud-run-main.yml](../.github/workflows/deploy-cloud-run-main.yml) provides a continuous deployment path for production webhook hosting:
+
+- Trigger 1: automatically after [../.github/workflows/ci.yml](../.github/workflows/ci.yml) completes successfully on `main`.
+- Trigger 2: manual `workflow_dispatch` for controlled redeploys.
+- Build step: builds and pushes image tagged with the merge commit SHA.
+- Deploy step: updates Cloud Run with hardened webhook defaults.
+
+Default deploy settings in workflow:
+
+- `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`
+- `BERTBOT_INGESTION_REQUIRE_APPROVAL=false`
+- Cloud SQL Postgres socket-factory JDBC wiring
+- Secret Manager mappings for AI key, DB password, and Telegram secret token
+
+Required GitHub repository secrets:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_DEPLOYER_SERVICE_ACCOUNT`
+
+Required GitHub repository variables:
+
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `GCP_ARTIFACT_REGISTRY_REPO`
+- `GCP_CLOUDSQL_INSTANCE`
+
+Optional GitHub repository variables:
+
+- `CLOUD_RUN_SERVICE` (default `bertbot-webhook`)
+- `BERTBOT_DB_NAME` (default `bertbot`)
+- `BERTBOT_DB_USER` (default `bertbot`)
+- `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
+- `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
+- `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
+- `SLACK_SIGNING_SECRET_NAME`
+- `WHATSAPP_APP_SECRET_NAME`
+- `WHATSAPP_VERIFY_TOKEN_SECRET_NAME`
+- `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT`
+- `CLOUD_RUN_ALLOW_UNAUTHENTICATED` (default `true`)
+
+The deployer identity (configured in `GCP_DEPLOYER_SERVICE_ACCOUNT`) needs IAM permissions for Artifact Registry push, Cloud Run deploy/update, and service usage needed by the deployment command. The Cloud Run runtime service account needs Secret Manager accessor and Cloud SQL client permissions for runtime access.
 
 ### Cloud SQL Setup
 

@@ -6,6 +6,7 @@ This repository includes GitHub workflow automation for merge guardrails, secret
 
 - `.github/workflows/bootstrap-repo-guardrails.yml`: ensures repository guardrails such as the `auto-merge` label exist.
 - `.github/workflows/merge-generated-prs-on-green.yml`: approves and enables GitHub native auto-merge for eligible pull requests when required checks pass.
+- `.github/workflows/deploy-cloud-run-main.yml`: builds and deploys the webhook service to Cloud Run after CI succeeds on `main` (also supports manual dispatch).
 - `.github/workflows/secret-scan.yml`: scans pushes and pull requests for leaked secrets and uploads SARIF findings.
 
 ## Generated PR Merge Automation
@@ -74,3 +75,13 @@ To trigger a release after publishing:
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+## Main Branch Deployment Trigger
+
+Cloud deployment is now decoupled from release tagging:
+
+- Merge to `main` -> CI runs on the merge commit.
+- When CI completes successfully, `.github/workflows/deploy-cloud-run-main.yml` deploys Cloud Run from that same commit SHA.
+- You can also run the deploy workflow manually with `workflow_dispatch`.
+
+This allows a standard branch -> PR -> merge -> deploy path while keeping tag-driven GitHub Releases in `.github/workflows/cd.yml`.
