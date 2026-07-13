@@ -61,7 +61,7 @@ jobs:
 
           if [[ "$KOOG_RUNTIME_CHANGED" == "true" && "$KOOG_TESTS_CHANGED" != "true" ]]; then
             echo "Koog runtime/config changed without matching Koog integration/config tests update."
-            echo "Update Koog tests (Koog*Test, AiRuntimeConfigurationTest, CapabilityStatusResponseTest, or SystemPromptBuilderTest) or adjust the change."
+            echo "Update one of: src/test/kotlin/com/personalagent/bertbot/app/Koog*Test.kt, src/test/kotlin/com/personalagent/bertbot/app/AiRuntimeConfigurationTest.kt, src/test/kotlin/com/personalagent/bertbot/app/CapabilityStatusResponseTest.kt, or src/test/kotlin/com/personalagent/bertbot/app/SystemPromptBuilderTest.kt."
             exit 1
           fi
 
