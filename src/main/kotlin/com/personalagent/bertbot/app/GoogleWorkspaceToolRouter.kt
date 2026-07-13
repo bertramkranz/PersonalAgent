@@ -128,7 +128,7 @@ private class StdioGoogleWorkspaceMcpTransport(
             if (isError) {
                 logger.log(
                     Level.WARNING,
-                    "Google Workspace MCP tools/call error for '$toolName': ${text.take(800)}"
+                    "Google Workspace MCP tools/call error for '$toolName': ${text.take(800)}",
                 )
             }
             isError to text
@@ -248,7 +248,7 @@ private class StdioGoogleWorkspaceMcpTransport(
                             val line = reader.readLine()
                             if (line == null) {
                                 error(
-                                    "Google Workspace MCP process terminated before responding. recentOutput=${formatRecentOutput()}"
+                                    "Google Workspace MCP process terminated before responding. recentOutput=${formatRecentOutput()}",
                                 )
                             }
                             val json = parseJsonObject(line) ?: continue
