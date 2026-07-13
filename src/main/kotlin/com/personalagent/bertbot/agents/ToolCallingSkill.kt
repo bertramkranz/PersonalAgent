@@ -8,6 +8,10 @@ import com.personalagent.bertbot.graph.runtime.TracingContext
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 internal class ToolCallingSkill(
     private val llmGateway: LlmGateway,
@@ -233,9 +237,9 @@ internal class ToolCallingSkill(
         if (events.isEmpty()) return "No events found."
 
         return buildString {
-            appendLine("📅 Calendar Events:")
+            appendLine("📅 Calendar Events (${events.size}):")
             appendLine()
-            events.forEach { event ->
+            events.forEachIndexed { index, event ->
                 val summary = event.get("summary")?.asString ?: "Untitled"
                 val start =
                     event.get("start")?.asJsonObject?.get("dateTime")?.asString
@@ -245,13 +249,14 @@ internal class ToolCallingSkill(
                     event.get("end")?.asJsonObject?.get("dateTime")?.asString
                         ?: event.get("end")?.asJsonObject?.get("date")?.asString
                         ?: ""
-                val description =
-                    event.get("description")?.asString?.take(100)?.let { " - $it" } ?: ""
+                val description = event.get("description")?.asString?.trim().orEmpty()
+                val location = event.get("location")?.asString?.trim().orEmpty()
 
-                appendLine("• $summary")
-                appendLine("  Start: $start")
-                if (end.isNotBlank()) appendLine("  End: $end")
-                if (description.isNotBlank()) appendLine("  Details:$description")
+                appendLine("${index + 1}. $summary")
+                appendLine("   When: ${prettyDateTime(start)}")
+                if (end.isNotBlank()) appendLine("   Ends: ${prettyDateTime(end)}")
+                if (location.isNotBlank()) appendLine("   Where: ${location.take(120)}")
+                if (description.isNotBlank()) appendLine("   Details: ${description.take(160)}")
                 appendLine()
             }
         }
@@ -262,18 +267,44 @@ internal class ToolCallingSkill(
         if (calendars.isEmpty()) return "No calendars found."
 
         return buildString {
-            appendLine("📋 Your Calendars:")
+            appendLine("📋 Your Calendars (${calendars.size}):")
             appendLine()
-            calendars.forEach { cal ->
+            calendars.forEachIndexed { index, cal ->
                 val id = cal.get("id")?.asString ?: "unknown"
                 val summary = cal.get("summary")?.asString ?: "Unnamed"
                 val isPrimary = cal.get("primary")?.asBoolean ?: false
                 val badge = if (isPrimary) " (Primary)" else ""
-                appendLine("• $summary$badge")
-                if (id != "unknown") appendLine("  ID: $id")
+                appendLine("${index + 1}. $summary$badge")
+                if (id != "unknown") appendLine("   ID: $id")
                 appendLine()
             }
         }
+    }
+
+    private fun prettyDateTime(value: String): String {
+        val trimmed = value.trim()
+        if (trimmed.isBlank()) return "Unknown time"
+
+        val parsedInstant =
+            runCatching { Instant.parse(trimmed) }
+                .map { instant ->
+                    DateTimeFormatter
+                        .ofPattern("EEE, MMM d yyyy HH:mm 'UTC'")
+                        .withZone(ZoneOffset.UTC)
+                        .format(instant)
+                }.getOrNull()
+        if (parsedInstant != null) return parsedInstant
+
+        val parsedDate =
+            runCatching { LocalDate.parse(trimmed) }
+                .map { date ->
+                    DateTimeFormatter
+                        .ofPattern("EEE, MMM d yyyy")
+                        .format(date)
+                }.getOrNull()
+        if (parsedDate != null) return "$parsedDate (all day)"
+
+        return trimmed
     }
 
     private fun formatGenericJson(json: JsonObject): String {

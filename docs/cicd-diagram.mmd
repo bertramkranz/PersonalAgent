@@ -1,5 +1,6 @@
 ```mermaid
 flowchart TD
+    %% 2026-07-13: deploy-cloud-run-main workflow now builds Cloud Run env vars via shell arrays for safer YAML maintenance.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
     DEP([Dependabot opens\na dependency PR])
