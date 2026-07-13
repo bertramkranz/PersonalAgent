@@ -128,8 +128,8 @@ class ToolCallingSkillTest {
         val response = skill.invoke("System", "User question", TracingContext())
 
         assertContains(response, "Calendar Events")
-        assertContains(response, "Team Sync")
-        assertContains(response, "Start: 2026-07-12T10:00:00Z")
+        assertContains(response, "1. Team Sync")
+        assertContains(response, "When: Sun, Jul 12 2026 10:00 UTC")
     }
 
     @Test
@@ -155,7 +155,7 @@ class ToolCallingSkillTest {
         val response = skill.invoke("System", "User question", TracingContext())
 
         assertContains(response, "Your Calendars")
-        assertContains(response, "Personal")
+        assertContains(response, "1. Personal")
         assertContains(response, "Primary")
     }
 

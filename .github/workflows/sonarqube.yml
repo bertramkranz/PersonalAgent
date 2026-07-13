@@ -1,0 +1,17 @@
+name: SonarQube Local Guidance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-sonarqube:
+    name: Local SonarQube Instructions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain local-only usage
+        run: |
+          echo "SonarQube runs locally for this repository."
+          echo "Use docker-compose.sonarqube.yml and scripts/sonarqube-local.ps1 from your workstation."
