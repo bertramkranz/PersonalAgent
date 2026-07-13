@@ -676,6 +676,53 @@ internal fun buildSystemPrompt(
     - selected sub-agent: "${escapeForSystemContext(state.selectedSubAgent ?: "none")}"
     """.trimIndent()
 
+internal fun buildCapabilityStatusResponse(
+    config: BertBotAgentConfig,
+    userMessage: String,
+): String? {
+    val normalized = userMessage.lowercase()
+    val isCapabilityQuestion =
+        listOf(
+            "sub agent",
+            "sub-agent",
+            "subagents",
+            "capabilities",
+            "what can you access",
+            "playwright",
+            "google workspace",
+            "documents",
+        ).any { token -> normalized.contains(token) }
+
+    if (!isCapabilityQuestion) {
+        return null
+    }
+
+    val googleWorkspaceEnabled = resolveGoogleWorkspaceRuntimeConfiguration().enabled
+    val playwrightEnabled =
+        config.enabledSubAgents().any { definition ->
+            definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) }
+        }
+    val workspaceReadEnabled = config.enabledTools().any { definition -> definition.name == "workspace.read_file" }
+
+    val subAgentLines =
+        config.subAgents
+            .sortedBy { definition -> definition.id }
+            .joinToString("\n") { definition ->
+                val status = if (definition.enabled) "enabled" else "disabled"
+                "- ${definition.id}: $status"
+            }
+
+    return buildString {
+        appendLine("Capability status snapshot:")
+        appendLine("- workspace.read_file (repo documents): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
+        appendLine("- Google Workspace MCP: ${if (googleWorkspaceEnabled) "enabled" else "disabled"}")
+        appendLine("- Playwright capability: ${if (playwrightEnabled) "enabled" else "disabled"}")
+        appendLine()
+        appendLine("Sub-agents:")
+        append(subAgentLines)
+    }.trim()
+}
+
 internal data class AssistantResponseEnvelope(
     val response: String,
 )
