@@ -92,4 +92,98 @@ class UserProfileStoreTest {
         assertTrue(interests.contains("interest-0-0"))
         assertTrue(file.readText().contains("\"stableInterests\""))
     }
+
+    @Test
+    fun `legacy profile JSON without shopping fields loads with defaults`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.deleteOnExit()
+        file.writeText("""{"displayName":"Legacy User","recurringPreferences":["updates"],"communicationStyleHints":[],"stableInterests":["kotlin"]}""")
+
+        val store = UserProfileStore(file)
+        val profile = store.current()
+
+        assertEquals("Legacy User", profile.displayName)
+        assertTrue(profile.recurringPreferences.contains("updates"))
+        assertTrue(profile.stableInterests.contains("kotlin"))
+        assertTrue(profile.preferredBrands.isEmpty())
+        assertTrue(profile.preferredSizes.isEmpty())
+        assertTrue(profile.preferredStores.isEmpty())
+        assertEquals(null, profile.budgetLimitCents)
+        assertTrue(profile.shoppingNotes.isEmpty())
+    }
+
+    @Test
+    fun `store persists shopping preference fields`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val store = UserProfileStore(file)
+        store.addPreferredBrand("Nike")
+        store.addPreferredSize("M")
+        store.addPreferredStore("Amazon")
+        store.setShoppingBudgetCents(10000)
+        store.addShoppingNote("prefer eco-friendly packaging")
+
+        val reloaded = UserProfileStore(file)
+        val profile = reloaded.current()
+
+        assertTrue(profile.preferredBrands.contains("Nike"))
+        assertTrue(profile.preferredSizes.contains("M"))
+        assertTrue(profile.preferredStores.contains("Amazon"))
+        assertEquals(10000L, profile.budgetLimitCents)
+        assertTrue(profile.shoppingNotes.contains("prefer eco-friendly packaging"))
+    }
+
+    @Test
+    fun `shopping fields normalize and deduplicate`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val store = UserProfileStore(file)
+        store.addPreferredBrand("  Nike  ")
+        store.addPreferredBrand("Nike")
+        store.addPreferredBrand("  Nike.  ")
+        store.addPreferredStore("Amazon")
+        store.addPreferredStore("amazon")
+
+        val profile = store.current()
+
+        assertEquals(1, profile.preferredBrands.size)
+        assertTrue(profile.preferredBrands.contains("Nike"))
+        assertEquals(2, profile.preferredStores.size)
+        assertTrue(profile.preferredStores.contains("Amazon"))
+        assertTrue(profile.preferredStores.contains("amazon"))
+    }
+
+    @Test
+    fun `shopping updates preserve unrelated profile data`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val store = UserProfileStore(file)
+        store.updateDisplayName("Bertram Kranz")
+        store.addStableInterest("kotlin")
+        store.addPreferredBrand("Nike")
+
+        val profile = store.current()
+
+        assertEquals("Bertram Kranz", profile.displayName)
+        assertTrue(profile.stableInterests.contains("kotlin"))
+        assertTrue(profile.preferredBrands.contains("Nike"))
+    }
+
+    @Test
+    fun `negative budget is ignored`() {
+        val file = File.createTempFile("bertbot-profile", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val store = UserProfileStore(file)
+        store.setShoppingBudgetCents(-100)
+
+        assertEquals(null, store.current().budgetLimitCents)
+    }
 }

@@ -74,6 +74,18 @@ MacroFactor MCP proxy:
 | `BERTBOT_MACROFACTOR_EXPECTED_TOOL` | Optional `tools/list` assertion target |
 | `BERTBOT_MACROFACTOR_EXPECTED_ARG` | Optional schema assertion key |
 
+Shopping store configuration (supports up to 9 numbered stores; replace `N` with 1–9):
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_SHOPPING_STORE_N_ENABLED` | Enable this shopping store slot | Required to activate the slot; default `false` |
+| `BERTBOT_SHOPPING_STORE_N_MODE` | Operating mode for the store | e.g. `browse`; default `browse` |
+| `BERTBOT_SHOPPING_STORE_N_PRIORITY` | Sort priority (lower = higher precedence) | Default `100` |
+| `BERTBOT_SHOPPING_STORE_N_REGION` | Region code for locale-aware queries | e.g. `us`; optional |
+| `BERTBOT_SHOPPING_STORE_N_CURRENCY` | Currency code for price display | e.g. `usd`; optional |
+
+Enabling the `personal_shopper` sub-agent without at least one store slot set to `ENABLED=true` causes startup to fail with a clear error message. Shopping actions that modify state (cart, order) always require explicit user confirmation; autonomous final checkout is never performed.
+
 Playwright browser store adapter:
 
 The Playwright store adapter is **disabled by default**. It adds an optional browser-automation fallback for external stores where the API is missing or unstable.
