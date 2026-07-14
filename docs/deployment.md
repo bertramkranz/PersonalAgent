@@ -90,6 +90,7 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
+- `TELEGRAM_BOT_TOKEN_SECRET_NAME` (default empty; set only when Telegram bot token integration is enabled)
 - `SLACK_SIGNING_SECRET_NAME` (default empty; set only when Slack integration is enabled)
 - `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
