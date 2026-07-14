@@ -260,6 +260,47 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `google workspace configuration defaults are applied`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_COMMAND, configuration.command)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_ARGS, configuration.args)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS, configuration.timeoutSeconds)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX, configuration.toolNamePrefix)
+    }
+
+    @Test
+    fun `google workspace configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_ENABLED" to "true",
+                        "BERTBOT_GOOGLE_WORKSPACE_COMMAND" to "node",
+                        "BERTBOT_GOOGLE_WORKSPACE_ARGS" to "workspace.js,--stdio",
+                        "BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS" to "120",
+                        "BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX" to "gw_",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_ENABLED" to "false",
+                        "BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX" to "dotenv_",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals("node", configuration.command)
+        assertEquals(listOf("workspace.js", "--stdio"), configuration.args)
+        assertEquals(120, configuration.timeoutSeconds)
+        assertEquals("gw_", configuration.toolNamePrefix)
+    }
+
+    @Test
     fun `research runtime overrides prefer environment values`() {
         val config =
             applyResearchRuntimeOverrides(
