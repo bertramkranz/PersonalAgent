@@ -42,16 +42,24 @@ private class HttpExternalChatFollowupSender(
 
     override fun sendTelegram(reply: TelegramReplyPayload) {
         val token = config.telegramBotToken ?: return
-        val payload =
+        val endpoint = "${config.telegramApiBaseUrl.trimEnd('/')}/bot$token/sendMessage"
+        val firstPayload =
             JsonObject().apply {
                 addProperty("chat_id", reply.chatId)
                 addProperty("text", reply.text)
                 reply.replyToMessageId?.let { addProperty("reply_to_message_id", it) }
             }
-        postJson(
-            url = "https://api.telegram.org/bot$token/sendMessage",
-            json = payload.toString(),
-        )
+        val firstStatus = postJson(url = endpoint, json = firstPayload.toString())
+        val shouldRetryWithoutReplyTarget = reply.replyToMessageId != null && (firstStatus == null || firstStatus !in 200..299)
+        if (shouldRetryWithoutReplyTarget) {
+            logger.warning("Telegram follow-up send failed with reply_to_message_id; retrying without reply target")
+            val retryPayload =
+                JsonObject().apply {
+                    addProperty("chat_id", reply.chatId)
+                    addProperty("text", reply.text)
+                }
+            postJson(url = endpoint, json = retryPayload.toString())
+        }
     }
 
     override fun sendSlack(reply: SlackReplyPayload) {
@@ -122,7 +130,7 @@ private class HttpExternalChatFollowupSender(
         bearerToken: String? = null,
         authorizationHeader: String? = null,
         authorizationScheme: String = "Bearer",
-    ) {
+    ): Int? {
         val builder =
             HttpRequest
                 .newBuilder(URI.create(url))
@@ -136,7 +144,7 @@ private class HttpExternalChatFollowupSender(
                     ?.let { "$authorizationScheme $it" }
         resolvedAuthorizationHeader?.let { builder.header("Authorization", it) }
 
-        runCatching {
+        return runCatching {
             client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
         }.onSuccess { response ->
             if (response.statusCode() !in 200..299) {
@@ -144,6 +152,6 @@ private class HttpExternalChatFollowupSender(
             }
         }.onFailure { error ->
             logger.warning("External follow-up send failed: url=$url error=${error.message}")
-        }
+        }.getOrNull()?.statusCode()
     }
 }

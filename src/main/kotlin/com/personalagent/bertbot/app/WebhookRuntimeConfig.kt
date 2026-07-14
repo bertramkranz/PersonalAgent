@@ -107,6 +107,7 @@ internal fun resolveExternalChatFollowupRuntimeConfig(
     fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
     return ExternalChatFollowupRuntimeConfig(
         telegramBotToken = env("BERTBOT_TELEGRAM_BOT_TOKEN")?.takeIf { it.isNotBlank() },
+        telegramApiBaseUrl = env("BERTBOT_TELEGRAM_API_BASE_URL")?.takeIf { it.isNotBlank() } ?: "https://api.telegram.org",
         slackBotToken = env("BERTBOT_SLACK_BOT_TOKEN")?.takeIf { it.isNotBlank() },
         whatsAppAccessToken = env("BERTBOT_WHATSAPP_ACCESS_TOKEN")?.takeIf { it.isNotBlank() },
         whatsAppApiVersion = env("BERTBOT_WHATSAPP_API_VERSION")?.takeIf { it.isNotBlank() } ?: "v22.0",

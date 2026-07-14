@@ -145,6 +145,7 @@ class WebhookMainTest {
                 environment =
                     mapOf(
                         "BERTBOT_TELEGRAM_BOT_TOKEN" to "telegram-token",
+                        "BERTBOT_TELEGRAM_API_BASE_URL" to "http://127.0.0.1:18088",
                         "BERTBOT_SLACK_BOT_TOKEN" to "slack-token",
                         "BERTBOT_WHATSAPP_ACCESS_TOKEN" to "wa-token",
                         "BERTBOT_WHATSAPP_API_VERSION" to "v23.0",
@@ -154,10 +155,22 @@ class WebhookMainTest {
             )
 
         assertEquals("telegram-token", config.telegramBotToken)
+        assertEquals("http://127.0.0.1:18088", config.telegramApiBaseUrl)
         assertEquals("slack-token", config.slackBotToken)
         assertEquals("wa-token", config.whatsAppAccessToken)
         assertEquals("v23.0", config.whatsAppApiVersion)
         assertEquals("discord-token", config.discordBotToken)
+    }
+
+    @Test
+    fun `resolve external chat followup config uses default telegram api base url`() {
+        val config =
+            resolveExternalChatFollowupRuntimeConfig(
+                environment = mapOf("BERTBOT_TELEGRAM_BOT_TOKEN" to "telegram-token"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals("https://api.telegram.org", config.telegramApiBaseUrl)
     }
 
     @Test
