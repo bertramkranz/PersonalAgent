@@ -94,7 +94,7 @@ class ExternalChatPayloadDispatcherTest {
     }
 
     @Test
-    fun `dispatcher returns macrofactor tool-path response for telegram webhook`() {
+    fun `dispatcher returns macrofactor missing credentials response for telegram webhook`() {
         val macrofactorRouter =
             MacrofactorToolRouter(
                 runtimeConfiguration =
