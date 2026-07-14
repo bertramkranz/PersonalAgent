@@ -6,6 +6,7 @@ flowchart TD
     %% 2026-07-13: Optional secret-name vars support a 'disabled' sentinel to intentionally skip validation and secret injection.
     %% 2026-07-14: codeql.yml build step now uses --no-build-cache so the Kotlin compiler is always invoked and CodeQL can intercept compilation.
     %% 2026-07-14: deploy-cloud-run-main supports optional TELEGRAM_BOT_TOKEN_SECRET_NAME and injects BERTBOT_TELEGRAM_BOT_TOKEN only when configured.
+    %% 2026-07-14: deploy-cloud-run-main now defaults TELEGRAM_BOT_TOKEN_SECRET_NAME and deploys Cloud Run with --no-cpu-throttling to keep async follow-up execution responsive.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
     DEP([Dependabot opens\na dependency PR])

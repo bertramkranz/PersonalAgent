@@ -12,6 +12,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.logging.Logger
 
 internal fun createWebhookFollowupSender(config: ExternalChatFollowupRuntimeConfig): ExternalChatFollowupSender {
     if (!hasAnyFollowupCredential(config)) {
@@ -29,6 +30,8 @@ private class HttpExternalChatFollowupSender(
     private val config: ExternalChatFollowupRuntimeConfig,
     private val client: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(),
 ) : ExternalChatFollowupSender {
+    private val logger = Logger.getLogger(HttpExternalChatFollowupSender::class.java.name)
+
     override fun canSendTelegram(): Boolean = !config.telegramBotToken.isNullOrBlank()
 
     override fun canSendSlack(): Boolean = !config.slackBotToken.isNullOrBlank()
@@ -134,7 +137,13 @@ private class HttpExternalChatFollowupSender(
         resolvedAuthorizationHeader?.let { builder.header("Authorization", it) }
 
         runCatching {
-            client.send(builder.build(), HttpResponse.BodyHandlers.discarding())
+            client.send(builder.build(), HttpResponse.BodyHandlers.ofString())
+        }.onSuccess { response ->
+            if (response.statusCode() !in 200..299) {
+                logger.warning("External follow-up send failed: status=${response.statusCode()} url=$url body=${response.body()}")
+            }
+        }.onFailure { error ->
+            logger.warning("External follow-up send failed: url=$url error=${error.message}")
         }
     }
 }

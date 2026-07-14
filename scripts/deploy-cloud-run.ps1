@@ -71,6 +71,7 @@ $deployArgs = @(
     "--execution-environment", "gen2",
     "--port", "8088",
     "--cpu", "1",
+    "--no-cpu-throttling",
     "--memory", "1Gi",
     "--concurrency", "1",
     "--min-instances", "1",
