@@ -61,7 +61,11 @@ internal class ToolCallingSkill(
             when {
                 action == null -> {
                     TraceLogger.warn(tracingContext, "tool_calling_parse_failed", "iteration=$iteration")
-                    return raw.trim()
+                    return forceFinalResponse(
+                        augmentedSystemPrompt = augmentedSystemPrompt,
+                        userPrompt = userPrompt,
+                        toolResults = toolResults,
+                    )
                 }
                 action.isRespond -> {
                     TraceLogger.skillCompleted(tracingContext, "skill=tool_calling iterations=$iteration")
@@ -105,10 +109,28 @@ internal class ToolCallingSkill(
                 appendLine("Return ONLY valid JSON using one of these exact shapes:")
                 appendLine("{\"action\":\"call_tool\",\"tool\":\"<tool_name>\",\"arguments\":{...}}")
                 appendLine("{\"action\":\"respond\",\"response\":\"<your answer>\"}")
+                appendLine("Do NOT return delegate/broadcast/internal orchestration actions.")
             }
 
         val retryRaw = llmGateway.complete(augmentedSystemPrompt, recoveryPrompt)
         return parseActionResponse(retryRaw)
+    }
+
+    private fun forceFinalResponse(
+        augmentedSystemPrompt: String,
+        userPrompt: String,
+        toolResults: List<Pair<String, String>>,
+    ): String {
+        val forcedPrompt =
+            buildString {
+                appendLine(buildUserPrompt(userPrompt, toolResults))
+                appendLine()
+                appendLine("Your previous replies did not follow the required action JSON schema.")
+                appendLine("Now provide ONLY the final user-facing answer in plain text.")
+                appendLine("Do not output JSON.")
+                appendLine("Do not mention internal delegation, sub-agents, or background execution.")
+            }
+        return llmGateway.complete(augmentedSystemPrompt, forcedPrompt).trim()
     }
 
     private fun sanitizeResultPreview(result: String): String {
@@ -313,9 +335,10 @@ internal class ToolCallingSkill(
     }
 
     private fun parseActionResponse(raw: String): ToolAction? {
+        val normalized = extractJsonObjectCandidate(raw)
         val payload =
             runCatching {
-                codec.decode(structuredOutputGateway.parse(raw).toString(), ToolActionEnvelope::class.java)
+                codec.decode(structuredOutputGateway.parse(normalized).toString(), ToolActionEnvelope::class.java)
             }.getOrNull() ?: return null
 
         return runCatching {
@@ -334,6 +357,54 @@ internal class ToolCallingSkill(
                 else -> null
             }
         }.getOrNull()
+    }
+
+    private fun extractJsonObjectCandidate(raw: String): String {
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            return trimmed
+        }
+
+        return findFirstJsonObject(trimmed) ?: trimmed
+    }
+
+    private fun findFirstJsonObject(text: String): String? {
+        val start = text.indexOf('{')
+        if (start < 0) {
+            return null
+        }
+
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (index in start until text.length) {
+            val ch = text[index]
+            if (escaped) {
+                escaped = false
+                continue
+            }
+            if (ch == '\\') {
+                escaped = true
+                continue
+            }
+            if (ch == '"') {
+                inString = !inString
+                continue
+            }
+            if (inString) {
+                continue
+            }
+            when (ch) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) {
+                        return text.substring(start, index + 1)
+                    }
+                }
+            }
+        }
+        return null
     }
 }
 

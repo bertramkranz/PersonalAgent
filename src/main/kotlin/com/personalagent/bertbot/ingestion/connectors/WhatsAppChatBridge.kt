@@ -13,6 +13,6 @@ class WhatsAppChatBridge(
         val inbound = WhatsAppNormalizer.normalize(payload)
         val outcome = responder(inbound, dryRun)
         val outbound = outcome.outbound ?: return null
-        return OutboundMappers.toWhatsApp(outbound)
+        return OutboundMappers.toWhatsApp(outbound).copy(toPhoneNumber = inbound.senderId)
     }
 }

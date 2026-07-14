@@ -96,13 +96,43 @@ class ToolCallingSkillTest {
     }
 
     @Test
-    fun `falls back to raw output when parse fails`() {
-        val gateway = SequenceLlmGateway(listOf("This is not valid JSON"))
+    fun `falls back to plain final response when parse fails`() {
+        val gateway = SequenceLlmGateway(listOf("This is not valid JSON", "Still invalid", "Fallback final answer"))
         val skill = ToolCallingSkill(gateway, emptyList(), { _, _ -> "unused" })
 
         val response = skill.invoke("System", "User question", TracingContext())
 
-        assertEquals("This is not valid JSON", response)
+        assertEquals("Fallback final answer", response)
+        assertEquals(3, gateway.callCount)
+    }
+
+    @Test
+    fun `parses valid action json surrounded by prose`() {
+        val gateway = SequenceLlmGateway(listOf("I will do that now.\n\n{\"action\":\"respond\",\"response\":\"Hello from wrapped JSON\"}"))
+        val skill = ToolCallingSkill(gateway, emptyList(), { _, _ -> "unused" })
+
+        val response = skill.invoke("System", "User question", TracingContext())
+
+        assertEquals("Hello from wrapped JSON", response)
+        assertEquals(1, gateway.callCount)
+    }
+
+    @Test
+    fun `forces plain final response when model keeps emitting unsupported actions`() {
+        val gateway =
+            SequenceLlmGateway(
+                listOf(
+                    "I'll delegate this.\n\n{\"action\":\"delegate\",\"agent\":\"polymarket_analyst\"}",
+                    "{\"action\":\"delegate\",\"agent\":\"polymarket_analyst\"}",
+                    "I couldn't complete that right now. Please try again in a moment.",
+                ),
+            )
+        val skill = ToolCallingSkill(gateway, emptyList(), { _, _ -> "unused" })
+
+        val response = skill.invoke("System", "User question", TracingContext())
+
+        assertEquals("I couldn't complete that right now. Please try again in a moment.", response)
+        assertEquals(3, gateway.callCount)
     }
 
     @Test

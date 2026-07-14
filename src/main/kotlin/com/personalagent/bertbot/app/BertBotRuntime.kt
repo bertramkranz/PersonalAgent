@@ -24,7 +24,9 @@ import com.personalagent.bertbot.ingestion.IngestionControlPlane
 import com.personalagent.bertbot.ingestion.IngestionOutcome
 import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
 import com.personalagent.bertbot.ingestion.connectors.BertBotExternalConnectors
+import com.personalagent.bertbot.ingestion.connectors.ExternalChatFollowupSender
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatPayloadDispatcher
+import com.personalagent.bertbot.ingestion.connectors.NoopExternalChatFollowupSender
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
@@ -259,7 +261,7 @@ internal class BertBotRuntime(
 
     fun connectors(): BertBotConnectorRuntime = connectorRuntime
 
-    fun externalPayloadDispatcher(): ExternalChatPayloadDispatcher =
+    fun externalPayloadDispatcher(followupSender: ExternalChatFollowupSender = NoopExternalChatFollowupSender): ExternalChatPayloadDispatcher =
         ExternalChatPayloadDispatcher(
             connectors =
                 BertBotExternalConnectors(
@@ -268,6 +270,7 @@ internal class BertBotRuntime(
                     whatsapp = connectorRuntime.whatsapp,
                     discord = connectorRuntime.discord,
                 ),
+            followupSender = followupSender,
         )
 
     override fun close() {

@@ -18,6 +18,7 @@ data class WhatsAppReplyPayload(
     val businessPhoneNumberId: String,
     val conversationId: String,
     val text: String,
+    val toPhoneNumber: String? = null,
 )
 
 data class DiscordReplyPayload(
