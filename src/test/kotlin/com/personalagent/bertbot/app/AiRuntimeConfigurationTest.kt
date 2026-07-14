@@ -445,6 +445,58 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `shopping configuration applies defaults when global settings are absent`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_SHOPPING_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS, configuration.budgetLimitCents)
+        assertEquals(DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE, configuration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration clamps negative budget to zero and out-of-range trust scores`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "-10",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "99.9",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(0L, configuration.budgetLimitCents)
+        assertEquals(1.0, configuration.minSellerTrustScore)
+
+        val lowTrustConfiguration =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "-2.0"),
+                dotEnvValues = emptyMap(),
+            )
+        assertEquals(0.0, lowTrustConfiguration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration keeps valid global numeric values unchanged`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "12345",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.65",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(12345L, configuration.budgetLimitCents)
+        assertEquals(0.65, configuration.minSellerTrustScore)
+    }
+
+    @Test
     fun `koog feature configuration defaults are applied`() {
         val configuration =
             resolveKoogFeatureRuntimeConfiguration(
