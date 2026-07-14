@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 class BertBotRuntimeToolIntegrationsTest {
     @Test
-    fun `macrofactor integration is skipped when macrofactor runtime is disabled`() {
+    fun `macrofactor router is not created when macrofactor runtime is disabled`() {
         val router = createMacrofactorToolRouterOrNull(MacrofactorRuntimeConfiguration(enabled = false))
 
         assertNull(router)
