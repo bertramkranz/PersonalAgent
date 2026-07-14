@@ -11,6 +11,7 @@
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
 %% 2026-07-14: Shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) added to architecture. RuntimeCapabilitySnapshot now includes persistenceBackend, playwrightFallbackAvailable, and shoppingProviderAvailable fields. Capability status response reports store backend, Playwright fallback, and store provider status.
+%% 2026-07-14: Optional Playwright browser store adapter added (disabled by default). Supports api/browser/hybrid per-store mode with AllowedBrowserActionPolicy allowlist and graceful recommendation-only fallback.
 %% 2026-07-14: ShoppingToolRouter added with operations search/details/compare/cart_prepare/checkout_prepare; hard-blocks place_order; enforces budget and seller-trust guardrails; requires confirmation_token for state-changing ops.
 %% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
 flowchart TD
@@ -112,6 +113,13 @@ flowchart TD
     subgraph GoogleWorkspaceBridge
         GoogleWorkspaceToolRouter[GoogleWorkspaceToolRouter]
         GoogleWorkspaceMcp[(Google Workspace MCP Server)]
+    end
+
+    subgraph PlaywrightStoreBridge
+        StoreAdapterResolver[resolveStoreAdapter\n(disabled by default)]
+        HybridStoreAdapter[HybridStoreAdapter\n(API → browser fallback)]
+        BrowserActionPolicy[AllowedBrowserActionPolicy\n(explicit action allowlist)]
+        NoopBrowserAdapter[NoopBrowserStoreAdapter\n(safe noop when Playwright absent)]
     end
 
     subgraph ShoppingBridge
@@ -252,6 +260,9 @@ flowchart TD
     RuntimeFactory --> StoreSelector
     StoreSelector --> CapabilitySnapshot
     RuntimeFlags --> CapabilitySnapshot
+    StoreAdapterResolver --> HybridStoreAdapter
+    StoreAdapterResolver --> BrowserActionPolicy
+    HybridStoreAdapter --> NoopBrowserAdapter
     MCP --> ShoppingToolRouter
     ShoppingToolRouter --> ShoppingGuardrails
 
