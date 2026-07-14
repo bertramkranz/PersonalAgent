@@ -566,7 +566,7 @@ internal fun resolveShoppingRuntimeConfiguration(
             val enabledRaw =
                 resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_ENABLED", environment, dotEnvValues)
                     ?: return@mapNotNull null
-            val storeEnabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
+            val enabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
             val mode =
                 resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_MODE", environment, dotEnvValues)
                     ?.takeIf { it.isNotBlank() }
@@ -583,7 +583,7 @@ internal fun resolveShoppingRuntimeConfiguration(
                     ?.takeIf { it.isNotBlank() }
             ShoppingStoreRuntimeConfiguration(
                 index = index,
-                enabled = storeEnabled,
+                enabled = enabled,
                 mode = mode,
                 priority = priority,
                 region = region,
