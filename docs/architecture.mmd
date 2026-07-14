@@ -5,6 +5,7 @@
 %% 2026-07-14: ExternalChatFollowupSender added for outbound platform replies (Telegram/Slack/WhatsApp/Discord); wired via WebhookMain into ExternalChatPayloadDispatcher.
 %% 2026-07-14: External chat follow-up async execution now uses Kotlin coroutines (SupervisorJob + Dispatchers.IO), and follow-up send failures are logged for observability.
 %% 2026-07-14: Telegram follow-up sender supports API base URL override for local endpoint tests and retries once without reply_to_message_id when Telegram rejects threaded replies.
+%% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]

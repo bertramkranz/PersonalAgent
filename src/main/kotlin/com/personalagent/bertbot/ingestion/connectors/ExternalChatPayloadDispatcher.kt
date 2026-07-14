@@ -29,16 +29,17 @@ class ExternalChatPayloadDispatcher(
 
         val message = update.message ?: return null
         asyncRunner.submit {
-            runCatching {
-                val finalReply =
-                    adapter.onUpdate(update, dryRun)
-                        ?: TelegramReplyPayload(
-                            chatId = message.chat.id,
-                            text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
-                            replyToMessageId = message.messageId,
-                        )
-                followupSender.sendTelegram(finalReply)
-            }.onFailure { error ->
+            val finalReply =
+                runCatching { adapter.onUpdate(update, dryRun) }
+                    .onFailure { error ->
+                        FOLLOWUP_LOGGER.warning("Failed to build Telegram follow-up response: ${error.message}")
+                    }.getOrNull()
+                    ?: TelegramReplyPayload(
+                        chatId = message.chat.id,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        replyToMessageId = message.messageId,
+                    )
+            runCatching { followupSender.sendTelegram(finalReply) }.onFailure { error ->
                 FOLLOWUP_LOGGER.warning("Failed to send Telegram follow-up: ${error.message}")
             }
         }
@@ -62,16 +63,17 @@ class ExternalChatPayloadDispatcher(
             FOLLOWUP_LOGGER.warning("Failed to send Slack status message: ${error.message}")
         }
         asyncRunner.submit {
-            runCatching {
-                val finalReply =
-                    adapter.onEvent(event, dryRun)
-                        ?: SlackReplyPayload(
-                            channel = event.event.channel,
-                            text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
-                            threadTs = event.event.threadTs,
-                        )
-                followupSender.sendSlack(finalReply)
-            }.onFailure { error ->
+            val finalReply =
+                runCatching { adapter.onEvent(event, dryRun) }
+                    .onFailure { error ->
+                        FOLLOWUP_LOGGER.warning("Failed to build Slack follow-up response: ${error.message}")
+                    }.getOrNull()
+                    ?: SlackReplyPayload(
+                        channel = event.event.channel,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        threadTs = event.event.threadTs,
+                    )
+            runCatching { followupSender.sendSlack(finalReply) }.onFailure { error ->
                 FOLLOWUP_LOGGER.warning("Failed to send Slack follow-up: ${error.message}")
             }
         }
@@ -100,17 +102,18 @@ class ExternalChatPayloadDispatcher(
             FOLLOWUP_LOGGER.warning("Failed to send WhatsApp status message: ${error.message}")
         }
         asyncRunner.submit {
-            runCatching {
-                val finalReply =
-                    adapter.onConversationEvent(event, dryRun)
-                        ?: WhatsAppReplyPayload(
-                            businessPhoneNumberId = event.businessPhoneNumberId,
-                            conversationId = event.conversationId,
-                            text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
-                            toPhoneNumber = event.message.from,
-                        )
-                followupSender.sendWhatsApp(finalReply)
-            }.onFailure { error ->
+            val finalReply =
+                runCatching { adapter.onConversationEvent(event, dryRun) }
+                    .onFailure { error ->
+                        FOLLOWUP_LOGGER.warning("Failed to build WhatsApp follow-up response: ${error.message}")
+                    }.getOrNull()
+                    ?: WhatsAppReplyPayload(
+                        businessPhoneNumberId = event.businessPhoneNumberId,
+                        conversationId = event.conversationId,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        toPhoneNumber = event.message.from,
+                    )
+            runCatching { followupSender.sendWhatsApp(finalReply) }.onFailure { error ->
                 FOLLOWUP_LOGGER.warning("Failed to send WhatsApp follow-up: ${error.message}")
             }
         }
@@ -133,16 +136,17 @@ class ExternalChatPayloadDispatcher(
             FOLLOWUP_LOGGER.warning("Failed to send Discord status message: ${error.message}")
         }
         asyncRunner.submit {
-            runCatching {
-                val finalReply =
-                    adapter.onMessage(event, dryRun)
-                        ?: DiscordReplyPayload(
-                            channelId = event.channelId,
-                            content = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
-                            messageReferenceId = event.messageId,
-                        )
-                followupSender.sendDiscord(finalReply)
-            }.onFailure { error ->
+            val finalReply =
+                runCatching { adapter.onMessage(event, dryRun) }
+                    .onFailure { error ->
+                        FOLLOWUP_LOGGER.warning("Failed to build Discord follow-up response: ${error.message}")
+                    }.getOrNull()
+                    ?: DiscordReplyPayload(
+                        channelId = event.channelId,
+                        content = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        messageReferenceId = event.messageId,
+                    )
+            runCatching { followupSender.sendDiscord(finalReply) }.onFailure { error ->
                 FOLLOWUP_LOGGER.warning("Failed to send Discord follow-up: ${error.message}")
             }
         }
