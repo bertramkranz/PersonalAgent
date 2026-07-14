@@ -441,4 +441,68 @@ class AiRuntimeConfigurationTest {
         assertEquals(true, configuration.openTelemetryVerbose)
         assertEquals("http://localhost:4317", configuration.openTelemetryOtlpEndpoint)
     }
+
+    @Test
+    fun `shopping configuration defaults are applied`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_SHOPPING_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS, configuration.budgetLimitCents)
+        assertEquals(DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE, configuration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "true",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "5000",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.9",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "false",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "9999",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.5",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(5000L, configuration.budgetLimitCents)
+        assertEquals(0.9, configuration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration clamps budget to zero minimum`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "-100"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(0L, configuration.budgetLimitCents)
+    }
+
+    @Test
+    fun `shopping configuration clamps trust score to valid range`() {
+        val below =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "-0.5"),
+                dotEnvValues = emptyMap(),
+            )
+        val above =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "1.5"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(0.0, below.minSellerTrustScore)
+        assertEquals(1.0, above.minSellerTrustScore)
+    }
 }
