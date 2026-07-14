@@ -14,6 +14,7 @@ param(
     [string]$GoogleWorkspaceTokenB64Secret,
     [string]$GoogleWorkspaceMasterKeyB64Secret,
     [string]$TelegramSecretTokenSecret,
+    [string]$TelegramBotTokenSecret,
     [string]$SlackSigningSecret,
     [string]$WhatsAppAppSecret,
     [string]$WhatsAppVerifyTokenSecret,
@@ -178,6 +179,11 @@ if ($CreateSecrets) {
         Set-SecretValue -Name $TelegramSecretTokenSecret -Value $value
     }
 
+    if ($TelegramBotTokenSecret) {
+        $value = Read-RequiredSecret -Prompt "Enter Telegram bot token"
+        Set-SecretValue -Name $TelegramBotTokenSecret -Value $value
+    }
+
     if ($SlackSigningSecret) {
         $value = Read-RequiredSecret -Prompt "Enter Slack signing secret"
         Set-SecretValue -Name $SlackSigningSecret -Value $value
@@ -222,6 +228,10 @@ if ($Deploy) {
 
     if ($TelegramSecretTokenSecret) {
         $deployParams.TelegramSecretTokenSecret = $TelegramSecretTokenSecret
+    }
+
+    if ($TelegramBotTokenSecret) {
+        $deployParams.TelegramBotTokenSecret = $TelegramBotTokenSecret
     }
 
     if ($GoogleWorkspaceTokenB64Secret) {

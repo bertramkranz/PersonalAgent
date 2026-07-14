@@ -26,6 +26,7 @@ param(
     [string]$GoogleWorkspaceTokenB64Secret,
     [string]$GoogleWorkspaceMasterKeyB64Secret,
     [string]$TelegramSecretTokenSecret,
+    [string]$TelegramBotTokenSecret,
     [string]$SlackSigningSecret,
     [string]$WhatsAppAppSecret,
     [string]$WhatsAppVerifyTokenSecret,
@@ -94,6 +95,10 @@ if ($DatabasePasswordSecret) {
 
 if ($TelegramSecretTokenSecret) {
     $secretMappings += "BERTBOT_TELEGRAM_SECRET_TOKEN=${TelegramSecretTokenSecret}:latest"
+}
+
+if ($TelegramBotTokenSecret) {
+    $secretMappings += "BERTBOT_TELEGRAM_BOT_TOKEN=${TelegramBotTokenSecret}:latest"
 }
 
 if ($SlackSigningSecret) {
