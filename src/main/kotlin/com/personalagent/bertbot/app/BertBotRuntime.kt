@@ -586,14 +586,44 @@ internal fun polymarketToolDefinitions(polymarketToolRouter: PolymarketToolRoute
         polymarketToolDefinition(
             McpConstants.POLYMARKET_GAMMA_TOOL_NAME,
             "Query Polymarket Gamma API public endpoints (markets, events, search).",
+            operationOptions =
+                listOf(
+                    "list_markets",
+                    "list_events",
+                    "get_market_by_slug",
+                    "get_event_by_slug",
+                    "search",
+                    "list_markets_keyset",
+                    "list_events_keyset",
+                ),
         ),
         polymarketToolDefinition(
             McpConstants.POLYMARKET_CLOB_TOOL_NAME,
             "Query Polymarket public CLOB market-data endpoints (book, prices, spreads, history).",
+            operationOptions =
+                listOf(
+                    "get_book",
+                    "get_price",
+                    "get_midpoint",
+                    "get_spread",
+                    "get_last_trade_price",
+                    "get_prices_history",
+                ),
         ),
         polymarketToolDefinition(
             McpConstants.POLYMARKET_DATA_TOOL_NAME,
             "Query Polymarket Data API public analytics endpoints (trades, activity, positions, value, holders, OI, leaderboards).",
+            operationOptions =
+                listOf(
+                    "get_trades",
+                    "get_activity",
+                    "get_positions",
+                    "get_value",
+                    "get_holders",
+                    "get_open_interest",
+                    "get_trader_leaderboard",
+                    "get_builder_leaderboard",
+                ),
         ),
     )
 }
@@ -601,6 +631,7 @@ internal fun polymarketToolDefinitions(polymarketToolRouter: PolymarketToolRoute
 private fun polymarketToolDefinition(
     name: String,
     description: String,
+    operationOptions: List<String>,
 ): JsonObject =
     JsonObject().apply {
         addProperty("name", name)
@@ -616,7 +647,15 @@ private fun polymarketToolDefinition(
                             "operation",
                             JsonObject().apply {
                                 addProperty("type", "string")
-                                addProperty("description", "Operation name for the selected Polymarket API.")
+                                addProperty("description", "Operation name for the selected Polymarket API. Must be one of the supported values.")
+                                add(
+                                    "enum",
+                                    JsonArray().apply {
+                                        operationOptions.forEach { option ->
+                                            add(option)
+                                        }
+                                    },
+                                )
                             },
                         )
                         add(
