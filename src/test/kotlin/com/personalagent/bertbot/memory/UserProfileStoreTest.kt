@@ -153,6 +153,8 @@ class UserProfileStoreTest {
         assertEquals(1, profile.preferredBrands.size)
         assertTrue(profile.preferredBrands.contains("Nike"))
         assertEquals(2, profile.preferredStores.size)
+        assertTrue(profile.preferredStores.contains("Amazon"))
+        assertTrue(profile.preferredStores.contains("amazon"))
     }
 
     @Test
