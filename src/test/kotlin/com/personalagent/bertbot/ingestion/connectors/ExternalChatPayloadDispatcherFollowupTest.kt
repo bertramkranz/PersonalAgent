@@ -94,6 +94,42 @@ class ExternalChatPayloadDispatcherFollowupTest {
     }
 
     @Test
+    fun `dispatcher sends telegram fallback final when adapter throws in followup mode`() {
+        val sender = RecordingFollowupSender(enableTelegram = true)
+        val telegramAdapter =
+            TelegramConnectorAdapter(
+                TelegramChatBridge { _, _ ->
+                    throw IllegalStateException("simulated adapter failure")
+                },
+            )
+        val dispatcher =
+            ExternalChatPayloadDispatcher(
+                connectors = BertBotExternalConnectors(telegram = telegramAdapter),
+                followupSender = sender,
+                asyncRunner = ExternalChatAsyncRunner { task -> task() },
+            )
+
+        val rawJson =
+            """
+            {
+              "update_id": 4006,
+              "message": {
+                "message_id": 99,
+                "date": 1700000000,
+                "chat": { "id": "chat-async" },
+                "text": "hello"
+              }
+            }
+            """.trimIndent()
+
+        val replyJson = dispatcher.handleTelegramUpdateJson(rawJson)
+
+        assertNotNull(replyJson)
+        assertEquals(1, sender.telegramReplies.size)
+        assertEquals("I could not produce a final answer for that request. Please try again.", sender.telegramReplies.first().text)
+    }
+
+    @Test
     fun `dispatcher sends slack status and final via followup sender`() {
         val sender = RecordingFollowupSender(enableSlack = true)
         val slackAdapter =
