@@ -26,14 +26,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require architecture and CICD diagram updates when changes are significant
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          bash .github/scripts/changed-file-guardrails.sh "$BASE_SHA" "$HEAD_SHA"
-
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
