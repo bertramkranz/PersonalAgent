@@ -260,6 +260,47 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `google workspace configuration defaults are applied`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_COMMAND, configuration.command)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_ARGS, configuration.args)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS, configuration.timeoutSeconds)
+        assertEquals(DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX, configuration.toolNamePrefix)
+    }
+
+    @Test
+    fun `google workspace configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_ENABLED" to "true",
+                        "BERTBOT_GOOGLE_WORKSPACE_COMMAND" to "node",
+                        "BERTBOT_GOOGLE_WORKSPACE_ARGS" to "workspace.js,--stdio",
+                        "BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS" to "120",
+                        "BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX" to "gw_",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_ENABLED" to "false",
+                        "BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX" to "dotenv_",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals("node", configuration.command)
+        assertEquals(listOf("workspace.js", "--stdio"), configuration.args)
+        assertEquals(120, configuration.timeoutSeconds)
+        assertEquals("gw_", configuration.toolNamePrefix)
+    }
+
+    @Test
     fun `research runtime overrides prefer environment values`() {
         val config =
             applyResearchRuntimeOverrides(
@@ -399,5 +440,69 @@ class AiRuntimeConfigurationTest {
         assertEquals("1.2.3", configuration.openTelemetryServiceVersion)
         assertEquals(true, configuration.openTelemetryVerbose)
         assertEquals("http://localhost:4317", configuration.openTelemetryOtlpEndpoint)
+    }
+
+    @Test
+    fun `shopping configuration defaults are applied`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_SHOPPING_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS, configuration.budgetLimitCents)
+        assertEquals(DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE, configuration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "true",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "5000",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.9",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "false",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "9999",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.5",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(5000L, configuration.budgetLimitCents)
+        assertEquals(0.9, configuration.minSellerTrustScore)
+    }
+
+    @Test
+    fun `shopping configuration clamps budget to zero minimum`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "-100"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(0L, configuration.budgetLimitCents)
+    }
+
+    @Test
+    fun `shopping configuration clamps trust score to valid range`() {
+        val below =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "-0.5"),
+                dotEnvValues = emptyMap(),
+            )
+        val above =
+            resolveShoppingRuntimeConfiguration(
+                environment = mapOf("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "1.5"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(0.0, below.minSellerTrustScore)
+        assertEquals(1.0, above.minSellerTrustScore)
     }
 }
