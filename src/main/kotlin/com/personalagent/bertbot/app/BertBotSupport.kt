@@ -560,7 +560,6 @@ internal fun resolveShoppingRuntimeConfiguration(
             ?.toDoubleOrNull()
             ?.coerceIn(0.0, 1.0)
             ?: DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE
-
     val stores =
         (1..MAX_SHOPPING_STORES).mapNotNull { index ->
             val enabledRaw =
@@ -590,7 +589,6 @@ internal fun resolveShoppingRuntimeConfiguration(
                 currency = currency,
             )
         }
-
     return ShoppingRuntimeConfiguration(
         enabled = enabled,
         budgetLimitCents = budgetLimitCents,
