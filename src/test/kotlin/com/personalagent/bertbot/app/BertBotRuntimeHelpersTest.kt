@@ -186,6 +186,37 @@ class BertBotRuntimeHelpersTest {
             memoryRuntime.memoryWorker.close()
         }
     }
+
+    @Test
+    fun `buildProfileSummary includes shopping preferences`() {
+        val profile =
+            com.personalagent.bertbot.memory.UserProfile(
+                displayName = "Bertram",
+                preferredBrands = setOf("Nike", "Adidas"),
+                preferredSizes = setOf("M"),
+                preferredStores = setOf("Amazon"),
+                budgetLimitCents = 5000L,
+                shoppingNotes = setOf("prefer eco-friendly"),
+            )
+
+        val summary = buildProfileSummary(profile)
+
+        assertTrue(summary.contains("Known user name: Bertram"))
+        assertTrue(summary.any { it.contains("Nike") && it.contains("Adidas") })
+        assertTrue(summary.any { it.contains("M") })
+        assertTrue(summary.any { it.contains("Amazon") })
+        assertTrue(summary.any { it.contains("5000") })
+        assertTrue(summary.any { it.contains("eco-friendly") })
+    }
+
+    @Test
+    fun `buildProfileSummary omits empty shopping fields`() {
+        val profile = com.personalagent.bertbot.memory.UserProfile(displayName = "Bertram")
+
+        val summary = buildProfileSummary(profile)
+
+        assertEquals(listOf("Known user name: Bertram"), summary)
+    }
 }
 
 private class CountingGateway : LlmGateway {

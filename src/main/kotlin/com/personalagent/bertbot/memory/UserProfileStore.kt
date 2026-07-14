@@ -12,6 +12,11 @@ data class UserProfile(
     val recurringPreferences: Set<String> = emptySet(),
     val communicationStyleHints: Set<String> = emptySet(),
     val stableInterests: Set<String> = emptySet(),
+    val preferredBrands: Set<String> = emptySet(),
+    val preferredSizes: Set<String> = emptySet(),
+    val preferredStores: Set<String> = emptySet(),
+    val budgetLimitCents: Long? = null,
+    val shoppingNotes: Set<String> = emptySet(),
 )
 
 class UserProfileStore internal constructor(
@@ -33,6 +38,16 @@ class UserProfileStore internal constructor(
     fun addCommunicationStyleHint(hint: String) = persistence.addCommunicationStyleHint(hint)
 
     fun addStableInterest(interest: String) = persistence.addStableInterest(interest)
+
+    fun addPreferredBrand(brand: String) = persistence.addPreferredBrand(brand)
+
+    fun addPreferredSize(size: String) = persistence.addPreferredSize(size)
+
+    fun addPreferredStore(store: String) = persistence.addPreferredStore(store)
+
+    fun setShoppingBudgetCents(limitCents: Long) = persistence.setShoppingBudgetCents(limitCents)
+
+    fun addShoppingNote(note: String) = persistence.addShoppingNote(note)
 
     fun <T> withScope(
         scopeKey: String,
@@ -147,6 +162,70 @@ private class FileUserProfileStore(
             }
 
             cached = cached.copy(stableInterests = normalizeSet(cached.stableInterests + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredBrand(brand: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(brand)
+            if (normalized.isBlank() || cached.preferredBrands.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredBrands = normalizeSet(cached.preferredBrands + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredSize(size: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(size)
+            if (normalized.isBlank() || cached.preferredSizes.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredSizes = normalizeSet(cached.preferredSizes + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredStore(store: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(store)
+            if (normalized.isBlank() || cached.preferredStores.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredStores = normalizeSet(cached.preferredStores + normalized))
+            persist()
+        }
+    }
+
+    override fun setShoppingBudgetCents(limitCents: Long) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            if (limitCents < 0 || cached.budgetLimitCents == limitCents) {
+                return
+            }
+
+            cached = cached.copy(budgetLimitCents = limitCents)
+            persist()
+        }
+    }
+
+    override fun addShoppingNote(note: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(note)
+            if (normalized.isBlank() || cached.shoppingNotes.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(shoppingNotes = normalizeSet(cached.shoppingNotes + normalized))
             persist()
         }
     }

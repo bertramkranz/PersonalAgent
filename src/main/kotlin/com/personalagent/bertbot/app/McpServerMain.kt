@@ -13,6 +13,7 @@ fun main() {
     val aiRuntimeConfiguration = resolveAiRuntimeConfiguration()
     val macrofactorRuntimeConfiguration = resolveMacrofactorRuntimeConfiguration()
     val googleWorkspaceRuntimeConfiguration = resolveGoogleWorkspaceRuntimeConfiguration()
+    val shoppingRuntimeConfiguration = resolveShoppingRuntimeConfiguration()
     val workspaceRoot = resolveWorkspaceRoot()
     val dispatcherContext =
         McpServerBootstrap.createDispatcherContext(
@@ -20,6 +21,7 @@ fun main() {
                 aiRuntimeConfiguration = aiRuntimeConfiguration,
                 macrofactorRuntimeConfiguration = macrofactorRuntimeConfiguration,
                 googleWorkspaceRuntimeConfiguration = googleWorkspaceRuntimeConfiguration,
+                shoppingRuntimeConfiguration = shoppingRuntimeConfiguration,
                 workspaceRoot = workspaceRoot,
                 toolNames = McpConstants.toolNames,
             ),
@@ -79,6 +81,7 @@ internal class McpRequestDispatcher(
     private val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter? = null,
     private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
+    private val shoppingToolRouter: ShoppingToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
@@ -141,9 +144,13 @@ internal class McpRequestDispatcher(
                     buildToolsListResultPayload(
                         includeIngestionTools = ingestionControlPlane != null,
                         toolNames = McpConstants.toolNames,
-                        macrofactorToolDefinitions = macrofactorToolRouter?.toolDefinitions() ?: emptyList(),
-                        googleWorkspaceToolDefinitions = googleWorkspaceToolRouter?.toolDefinitions() ?: emptyList(),
-                        continuousResearchToolDefinitions = continuousResearchToolRouter?.toolDefinitions() ?: emptyList(),
+                        optionalToolDefinitions =
+                            OptionalToolDefinitions(
+                                macrofactorToolDefinitions = macrofactorToolRouter?.toolDefinitions() ?: emptyList(),
+                                googleWorkspaceToolDefinitions = googleWorkspaceToolRouter?.toolDefinitions() ?: emptyList(),
+                                continuousResearchToolDefinitions = continuousResearchToolRouter?.toolDefinitions() ?: emptyList(),
+                                shoppingToolDefinitions = shoppingToolRouter?.toolDefinitions() ?: emptyList(),
+                            ),
                     ),
                 )
             "tools/call" -> handleToolCall(requestId, request.params)
@@ -180,7 +187,12 @@ internal class McpRequestDispatcher(
             return googleWorkspaceResult
         }
 
-        return continuousResearchToolRouter?.handle(toolName, params)
+        val researchResult = continuousResearchToolRouter?.handle(toolName, params)
+        if (researchResult != null) {
+            return researchResult
+        }
+
+        return shoppingToolRouter?.handle(toolName, params)
     }
 
     private fun handleBuiltInToolCall(

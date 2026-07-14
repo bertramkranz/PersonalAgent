@@ -1,3 +1,5 @@
+%% 2026-07-14: ShoppingBridge added: StoreProvider interface, StoreProviderRegistry (priority-based selection), AmazonStoreProvider scaffold, and PersonalShopperService (provider-agnostic orchestration with budget/seller-threshold safety invariants).
+```mermaid
 %% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
 %% 2026-07-13: Calendar response formatting now performs MCP envelope unwrapping and readable event rendering in ToolCallingSkill.
 %% 2026-07-13: Runtime tool-calling now uses explicit integration registry and validates required sub-agent -> tool integration coverage at startup.
@@ -8,7 +10,9 @@
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
-%% 2026-07-14: Shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) added to architecture. RuntimeCapabilitySnapshot now includes persistenceBackend and playwrightFallbackAvailable fields. Capability status response reports store backend and Playwright fallback status.
+%% 2026-07-14: Shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) added to architecture. RuntimeCapabilitySnapshot now includes persistenceBackend, playwrightFallbackAvailable, and shoppingProviderAvailable fields. Capability status response reports store backend, Playwright fallback, and store provider status.
+%% 2026-07-14: ShoppingToolRouter added with operations search/details/compare/cart_prepare/checkout_prepare; hard-blocks place_order; enforces budget and seller-trust guardrails; requires confirmation_token for state-changing ops.
+%% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -108,6 +112,14 @@ flowchart TD
     subgraph GoogleWorkspaceBridge
         GoogleWorkspaceToolRouter[GoogleWorkspaceToolRouter]
         GoogleWorkspaceMcp[(Google Workspace MCP Server)]
+    end
+
+    subgraph ShoppingBridge
+        ShoppingToolRouter[ShoppingToolRouter\n(policy-only: no external API)]
+        ShoppingGuardrails[Guardrails:\n- confirmation_token required for cart/checkout\n- budget limit check\n- seller trust score filter\n- hard-block place_order]
+        StoreProviderRegistry[StoreProviderRegistry\n(priority-based provider selection)]
+        AmazonStoreProvider[AmazonStoreProvider\n(API skeleton)]
+        PersonalShopperService[PersonalShopperService\n(provider-agnostic orchestration\n+ safety invariants)]
     end
 
     subgraph BuildQuality
@@ -240,6 +252,12 @@ flowchart TD
     RuntimeFactory --> StoreSelector
     StoreSelector --> CapabilitySnapshot
     RuntimeFlags --> CapabilitySnapshot
+    MCP --> ShoppingToolRouter
+    ShoppingToolRouter --> ShoppingGuardrails
+
+    PersonalShopperService --> StoreProviderRegistry
+    StoreProviderRegistry --> AmazonStoreProvider
 
     JaCoCo --> SonarQube
     DetektReport --> SonarQube
+```
