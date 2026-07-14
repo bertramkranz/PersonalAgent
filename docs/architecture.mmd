@@ -14,6 +14,7 @@
 %% 2026-07-14: Optional Playwright browser store adapter added (disabled by default). Supports api/browser/hybrid per-store mode with AllowedBrowserActionPolicy allowlist and graceful recommendation-only fallback.
 %% 2026-07-14: ShoppingToolRouter added with operations search/details/compare/cart_prepare/checkout_prepare; hard-blocks place_order; enforces budget and seller-trust guardrails; requires confirmation_token for state-changing ops.
 %% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
+%% 2026-07-14: Shopping runtime configuration declarations consolidated in BertBotSupport so global shopping flags and indexed store-slot settings are resolved together.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
