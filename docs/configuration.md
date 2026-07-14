@@ -74,6 +74,25 @@ MacroFactor MCP proxy:
 | `BERTBOT_MACROFACTOR_EXPECTED_TOOL` | Optional `tools/list` assertion target |
 | `BERTBOT_MACROFACTOR_EXPECTED_ARG` | Optional schema assertion key |
 
+Playwright browser store adapter:
+
+The Playwright store adapter is **disabled by default**. It adds an optional browser-automation fallback for external stores where the API is missing or unstable.
+
+Three modes are available per store:
+
+- `api` – API-only execution (default).
+- `browser` – Browser-only execution via Playwright.
+- `hybrid` – Try API first; fall back to browser on failure.
+
+Browser actions are restricted to an explicit allowlist. When both the API and browser paths fail, the adapter returns a safe, user-facing recommendation instead of an unrecoverable error.
+
+| Variable | Purpose |
+| --- | --- |
+| `BERTBOT_PLAYWRIGHT_STORE_ENABLED` | Enable the Playwright store adapter (default `false`) |
+| `BERTBOT_PLAYWRIGHT_STORE_DEFAULT_MODE` | Default mode for all stores: `api`, `browser`, or `hybrid` (default `api`) |
+| `BERTBOT_PLAYWRIGHT_STORE_MODES` | Per-store mode overrides as `store1:hybrid,store2:browser` |
+| `BERTBOT_PLAYWRIGHT_STORE_ALLOWED_BROWSER_ACTIONS` | Comma-separated allowlist of browser actions (default: `navigate,click,fill,read,screenshot,select,hover,scroll`) |
+
 ## Persistence Settings
 
 Backend selection:

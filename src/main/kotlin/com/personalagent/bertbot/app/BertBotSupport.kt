@@ -71,6 +71,23 @@ internal data class GoogleWorkspaceRuntimeConfiguration(
     val toolNamePrefix: String = DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX,
 )
 
+/**
+ * Runtime configuration for the optional Playwright browser store adapter.
+ *
+ * [enabled] must be `true` to activate any browser-path logic; defaults to `false`.
+ * [defaultMode] governs stores not listed in [storeModes].
+ * [storeModes] provides per-store overrides keyed by store name.
+ * [allowedBrowserActions] is the explicit allowlist enforced by [AllowedBrowserActionPolicy].
+ */
+internal data class PlaywrightStoreRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_PLAYWRIGHT_STORE_ENABLED,
+    val defaultMode: StoreAdapterMode = DEFAULT_PLAYWRIGHT_STORE_MODE,
+    val storeModes: Map<String, StoreAdapterMode> = emptyMap(),
+    val allowedBrowserActions: Set<String> = AllowedBrowserActionPolicy.DEFAULT_ALLOWED_BROWSER_ACTIONS,
+) {
+    fun resolveMode(storeName: String): StoreAdapterMode = storeModes[storeName] ?: defaultMode
+}
+
 internal data class KoogFeatureRuntimeConfiguration(
     val chatMemoryEnabled: Boolean = DEFAULT_KOOG_CHAT_MEMORY_ENABLED,
     val chatMemoryWindowSize: Int = DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE,
@@ -138,6 +155,8 @@ internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K = 5
 internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME = "personalagent-bertbot"
 internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION = "0.1.0"
 internal const val DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE = false
+internal const val DEFAULT_PLAYWRIGHT_STORE_ENABLED = false
+internal val DEFAULT_PLAYWRIGHT_STORE_MODE = StoreAdapterMode.API
 internal const val DEFAULT_RUNTIME_ENVIRONMENT = "dev"
 internal const val DEFAULT_CHECKPOINT_ROLLBACK_ENABLED = true
 internal const val DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM = true
@@ -585,6 +604,63 @@ private fun parseCommandArgs(value: String): List<String> {
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 }
+
+internal fun resolvePlaywrightStoreRuntimeConfiguration(): PlaywrightStoreRuntimeConfiguration =
+    resolvePlaywrightStoreRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolvePlaywrightStoreRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): PlaywrightStoreRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_PLAYWRIGHT_STORE_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_PLAYWRIGHT_STORE_ENABLED
+
+    val defaultMode =
+        resolveRuntimeSetting("BERTBOT_PLAYWRIGHT_STORE_DEFAULT_MODE", environment, dotEnvValues)
+            ?.uppercase()
+            ?.let { runCatching { StoreAdapterMode.valueOf(it) }.getOrNull() }
+            ?: DEFAULT_PLAYWRIGHT_STORE_MODE
+
+    val storeModes =
+        resolveRuntimeSetting("BERTBOT_PLAYWRIGHT_STORE_MODES", environment, dotEnvValues)
+            ?.let { parseStoreModes(it) }
+            ?: emptyMap()
+
+    val allowedBrowserActions =
+        resolveRuntimeSettingAllowBlank("BERTBOT_PLAYWRIGHT_STORE_ALLOWED_BROWSER_ACTIONS", environment, dotEnvValues)
+            ?.let { raw ->
+                raw.split(',')
+                    .map { it.trim().lowercase() }
+                    .filter { it.isNotEmpty() }
+                    .toSet()
+                    .takeIf { it.isNotEmpty() }
+            }
+            ?: AllowedBrowserActionPolicy.DEFAULT_ALLOWED_BROWSER_ACTIONS
+
+    return PlaywrightStoreRuntimeConfiguration(
+        enabled = enabled,
+        defaultMode = defaultMode,
+        storeModes = storeModes,
+        allowedBrowserActions = allowedBrowserActions,
+    )
+}
+
+private fun parseStoreModes(value: String): Map<String, StoreAdapterMode> =
+    value
+        .split(',')
+        .mapNotNull { segment ->
+            val parts = segment.trim().split(':')
+            if (parts.size != 2) return@mapNotNull null
+            val storeName = parts[0].trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val mode = runCatching { StoreAdapterMode.valueOf(parts[1].trim().uppercase()) }.getOrNull() ?: return@mapNotNull null
+            storeName to mode
+        }
+        .toMap()
 
 internal fun resolveTraceFilePath(
     environment: Map<String, String> = System.getenv(),
