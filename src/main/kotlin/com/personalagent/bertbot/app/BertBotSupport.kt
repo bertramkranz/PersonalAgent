@@ -644,6 +644,12 @@ internal fun resolvePlaywrightStoreRuntimeConfiguration(
     )
 }
 
+/**
+ * Parses [value] into a non-empty set of trimmed, lowercase tokens.
+ * Returns `null` when [value] contains only whitespace or empty segments,
+ * which signals to the caller that no override was provided so it should
+ * use its own default instead of an empty set.
+ */
 private fun parseCommaSeparatedSet(value: String): Set<String>? =
     value
         .split(',')
