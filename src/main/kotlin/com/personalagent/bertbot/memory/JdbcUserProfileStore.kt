@@ -19,12 +19,23 @@ internal interface UserProfilePersistence {
 
     fun addStableInterest(interest: String)
 
+    fun addPreferredBrand(brand: String)
+
+    fun addPreferredSize(size: String)
+
+    fun addPreferredStore(store: String)
+
+    fun setShoppingBudgetCents(limitCents: Long)
+
+    fun addShoppingNote(note: String)
+
     fun <T> withScope(
         scopeKey: String,
         action: () -> T,
     ): T = action()
 }
 
+@Suppress("TooManyFunctions")
 internal class JdbcUserProfileStore(
     private val jdbcUrl: String,
     private val username: String? = null,
@@ -143,6 +154,70 @@ internal class JdbcUserProfileStore(
             }
 
             cached = cached.copy(stableInterests = normalizeSet(cached.stableInterests + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredBrand(brand: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(brand)
+            if (normalized.isBlank() || cached.preferredBrands.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredBrands = normalizeSet(cached.preferredBrands + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredSize(size: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(size)
+            if (normalized.isBlank() || cached.preferredSizes.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredSizes = normalizeSet(cached.preferredSizes + normalized))
+            persist()
+        }
+    }
+
+    override fun addPreferredStore(store: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(store)
+            if (normalized.isBlank() || cached.preferredStores.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(preferredStores = normalizeSet(cached.preferredStores + normalized))
+            persist()
+        }
+    }
+
+    override fun setShoppingBudgetCents(limitCents: Long) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            if (limitCents < 0 || cached.budgetLimitCents == limitCents) {
+                return
+            }
+
+            cached = cached.copy(budgetLimitCents = limitCents)
+            persist()
+        }
+    }
+
+    override fun addShoppingNote(note: String) {
+        synchronized(lock) {
+            ensureLoadedForCurrentScope()
+            val normalized = normalizeLabel(note)
+            if (normalized.isBlank() || cached.shoppingNotes.contains(normalized)) {
+                return
+            }
+
+            cached = cached.copy(shoppingNotes = normalizeSet(cached.shoppingNotes + normalized))
             persist()
         }
     }
