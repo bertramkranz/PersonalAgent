@@ -12,7 +12,7 @@ runs:
   using: composite
   steps:
     - name: Validate Gradle wrapper
-      if: inputs.validate-wrapper == 'true'
+      if: ${{ inputs.validate-wrapper == 'true' }}
       uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
     - name: Set up JDK 17
