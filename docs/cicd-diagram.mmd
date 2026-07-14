@@ -1,5 +1,7 @@
 ```mermaid
 flowchart TD
+    %% 2026-07-14: Consolidated repeated workflow bootstrap steps into .github/actions/setup-java-gradle (JDK17 + Gradle cache + chmod gradlew) and reused in ci/cd/autofix; workflows still perform checkout and Gradle wrapper validation separately.
+    %% 2026-07-14: Consolidated duplicate checks by keeping changed-file doc guardrails in dod-enforcement and removing redundant CI guardrail invocation; DoD now focuses on policy-only enforcement.
     %% 2026-07-13: deploy-cloud-run-main workflow now builds Cloud Run env vars via shell arrays for safer YAML maintenance.
     %% 2026-07-13: Slack/WhatsApp secrets are optional and only injected when corresponding repo vars are set.
     %% 2026-07-13: deploy workflow now preflights optional secret names and runtime service account references before build/deploy.
@@ -20,7 +22,7 @@ flowchart TD
         direction LR
         CI_JOB["ci.yml\nquality-and-test\n(detekt · ktlint · tests)"]
         MAAT["code-maat-hotspots.yml\nMonthly churn + coupling report\n(repository mining artifact)"]
-        DOD["dod-enforcement.yml\nDoD policy checks\n(path-coupled tests + gradle check)"]
+        DOD["dod-enforcement.yml\nDoD policy checks\n(path-coupled policy + doc guardrails)"]
         CODEQL["codeql.yml\nanalyze\n(PR: acknowledge repo default setup;\nmain/schedule: custom CodeQL SAST;\nbuild: --no-build-cache to ensure compiler invocation)"]
         DEPREVIEW["dependency-review.yml\ndependency-review\n(CVE gate ≥ moderate)"]
         SECRET["secret-scan.yml\ngitleaks\n(secret detection)"]

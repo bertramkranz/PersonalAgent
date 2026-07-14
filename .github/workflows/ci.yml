@@ -26,26 +26,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require architecture and CICD diagram updates when changes are significant
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          bash .github/scripts/changed-file-guardrails.sh "$BASE_SHA" "$HEAD_SHA"
-
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x gradlew
+      - name: Set up repository and Java toolchain
+        uses: ./.github/actions/setup-java-gradle
 
       - name: Quality gate and tests
         run: ./gradlew --no-daemon clean check

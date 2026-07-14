@@ -1,4 +1,5 @@
 %% 2026-07-14: ShoppingBridge added: StoreProvider interface, StoreProviderRegistry (priority-based selection), AmazonStoreProvider scaffold, and PersonalShopperService (provider-agnostic orchestration with budget/seller-threshold safety invariants).
+```mermaid
 %% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
 %% 2026-07-13: Calendar response formatting now performs MCP envelope unwrapping and readable event rendering in ToolCallingSkill.
 %% 2026-07-13: Runtime tool-calling now uses explicit integration registry and validates required sub-agent -> tool integration coverage at startup.
@@ -222,3 +223,4 @@ flowchart TD
 
     PersonalShopperService --> StoreProviderRegistry
     StoreProviderRegistry --> AmazonStoreProvider
+```
