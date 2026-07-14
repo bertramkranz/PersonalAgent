@@ -57,7 +57,7 @@ jobs:
 
       - name: Build project for analysis
         if: github.event_name != 'pull_request'
-        run: ./gradlew --no-daemon --build-cache classes
+        run: ./gradlew --no-daemon --no-build-cache classes
 
       - name: Perform CodeQL analysis
         if: github.event_name != 'pull_request'
