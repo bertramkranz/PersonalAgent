@@ -126,15 +126,12 @@ private class HttpExternalChatFollowupSender(
                 .timeout(Duration.ofSeconds(15))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
-        if (!authorizationHeader.isNullOrBlank()) {
-            builder.header("Authorization", authorizationHeader)
-        } else if (!bearerToken.isNullOrBlank()) {
-            builder.header("Authorization", "Bearer $bearerToken")
-        if (!authorizationHeader.isNullOrBlank()) {
-            builder.header("Authorization", authorizationHeader)
-        } else if (!bearerToken.isNullOrBlank()) {
-            builder.header("Authorization", "$authorizationScheme $bearerToken")
-        }
+        val resolvedAuthorizationHeader =
+            authorizationHeader?.takeIf { it.isNotBlank() }
+                ?: bearerToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { "$authorizationScheme $it" }
+        resolvedAuthorizationHeader?.let { builder.header("Authorization", it) }
 
         runCatching {
             client.send(builder.build(), HttpResponse.BodyHandlers.discarding())
