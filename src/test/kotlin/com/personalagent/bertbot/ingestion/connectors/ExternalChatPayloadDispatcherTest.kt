@@ -1,17 +1,17 @@
 package com.personalagent.bertbot.ingestion.connectors
 
-import com.google.gson.JsonParser
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.personalagent.bertbot.app.MacrofactorMcpTransport
 import com.personalagent.bertbot.app.MacrofactorRuntimeConfiguration
 import com.personalagent.bertbot.app.MacrofactorToolRouter
-import com.personalagent.bertbot.app.MacrofactorMcpTransport
 import com.personalagent.bertbot.app.buildRuntimeToolIntegrations
 import com.personalagent.bertbot.ingestion.ExternalChatOutcome
 import com.personalagent.bertbot.ingestion.IngestionDecision
 import com.personalagent.bertbot.ingestion.IngestionOutcome
 import com.personalagent.bertbot.ingestion.NormalizedOutboundMessage
-import kotlin.test.assertContains
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
