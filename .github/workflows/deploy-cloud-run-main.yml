@@ -32,7 +32,7 @@ jobs:
       AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
       DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
       TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
-      TELEGRAM_BOT_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_BOT_TOKEN_SECRET_NAME || '' }}
+      TELEGRAM_BOT_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_BOT_TOKEN_SECRET_NAME || 'bertbot-telegram-bot-token' }}
       SLACK_SIGNING_SECRET_NAME: ${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}
       WHATSAPP_APP_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}
       WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}
@@ -229,6 +229,7 @@ jobs:
             --execution-environment gen2
             --port 8088
             --cpu 1
+            --no-cpu-throttling
             --memory 1Gi
             --concurrency 1
             --min-instances 1
