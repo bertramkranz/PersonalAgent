@@ -2,6 +2,7 @@
 %% 2026-07-13: Calendar response formatting now performs MCP envelope unwrapping and readable event rendering in ToolCallingSkill.
 %% 2026-07-13: Runtime tool-calling now uses explicit integration registry and validates required sub-agent -> tool integration coverage at startup.
 %% 2026-07-14: MacrofactorToolRouter wired into RuntimeFactory as a RuntimeToolIntegration via buildRuntimeToolIntegrations.
+%% 2026-07-14: ExternalChatFollowupSender added for outbound platform replies (Telegram/Slack/WhatsApp/Discord); wired via WebhookMain into ExternalChatPayloadDispatcher.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -20,6 +21,7 @@ flowchart TD
         ResearchFactory[BertBotRuntimeDependenciesFactory]
         PayloadDispatcher[ExternalChatPayloadDispatcher\n(outbound payload + text normalization)]
         KoogIntegration[KoogRuntimeIntegration]
+        FollowupSender[ExternalChatFollowupSender\n(outbound platform replies:\nTelegram / Slack / WhatsApp / Discord)]
     end
 
     subgraph GraphExecution
@@ -116,6 +118,8 @@ flowchart TD
     RuntimeFactory --> ConnectorFactory
     RuntimeFactory --> ResearchFactory
     ConnectorFactory --> PayloadDispatcher
+    Webhook --> FollowupSender
+    FollowupSender --> PayloadDispatcher
     PayloadDispatcher --> ExternalChatHandler
     ExternalChatHandler --> RuntimeCore
 
