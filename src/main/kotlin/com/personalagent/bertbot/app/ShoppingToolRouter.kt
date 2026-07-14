@@ -62,7 +62,7 @@ internal class ShoppingToolRouter(
         arguments: JsonObject,
     ): Pair<Boolean, String>? {
         val token = arguments.stringValue("confirmation_token")
-        if (token == null) {
+        if (token.isNullOrBlank()) {
             return true to
                 "Operation '$operation' requires explicit user confirmation. " +
                 "Provide a non-empty 'confirmation_token' obtained from the user before proceeding."

@@ -23,7 +23,6 @@ internal object McpConstants {
     const val CHECKPOINT_ROLLBACK_TOOL_NAME = "checkpoint_rollback"
     const val CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME = "checkpoint_rollback_latest"
     const val CHECKPOINT_POLICY_TOOL_NAME = "checkpoint_policy"
-    const val SHOPPING_QUERY_TOOL_NAME = "shopping_query"
 
     const val WORKSPACE_ROOT_ENV_VAR = "BERTBOT_WORKSPACE_ROOT"
 
