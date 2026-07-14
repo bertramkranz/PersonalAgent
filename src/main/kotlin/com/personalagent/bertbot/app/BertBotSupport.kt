@@ -633,13 +633,7 @@ internal fun resolvePlaywrightStoreRuntimeConfiguration(
 
     val allowedBrowserActions =
         resolveRuntimeSettingAllowBlank("BERTBOT_PLAYWRIGHT_STORE_ALLOWED_BROWSER_ACTIONS", environment, dotEnvValues)
-            ?.let { raw ->
-                raw.split(',')
-                    .map { it.trim().lowercase() }
-                    .filter { it.isNotEmpty() }
-                    .toSet()
-                    .takeIf { it.isNotEmpty() }
-            }
+            ?.let { parseCommaSeparatedSet(it) }
             ?: AllowedBrowserActionPolicy.DEFAULT_ALLOWED_BROWSER_ACTIONS
 
     return PlaywrightStoreRuntimeConfiguration(
@@ -649,6 +643,14 @@ internal fun resolvePlaywrightStoreRuntimeConfiguration(
         allowedBrowserActions = allowedBrowserActions,
     )
 }
+
+private fun parseCommaSeparatedSet(value: String): Set<String>? =
+    value
+        .split(',')
+        .map { it.trim().lowercase() }
+        .filter { it.isNotEmpty() }
+        .toSet()
+        .takeIf { it.isNotEmpty() }
 
 private fun parseStoreModes(value: String): Map<String, StoreAdapterMode> =
     value

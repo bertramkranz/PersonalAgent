@@ -293,7 +293,7 @@ class PlaywrightStoreAdapterTest {
     }
 
     @Test
-    fun `resolver parses per-store modes from environment`() {
+    fun `resolvePlaywrightStoreRuntimeConfiguration parses per-store modes from environment`() {
         val env =
             mapOf(
                 "BERTBOT_PLAYWRIGHT_STORE_ENABLED" to "true",
@@ -306,7 +306,7 @@ class PlaywrightStoreAdapterTest {
     }
 
     @Test
-    fun `resolver ignores malformed store mode entries`() {
+    fun `resolvePlaywrightStoreRuntimeConfiguration ignores malformed store mode entries`() {
         val env =
             mapOf(
                 "BERTBOT_PLAYWRIGHT_STORE_ENABLED" to "true",
@@ -318,7 +318,7 @@ class PlaywrightStoreAdapterTest {
     }
 
     @Test
-    fun `resolver parses custom allowed browser actions from environment`() {
+    fun `resolvePlaywrightStoreRuntimeConfiguration parses custom allowed browser actions from environment`() {
         val env =
             mapOf(
                 "BERTBOT_PLAYWRIGHT_STORE_ENABLED" to "true",
@@ -329,7 +329,7 @@ class PlaywrightStoreAdapterTest {
     }
 
     @Test
-    fun `resolver falls back to default allowed actions when env is blank`() {
+    fun `resolvePlaywrightStoreRuntimeConfiguration falls back to default allowed actions when env is blank`() {
         val env = mapOf("BERTBOT_PLAYWRIGHT_STORE_ENABLED" to "true")
         val config = resolvePlaywrightStoreRuntimeConfiguration(env, emptyMap())
         assertEquals(AllowedBrowserActionPolicy.DEFAULT_ALLOWED_BROWSER_ACTIONS, config.allowedBrowserActions)
