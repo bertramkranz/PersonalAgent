@@ -1,3 +1,4 @@
+%% 2026-07-14: ShoppingBridge added: StoreProvider interface, StoreProviderRegistry (priority-based selection), AmazonStoreProvider scaffold, and PersonalShopperService (provider-agnostic orchestration with budget/seller-threshold safety invariants).
 ```mermaid
 %% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
 %% 2026-07-13: Calendar response formatting now performs MCP envelope unwrapping and readable event rendering in ToolCallingSkill.
@@ -111,6 +112,12 @@ flowchart TD
         GoogleWorkspaceMcp[(Google Workspace MCP Server)]
     end
 
+    subgraph ShoppingBridge
+        StoreProviderRegistry[StoreProviderRegistry\n(priority-based provider selection)]
+        AmazonStoreProvider[AmazonStoreProvider\n(API skeleton)]
+        PersonalShopperService[PersonalShopperService\n(provider-agnostic orchestration\n+ safety invariants)]
+    end
+
     subgraph BuildQuality
         JaCoCo[JaCoCo Coverage Report\n(build/reports/jacoco)]
         SonarQube[SonarQube Community\n(local: docker-compose.sonarqube.yml)]
@@ -214,4 +221,7 @@ flowchart TD
 
     JaCoCo --> SonarQube
     DetektReport --> SonarQube
+
+    PersonalShopperService --> StoreProviderRegistry
+    StoreProviderRegistry --> AmazonStoreProvider
 ```
