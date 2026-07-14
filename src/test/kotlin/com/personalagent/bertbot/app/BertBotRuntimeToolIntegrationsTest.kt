@@ -145,6 +145,30 @@ class BertBotRuntimeToolIntegrationsTest {
         }
     }
 
+    @Test
+    fun `polymarket tool definitions constrain operation values per api family`() {
+        val polymarketRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment(emptyMap()))
+        val definitions = polymarketToolDefinitions(polymarketRouter)
+
+        fun operationsFor(toolName: String): Set<String> {
+            val definition = definitions.first { it.get("name").asString == toolName }
+            val operationSchema = definition.getAsJsonObject("inputSchema").getAsJsonObject("properties").getAsJsonObject("operation")
+            return operationSchema.getAsJsonArray("enum").map { element -> element.asString }.toSet()
+        }
+
+        val gammaOps = operationsFor(McpConstants.POLYMARKET_GAMMA_TOOL_NAME)
+        assertContains(gammaOps, "list_markets")
+        assertContains(gammaOps, "search")
+
+        val clobOps = operationsFor(McpConstants.POLYMARKET_CLOB_TOOL_NAME)
+        assertContains(clobOps, "get_book")
+        assertContains(clobOps, "get_prices_history")
+
+        val dataOps = operationsFor(McpConstants.POLYMARKET_DATA_TOOL_NAME)
+        assertContains(dataOps, "get_trades")
+        assertContains(dataOps, "get_open_interest")
+    }
+
     private fun macrofactorToolRouterWithSingleTool(): MacrofactorToolRouter {
         val runtimeConfiguration =
             MacrofactorRuntimeConfiguration(

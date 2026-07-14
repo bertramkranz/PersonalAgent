@@ -6,6 +6,8 @@
 %% 2026-07-14: External chat follow-up async execution now uses Kotlin coroutines (SupervisorJob + Dispatchers.IO), and follow-up send failures are logged for observability.
 %% 2026-07-14: Telegram follow-up sender supports API base URL override for local endpoint tests and retries once without reply_to_message_id when Telegram rejects threaded replies.
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
+%% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
+%% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]

@@ -74,7 +74,13 @@ internal class ToolCallingSkill(
                 }
                 action.isCallTool -> {
                     val toolName = action.tool ?: break
-                    val args = action.arguments ?: JsonObject()
+                    val args =
+                        normalizeToolArguments(
+                            toolName = toolName,
+                            arguments = action.arguments ?: JsonObject(),
+                            userPrompt = userPrompt,
+                            toolDefinitions = toolDefinitionsProvider(),
+                        )
                     TraceLogger.info(tracingContext, "tool_call", "tool=$toolName iteration=$iteration")
                     val result =
                         runCatching { toolExecutor(toolName, args) }
@@ -422,3 +428,149 @@ private data class ToolActionEnvelope(
     val tool: String? = null,
     val arguments: JsonObject? = null,
 )
+
+private fun normalizeToolArguments(
+    toolName: String,
+    arguments: JsonObject,
+    userPrompt: String,
+    toolDefinitions: List<JsonObject>,
+): JsonObject {
+    val operationOptions = operationEnumOptions(toolName, toolDefinitions)
+    if (operationOptions.isEmpty()) return arguments
+
+    val normalized = arguments.deepCopy()
+    val current = normalized.get("operation")?.takeIf { it.isJsonPrimitive }?.asString?.trim().orEmpty()
+    if (current in operationOptions) {
+        return normalized
+    }
+
+    val inferred =
+        inferOperationFromIntent(
+            toolName = toolName,
+            userPrompt = userPrompt,
+            operationOptions = operationOptions,
+            arguments = normalized,
+        ) ?: operationOptions.first()
+    normalized.addProperty("operation", inferred)
+    return normalized
+}
+
+private fun operationEnumOptions(
+    toolName: String,
+    toolDefinitions: List<JsonObject>,
+): List<String> {
+    val definition = toolDefinitions.firstOrNull { it.get("name")?.asString == toolName } ?: return emptyList()
+    val schema = definition.getAsJsonObject("inputSchema") ?: return emptyList()
+    val properties = schema.getAsJsonObject("properties") ?: return emptyList()
+    val operation = properties.getAsJsonObject("operation") ?: return emptyList()
+    val enumValues = operation.getAsJsonArray("enum") ?: return emptyList()
+    return enumValues.mapNotNull { element -> element.takeIf { it.isJsonPrimitive }?.asString?.trim() }.filter { it.isNotEmpty() }
+}
+
+private fun inferOperationFromIntent(
+    toolName: String,
+    userPrompt: String,
+    operationOptions: List<String>,
+    arguments: JsonObject,
+): String? {
+    val normalizedPrompt = userPrompt.lowercase()
+    val aliasMatch = bestAliasMatch(toolName, normalizedPrompt, operationOptions)
+    if (aliasMatch != null) {
+        return aliasMatch
+    }
+
+    val argumentMatch = operationFromArguments(arguments, operationOptions)
+    if (argumentMatch != null) {
+        return argumentMatch
+    }
+
+    return bestTokenOverlapMatch(normalizedPrompt, operationOptions)
+}
+
+private fun bestAliasMatch(
+    toolName: String,
+    normalizedPrompt: String,
+    operationOptions: List<String>,
+): String? {
+    val aliases = operationAliases(toolName)
+    return operationOptions
+        .map { option ->
+            val score = aliases[option].orEmpty().count { keyword -> normalizedPrompt.contains(keyword) }
+            option to score
+        }.maxByOrNull { (_, score) -> score }
+        ?.takeIf { (_, score) -> score > 0 }
+        ?.first
+}
+
+private fun operationFromArguments(
+    arguments: JsonObject,
+    operationOptions: List<String>,
+): String? {
+    val hintPairs =
+        listOf(
+            "slug" to listOf("get_market_by_slug", "get_event_by_slug"),
+            "q" to listOf("search"),
+            "token_id" to listOf("get_book"),
+            "market" to listOf("get_prices_history"),
+            "user" to listOf("get_positions"),
+        )
+
+    return hintPairs.firstNotNullOfOrNull { (field, candidates) ->
+        if (!arguments.has(field)) {
+            null
+        } else {
+            candidates.firstOrNull { it in operationOptions }
+        }
+    }
+}
+
+private fun bestTokenOverlapMatch(
+    normalizedPrompt: String,
+    operationOptions: List<String>,
+): String? {
+    val promptTerms = Regex("[a-z0-9_]+").findAll(normalizedPrompt).map { it.value }.toSet()
+    return operationOptions
+        .map { option ->
+            val optionTerms = option.split("_").filter { it.length > 1 }.toSet()
+            val overlap = optionTerms.intersect(promptTerms).size
+            option to overlap
+        }.maxByOrNull { (_, overlap) -> overlap }
+        ?.takeIf { (_, overlap) -> overlap > 0 }
+        ?.first
+}
+
+private fun operationAliases(toolName: String): Map<String, List<String>> {
+    return when (toolName) {
+        "polymarket_gamma_query" ->
+            mapOf(
+                "list_markets" to listOf("market", "markets", "active markets"),
+                "list_events" to listOf("event", "events"),
+                "get_market_by_slug" to listOf("market slug", "market by slug"),
+                "get_event_by_slug" to listOf("event slug", "event by slug"),
+                "search" to listOf("search", "find", "lookup"),
+                "list_markets_keyset" to listOf("cursor markets", "keyset markets"),
+                "list_events_keyset" to listOf("cursor events", "keyset events"),
+            )
+        "polymarket_clob_query" ->
+            mapOf(
+                "get_book" to listOf("order book", "book", "depth"),
+                "get_price" to listOf("price", "best price", "quote"),
+                "get_midpoint" to listOf("midpoint", "mid price"),
+                "get_spread" to listOf("spread", "bid ask"),
+                "get_last_trade_price" to listOf("last trade", "last price"),
+                "get_prices_history" to listOf("history", "historical", "chart"),
+            )
+        "polymarket_data_query" ->
+            mapOf(
+                "get_trades" to listOf("trade", "trades", "fills"),
+                "get_activity" to listOf("activity", "actions"),
+                "get_positions" to listOf("position", "positions", "exposure"),
+                "get_value" to listOf("value", "portfolio value", "pnl"),
+                "get_holders" to listOf("holders", "holder", "ownership"),
+                "get_open_interest" to listOf("open interest", "oi"),
+                "get_trader_leaderboard" to listOf("leaderboard", "top traders", "ranking"),
+                "get_builder_leaderboard" to listOf("builder leaderboard", "builders"),
+            )
+        else -> emptyMap()
+    }
+}

@@ -207,10 +207,88 @@ class ToolCallingSkillTest {
         assertEquals(1, gateway.callCount)
     }
 
+    @Test
+    fun `infers polymarket data operation from user intent when invalid operation provided`() {
+        val gateway =
+            SequenceLlmGateway(
+                listOf(
+                    """{"action":"call_tool","tool":"polymarket_data_query","arguments":{"operation":"top_topics","user":"0xabc"}}""",
+                    """{"action":"respond","response":"done"}""",
+                ),
+            )
+        var capturedOperation = ""
+        val skill =
+            ToolCallingSkill(
+                llmGateway = gateway,
+                toolDefinitions = listOf(polymarketDataToolDef()),
+                toolExecutor = { _, args ->
+                    capturedOperation = args.get("operation").asString
+                    "ok"
+                },
+            )
+
+        val response = skill.invoke("System", "Show my positions on Polymarket", TracingContext())
+
+        assertEquals("done", response)
+        assertEquals("get_positions", capturedOperation)
+    }
+
+    @Test
+    fun `keeps valid operation when already supported`() {
+        val gateway =
+            SequenceLlmGateway(
+                listOf(
+                    """{"action":"call_tool","tool":"polymarket_data_query","arguments":{"operation":"get_trades","market":"0x1"}}""",
+                    """{"action":"respond","response":"done"}""",
+                ),
+            )
+        var capturedOperation = ""
+        val skill =
+            ToolCallingSkill(
+                llmGateway = gateway,
+                toolDefinitions = listOf(polymarketDataToolDef()),
+                toolExecutor = { _, args ->
+                    capturedOperation = args.get("operation").asString
+                    "ok"
+                },
+            )
+
+        val response = skill.invoke("System", "Get latest trades", TracingContext())
+
+        assertEquals("done", response)
+        assertEquals("get_trades", capturedOperation)
+    }
+
     private fun toolDef(name: String): JsonObject {
         val obj = JsonObject()
         obj.addProperty("name", name)
         obj.addProperty("description", "Test tool")
+        return obj
+    }
+
+    private fun polymarketDataToolDef(): JsonObject {
+        val obj = toolDef("polymarket_data_query")
+        val inputSchema = JsonObject()
+        inputSchema.addProperty("type", "object")
+        val properties = JsonObject()
+        val operation = JsonObject()
+        operation.addProperty("type", "string")
+        operation.add(
+            "enum",
+            JsonArray().apply {
+                add("get_trades")
+                add("get_activity")
+                add("get_positions")
+                add("get_value")
+                add("get_holders")
+                add("get_open_interest")
+                add("get_trader_leaderboard")
+                add("get_builder_leaderboard")
+            },
+        )
+        properties.add("operation", operation)
+        inputSchema.add("properties", properties)
+        obj.add("inputSchema", inputSchema)
         return obj
     }
 
