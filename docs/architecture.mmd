@@ -8,6 +8,7 @@
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
+%% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]

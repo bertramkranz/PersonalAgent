@@ -199,4 +199,49 @@ class BertBotRuntimeToolIntegrationsTest {
 
         return MacrofactorToolRouter(runtimeConfiguration = runtimeConfiguration, transport = transport)
     }
+
+    @Test
+    fun `validate shopping configuration fails fast when personal shopper is enabled without a store`() {
+        val configWithShopperEnabled =
+            BertBotAgentConfig(
+                subAgents =
+                    BertBotAgentConfig().subAgents.map { definition ->
+                        if (definition.id == "personal_shopper") definition.copy(enabled = true) else definition
+                    },
+            )
+        val shoppingConfig = ShoppingRuntimeConfiguration(stores = emptyList())
+
+        val error =
+            assertFailsWith<IllegalStateException> {
+                validateShoppingConfiguration(configWithShopperEnabled, shoppingConfig)
+            }
+
+        assertContains(error.message ?: "", "personal_shopper")
+        assertContains(error.message ?: "", "BERTBOT_SHOPPING_STORE_1_ENABLED")
+    }
+
+    @Test
+    fun `validate shopping configuration passes when personal shopper is enabled with a store`() {
+        val configWithShopperEnabled =
+            BertBotAgentConfig(
+                subAgents =
+                    BertBotAgentConfig().subAgents.map { definition ->
+                        if (definition.id == "personal_shopper") definition.copy(enabled = true) else definition
+                    },
+            )
+        val shoppingConfig =
+            ShoppingRuntimeConfiguration(
+                stores = listOf(ShoppingStoreRuntimeConfiguration(index = 1, enabled = true)),
+            )
+
+        validateShoppingConfiguration(configWithShopperEnabled, shoppingConfig)
+    }
+
+    @Test
+    fun `validate shopping configuration passes when personal shopper is disabled without a store`() {
+        val defaultConfig = BertBotAgentConfig()
+        val shoppingConfig = ShoppingRuntimeConfiguration(stores = emptyList())
+
+        validateShoppingConfiguration(defaultConfig, shoppingConfig)
+    }
 }

@@ -579,6 +579,19 @@ internal fun validateToolBackedSubAgentCoverage(
     }
 }
 
+internal fun validateShoppingConfiguration(
+    config: BertBotAgentConfig,
+    shoppingConfiguration: ShoppingRuntimeConfiguration,
+) {
+    val personalShopperEnabled = config.enabledSubAgents().any { it.id == "personal_shopper" }
+    if (personalShopperEnabled && !shoppingConfiguration.hasEnabledStore) {
+        error(
+            "personal_shopper sub-agent is enabled but no shopping store provider is configured and enabled. " +
+                "Configure at least one store via BERTBOT_SHOPPING_STORE_1_ENABLED=true.",
+        )
+    }
+}
+
 internal fun polymarketToolDefinitions(polymarketToolRouter: PolymarketToolRouter?): List<JsonObject> {
     if (polymarketToolRouter == null) return emptyList()
 
