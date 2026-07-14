@@ -51,6 +51,18 @@ Core tools include:
 - `polymarket_clob_query`
 - `polymarket_data_query`
 
+`workspace_list_dir`, `workspace_read_file`, and `workspace_search` now accept an optional `root` argument. Supported roots are `workspace` (default), `state`, and `logs`.
+
+Example MCP calls:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"workspace_read_file","arguments":{"root":"state","path":"bertbot-memory.txt"}}}
+```
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"workspace_search","arguments":{"root":"logs","query":"ERROR","maxResults":10}}}
+```
+
 Additional tool groups are conditional:
 
 - Ingestion tools appear when ingestion control is enabled.

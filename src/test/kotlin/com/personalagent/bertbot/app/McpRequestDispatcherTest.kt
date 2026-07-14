@@ -393,6 +393,35 @@ class McpRequestDispatcherTest {
     }
 
     @Test
+    fun `workspace read file supports state root`() {
+        val workspace = createTempDirectory(prefix = "mcp-workspace").toFile()
+        workspace.deleteOnExit()
+        val stateDir = createTempDirectory(prefix = "mcp-state").toFile()
+        stateDir.deleteOnExit()
+        File(stateDir, "memory.txt").writeText("episodic\nsemantic")
+
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                workspaceRoot = workspace,
+                persistenceConfiguration = PersistenceRuntimeConfiguration(stateFilePath = File(stateDir, "bertbot-state.json").path),
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":71,"method":"tools/call","params":{"name":"workspace_read_file","arguments":{"root":"state","path":"memory.txt"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("episodic"))
+        assertTrue(text.contains("semantic"))
+        assertEquals(false, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
     fun `workspace search returns matching files`() {
         val workspace = createTempDirectory(prefix = "mcp-workspace").toFile()
         workspace.deleteOnExit()
@@ -410,7 +439,35 @@ class McpRequestDispatcherTest {
 
         val json = JsonParser.parseString(response).asJsonObject
         val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
-        assertTrue(text.contains("alpha.txt:2"))
+        assertTrue(text.contains("workspace:alpha.txt:2"))
+        assertEquals(false, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
+    fun `workspace search supports state root`() {
+        val workspace = createTempDirectory(prefix = "mcp-workspace").toFile()
+        workspace.deleteOnExit()
+        val stateDir = createTempDirectory(prefix = "mcp-state-search").toFile()
+        stateDir.deleteOnExit()
+        File(stateDir, "memory.txt").writeText("summary token\n")
+
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                workspaceRoot = workspace,
+                persistenceConfiguration = PersistenceRuntimeConfiguration(stateFilePath = File(stateDir, "bertbot-state.json").path),
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":81,"method":"tools/call","params":{"name":"workspace_search","arguments":{"root":"state","query":"summary token"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("state:memory.txt:1"))
         assertEquals(false, json.getAsJsonObject("result").get("isError").asBoolean)
     }
 
@@ -430,7 +487,51 @@ class McpRequestDispatcherTest {
 
         val json = JsonParser.parseString(response).asJsonObject
         val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
-        assertTrue(text.contains("outside workspace root"))
+        assertTrue(text.contains("outside allowed root: workspace"))
+        assertEquals(true, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
+    fun `workspace tools reject paths outside selected state root`() {
+        val workspace = createTempDirectory(prefix = "mcp-workspace").toFile()
+        workspace.deleteOnExit()
+        val stateDir = createTempDirectory(prefix = "mcp-state-reject").toFile()
+        stateDir.deleteOnExit()
+
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                workspaceRoot = workspace,
+                persistenceConfiguration = PersistenceRuntimeConfiguration(stateFilePath = File(stateDir, "bertbot-state.json").path),
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":91,"method":"tools/call","params":{"name":"workspace_read_file","arguments":{"root":"state","path":"../secrets.txt"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("outside allowed root: state"))
+        assertEquals(true, json.getAsJsonObject("result").get("isError").asBoolean)
+    }
+
+    @Test
+    fun `workspace tools reject unsupported root`() {
+        val dispatcher = McpRequestDispatcher(respondToPrompt = { _, _ -> "unused" })
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":92,"method":"tools/call","params":{"name":"workspace_read_file","arguments":{"root":"desktop","path":"notes.txt"}}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
+        assertTrue(text.contains("Unsupported root: desktop"))
         assertEquals(true, json.getAsJsonObject("result").get("isError").asBoolean)
     }
 

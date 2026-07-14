@@ -74,6 +74,7 @@ internal fun runMcpSession(
 internal class McpRequestDispatcher(
     private val respondToPrompt: (String, String?) -> String?,
     workspaceRoot: File = File("."),
+    persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     private val macrofactorToolRouter: MacrofactorToolRouter? = null,
     private val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter? = null,
     private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
@@ -90,7 +91,7 @@ internal class McpRequestDispatcher(
     },
 ) {
     private val workspaceRootFile = workspaceRoot.canonicalFile
-    private val workspaceToolHandler = McpWorkspaceToolHandler(workspaceRootFile)
+    private val workspaceToolHandler = McpWorkspaceToolHandler(workspaceRootFile, persistenceConfiguration)
     private val ingestionToolHandler = McpIngestionToolHandler(ingestionControlPlane, externalChatResponder)
     private val checkpointToolHandler =
         if (hasCheckpointToolFunctions()) {

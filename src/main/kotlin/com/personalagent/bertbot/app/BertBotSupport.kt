@@ -734,7 +734,7 @@ internal fun buildCapabilityStatusResponse(
 
     return buildString {
         appendLine("Capability status snapshot:")
-        appendLine("- workspace.read_file (repo documents): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
+        appendLine("- workspace.read_file (allowed file roots): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
         appendLine("- Google Workspace MCP: $googleWorkspaceStatus")
         appendLine("- Playwright capability: ${if (playwrightEnabled) "enabled" else "disabled"}")
         appendLine()

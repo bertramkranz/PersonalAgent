@@ -5,17 +5,16 @@ import java.io.File
 
 internal class McpWorkspaceToolHandler(
     workspaceRoot: File,
+    persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
 ) {
     private val workspaceRootFile = workspaceRoot.canonicalFile
-    private val inspector = McpWorkspaceFileInspector(workspaceRootFile)
+    private val fileAccessRoots = buildFileAccessRoots(workspaceRootFile, persistenceConfiguration)
 
     fun listDir(params: JsonObject): Pair<Boolean, String> {
         val arguments = params.argumentsOrSelf()
         val pathValue = arguments.stringValue("path") ?: "."
-        val directory = inspector.resolveWorkspacePath(pathValue)
-        if (directory == null) {
-            return true to "Path is outside workspace root."
-        }
+        val access = resolveAccessTarget(arguments, pathValue) ?: return true to unsupportedRootMessage(arguments)
+        val directory = access.file ?: return true to "Path is outside allowed root: ${access.root.id}."
 
         if (!directory.exists()) {
             return true to "Path does not exist: $pathValue"
@@ -30,7 +29,7 @@ internal class McpWorkspaceToolHandler(
                 ?.sortedBy { it.name.lowercase() }
                 ?.joinToString(separator = "\n") { file ->
                     val suffix = if (file.isDirectory) "/" else ""
-                    "${inspector.toWorkspaceRelativePath(file)}$suffix"
+                    "${access.root.id}:${access.inspector.toRootRelativePath(file)}$suffix"
                 }
                 ?: ""
 
@@ -45,10 +44,8 @@ internal class McpWorkspaceToolHandler(
             return true to "Missing required field: path"
         }
 
-        val file = inspector.resolveWorkspacePath(pathValue)
-        if (file == null) {
-            return true to "Path is outside workspace root."
-        }
+        val access = resolveAccessTarget(arguments, pathValue) ?: return true to unsupportedRootMessage(arguments)
+        val file = access.file ?: return true to "Path is outside allowed root: ${access.root.id}."
 
         if (!file.exists()) {
             return true to "File does not exist: $pathValue"
@@ -83,10 +80,12 @@ internal class McpWorkspaceToolHandler(
         if (query.isNullOrBlank()) {
             return true to "Missing required field: query"
         }
+        val access = resolveAccessTarget(arguments, ".") ?: return true to unsupportedRootMessage(arguments)
+        val searchRoot = access.file ?: return true to "Path is outside allowed root: ${access.root.id}."
 
         val maxResults = (arguments.intValue("maxResults") ?: 20).coerceIn(1, 200)
         val files =
-            workspaceRootFile
+            searchRoot
                 .walkTopDown()
                 .onEnter { dir -> dir.name != ".git" && dir.name != "build" && dir.name != ".gradle" }
                 .filter { it.isFile }
@@ -104,7 +103,7 @@ internal class McpWorkspaceToolHandler(
                         ?.let { (index, line) ->
                             val lineNumber = index + 1
                             val snippet = line.trim().take(200)
-                            matches.add("${inspector.toWorkspaceRelativePath(file)}:$lineNumber: $snippet")
+                            matches.add("${access.root.id}:${access.inspector.toRootRelativePath(file)}:$lineNumber: $snippet")
                         }
                 }
             }
@@ -113,7 +112,58 @@ internal class McpWorkspaceToolHandler(
         val body = if (matches.isEmpty()) "No matches found." else matches.joinToString(separator = "\n")
         return false to body
     }
+
+    private fun resolveAccessTarget(
+        arguments: JsonObject,
+        pathValue: String,
+    ): AccessTarget? {
+        val rootId = arguments.stringValue("root") ?: DEFAULT_FILE_ACCESS_ROOT_ID
+        val root = fileAccessRoots[rootId] ?: return null
+        return AccessTarget(
+            root = root,
+            inspector = McpWorkspaceFileInspector(root.directory),
+            file = McpWorkspaceFileInspector(root.directory).resolveWorkspacePath(pathValue),
+        )
+    }
+
+    private fun unsupportedRootMessage(arguments: JsonObject): String {
+        val requestedRoot = arguments.stringValue("root") ?: DEFAULT_FILE_ACCESS_ROOT_ID
+        return if (fileAccessRoots.containsKey(requestedRoot)) {
+            "Path is outside allowed root: $requestedRoot."
+        } else {
+            "Unsupported root: $requestedRoot. Supported roots: ${fileAccessRoots.keys.sorted().joinToString()}"
+        }
+    }
 }
+
+private data class FileAccessRoot(
+    val id: String,
+    val directory: File,
+)
+
+private data class AccessTarget(
+    val root: FileAccessRoot,
+    val inspector: McpWorkspaceFileInspector,
+    val file: File?,
+)
+
+private fun buildFileAccessRoots(
+    workspaceRoot: File,
+    persistenceConfiguration: PersistenceRuntimeConfiguration,
+): Map<String, FileAccessRoot> {
+    val stateDirectory = File(persistenceConfiguration.stateFilePath).absoluteFile.parentFile ?: File(DEFAULT_STATE_FILES_DIRECTORY)
+    val logsDirectory = File(DEFAULT_TRACE_FILE_PATH).absoluteFile.parentFile ?: File(DEFAULT_LOGS_DIRECTORY)
+
+    return listOf(
+        FileAccessRoot(DEFAULT_FILE_ACCESS_ROOT_ID, workspaceRoot.canonicalFile),
+        FileAccessRoot(STATE_FILE_ACCESS_ROOT_ID, stateDirectory.canonicalFile),
+        FileAccessRoot(LOGS_FILE_ACCESS_ROOT_ID, logsDirectory.canonicalFile),
+    ).associateBy { root -> root.id }
+}
+
+private const val DEFAULT_FILE_ACCESS_ROOT_ID = "workspace"
+private const val STATE_FILE_ACCESS_ROOT_ID = "state"
+private const val LOGS_FILE_ACCESS_ROOT_ID = "logs"
 
 private class McpWorkspaceFileInspector(
     private val workspaceRootFile: File,
@@ -130,7 +180,7 @@ private class McpWorkspaceFileInspector(
         return if (canonicalCandidate.mcpWorkspaceIsWithin(workspaceRootFile)) canonicalCandidate else null
     }
 
-    fun toWorkspaceRelativePath(file: File): String {
+    fun toRootRelativePath(file: File): String {
         val workspacePath = workspaceRootFile.toPath()
         val filePath = file.canonicalFile.toPath()
         return workspacePath.relativize(filePath).toString().replace("\\", "/")

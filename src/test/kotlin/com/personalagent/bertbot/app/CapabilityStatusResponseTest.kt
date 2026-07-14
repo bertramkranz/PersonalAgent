@@ -24,7 +24,7 @@ class CapabilityStatusResponseTest {
         val response = buildCapabilityStatusResponse(BertBotAgentConfig(), "Do you have access to my documents and can you use Playwright?")
 
         assertNotNull(response)
-        assertTrue(response.contains("workspace.read_file (repo documents): enabled"))
+        assertTrue(response.contains("workspace.read_file (allowed file roots): enabled"))
         assertTrue(response.contains("Playwright capability: enabled"))
     }
 

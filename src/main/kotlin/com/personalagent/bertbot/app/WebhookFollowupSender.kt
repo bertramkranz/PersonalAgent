@@ -108,7 +108,7 @@ private class HttpExternalChatFollowupSender(
         postJson(
             url = url,
             json = payload.toString(),
-            bearerToken = token,
+            authorizationHeader = "Bot $token",
         )
     }
 
@@ -116,6 +116,7 @@ private class HttpExternalChatFollowupSender(
         url: String,
         json: String,
         bearerToken: String? = null,
+        authorizationHeader: String? = null,
     ) {
         val builder =
             HttpRequest
@@ -123,7 +124,9 @@ private class HttpExternalChatFollowupSender(
                 .timeout(Duration.ofSeconds(15))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
-        if (!bearerToken.isNullOrBlank()) {
+        if (!authorizationHeader.isNullOrBlank()) {
+            builder.header("Authorization", authorizationHeader)
+        } else if (!bearerToken.isNullOrBlank()) {
             builder.header("Authorization", "Bearer $bearerToken")
         }
 
