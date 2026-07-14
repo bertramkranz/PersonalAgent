@@ -32,7 +32,7 @@ jobs:
       AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
       DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
       TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
-      TELEGRAM_BOT_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_BOT_TOKEN_SECRET_NAME || 'bertbot-telegram-bot-token' }}
+      TELEGRAM_BOT_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_BOT_TOKEN_SECRET_NAME || '' }}
       SLACK_SIGNING_SECRET_NAME: ${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}
       WHATSAPP_APP_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}
       WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}
@@ -167,8 +167,13 @@ jobs:
             "BERTBOT_AI_API_KEY=${AI_API_KEY_SECRET_NAME}:latest"
             "BERTBOT_STATE_JDBC_PASSWORD=${DB_PASSWORD_SECRET_NAME}:latest"
             "BERTBOT_TELEGRAM_SECRET_TOKEN=${TELEGRAM_SECRET_TOKEN_SECRET_NAME}:latest"
-            "BERTBOT_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN_SECRET_NAME}:latest"
           )
+
+          if [ -n "${TELEGRAM_BOT_TOKEN_SECRET_NAME:-}" ]; then
+            if [ "${TELEGRAM_BOT_TOKEN_SECRET_NAME,,}" != "disabled" ]; then
+              secret_mappings+=("BERTBOT_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN_SECRET_NAME}:latest")
+            fi
+          fi
 
           if [ -n "${SLACK_SIGNING_SECRET_NAME:-}" ]; then
             if [ "${SLACK_SIGNING_SECRET_NAME,,}" != "disabled" ]; then

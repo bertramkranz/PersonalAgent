@@ -90,7 +90,7 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
-- `TELEGRAM_BOT_TOKEN_SECRET_NAME` (default `bertbot-telegram-bot-token`)
+- `TELEGRAM_BOT_TOKEN_SECRET_NAME` (default empty; set only when Telegram bot token integration is enabled)
 - `SLACK_SIGNING_SECRET_NAME` (default empty; set only when Slack integration is enabled)
 - `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
@@ -125,7 +125,7 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
 Grant Secret Manager accessor on runtime secrets actually used by the service:
 
 ```bash
-for secret in bertbot-ai-api-key bertbot-db-password bertbot-telegram-secret-token bertbot-telegram-bot-token; do
+for secret in bertbot-ai-api-key bertbot-db-password bertbot-telegram-secret-token; do
   gcloud secrets add-iam-policy-binding "$secret" \
     --project=YOUR_PROJECT_ID \
     --member="serviceAccount:bertbot-webhook-runtime@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
