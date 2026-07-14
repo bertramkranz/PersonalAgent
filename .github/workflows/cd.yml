@@ -24,10 +24,11 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag_ref || github.ref }}
 
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+
       - name: Set up repository and Java toolchain
         uses: ./.github/actions/setup-java-gradle
-        with:
-          validate-wrapper: "true"
 
       - name: Build distributions
         run: ./gradlew --no-daemon clean check distZip distTar
