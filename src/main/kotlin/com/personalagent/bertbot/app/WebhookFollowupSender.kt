@@ -108,7 +108,8 @@ private class HttpExternalChatFollowupSender(
         postJson(
             url = url,
             json = payload.toString(),
-            authorizationHeader = "Bot $token",
+            bearerToken = token,
+            authorizationScheme = "Bot",
         )
     }
 
@@ -117,6 +118,7 @@ private class HttpExternalChatFollowupSender(
         json: String,
         bearerToken: String? = null,
         authorizationHeader: String? = null,
+        authorizationScheme: String = "Bearer",
     ) {
         val builder =
             HttpRequest
@@ -128,6 +130,10 @@ private class HttpExternalChatFollowupSender(
             builder.header("Authorization", authorizationHeader)
         } else if (!bearerToken.isNullOrBlank()) {
             builder.header("Authorization", "Bearer $bearerToken")
+        if (!authorizationHeader.isNullOrBlank()) {
+            builder.header("Authorization", authorizationHeader)
+        } else if (!bearerToken.isNullOrBlank()) {
+            builder.header("Authorization", "$authorizationScheme $bearerToken")
         }
 
         runCatching {
