@@ -8,6 +8,7 @@
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
+%% 2026-07-14: ShoppingToolRouter added with operations search/details/compare/cart_prepare/checkout_prepare; hard-blocks place_order; enforces budget and seller-trust guardrails; requires confirmation_token for state-changing ops.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -107,6 +108,11 @@ flowchart TD
     subgraph GoogleWorkspaceBridge
         GoogleWorkspaceToolRouter[GoogleWorkspaceToolRouter]
         GoogleWorkspaceMcp[(Google Workspace MCP Server)]
+    end
+
+    subgraph ShoppingBridge
+        ShoppingToolRouter[ShoppingToolRouter\n(policy-only: no external API)]
+        ShoppingGuardrails[Guardrails:\n- confirmation_token required for cart/checkout\n- budget limit check\n- seller trust score filter\n- hard-block place_order]
     end
 
     subgraph BuildQuality
@@ -209,6 +215,9 @@ flowchart TD
 
     MCP --> GoogleWorkspaceToolRouter
     GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
+
+    MCP --> ShoppingToolRouter
+    ShoppingToolRouter --> ShoppingGuardrails
 
     JaCoCo --> SonarQube
     DetektReport --> SonarQube

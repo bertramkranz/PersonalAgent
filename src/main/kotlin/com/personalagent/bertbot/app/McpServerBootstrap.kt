@@ -7,6 +7,7 @@ internal object McpServerBootstrap {
         val aiRuntimeConfiguration: AiRuntimeConfiguration,
         val macrofactorRuntimeConfiguration: MacrofactorRuntimeConfiguration,
         val googleWorkspaceRuntimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
+        val shoppingRuntimeConfiguration: ShoppingRuntimeConfiguration = ShoppingRuntimeConfiguration(),
         val workspaceRoot: File,
         val toolNames: McpToolNames,
         val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration? = null,
@@ -19,7 +20,7 @@ internal object McpServerBootstrap {
         val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     )
 
-    @Suppress("CyclomaticComplexMethod")
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     fun createDispatcherContext(input: DispatcherContextInput): DispatcherContext {
         val startup = createStartupState(input.aiRuntimeConfiguration, input.workspaceRoot)
         val checkpointRollbackPolicy = input.checkpointRollbackPolicy ?: resolveCheckpointRollbackPolicyConfiguration()
@@ -32,6 +33,12 @@ internal object McpServerBootstrap {
         val googleWorkspaceToolRouter =
             if (input.googleWorkspaceRuntimeConfiguration.enabled) {
                 GoogleWorkspaceToolRouter(input.googleWorkspaceRuntimeConfiguration)
+            } else {
+                null
+            }
+        val shoppingToolRouter =
+            if (input.shoppingRuntimeConfiguration.enabled) {
+                ShoppingToolRouter(input.shoppingRuntimeConfiguration)
             } else {
                 null
             }
@@ -74,6 +81,7 @@ internal object McpServerBootstrap {
                 googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                 polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
                 continuousResearchToolRouter = continuousResearchToolRouter,
+                shoppingToolRouter = shoppingToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
                 externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
                 listCheckpoints = startup.runtime?.let { runtime -> { scopeKey -> runtime.listCheckpoints(scopeKey ?: "global") } },

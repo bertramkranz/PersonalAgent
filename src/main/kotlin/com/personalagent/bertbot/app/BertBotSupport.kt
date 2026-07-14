@@ -50,6 +50,12 @@ internal data class PersistenceRuntimeConfiguration(
     val ingestionSourceStateJdbcTable: String = DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
 )
 
+internal data class ShoppingRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_SHOPPING_ENABLED,
+    val budgetLimitCents: Long = DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS,
+    val minSellerTrustScore: Double = DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE,
+)
+
 internal data class MacrofactorRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_MACROFACTOR_ENABLED,
     val command: String = DEFAULT_MACROFACTOR_COMMAND,
@@ -121,6 +127,9 @@ internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic
 internal const val DEFAULT_PROFILE_JDBC_TABLE = "bertbot_profile_snapshot"
 internal const val DEFAULT_INGESTION_CONSENT_JDBC_TABLE = "bertbot_ingestion_consent_snapshot"
 internal const val DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE = "bertbot_ingestion_source_state_snapshot"
+internal const val DEFAULT_SHOPPING_ENABLED = false
+internal const val DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS: Long = 10_000L
+internal const val DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE: Double = 0.7
 internal const val DEFAULT_MACROFACTOR_ENABLED = false
 internal const val DEFAULT_MACROFACTOR_COMMAND = "npx"
 internal val DEFAULT_MACROFACTOR_ARGS = listOf("-y", "sjawhar-macrofactor")
@@ -484,6 +493,40 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
         args = args,
         timeoutSeconds = timeoutSeconds,
         toolNamePrefix = toolNamePrefix,
+    )
+}
+
+internal fun resolveShoppingRuntimeConfiguration(): ShoppingRuntimeConfiguration =
+    resolveShoppingRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveShoppingRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): ShoppingRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_SHOPPING_ENABLED", environment, dotEnvValues)
+            ?.toBooleanStrictOrNull()
+            ?: DEFAULT_SHOPPING_ENABLED
+
+    val budgetLimitCents =
+        resolveRuntimeSetting("BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceAtLeast(0)
+            ?: DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS
+
+    val minSellerTrustScore =
+        resolveRuntimeSetting("BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE", environment, dotEnvValues)
+            ?.toDoubleOrNull()
+            ?.coerceIn(0.0, 1.0)
+            ?: DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE
+
+    return ShoppingRuntimeConfiguration(
+        enabled = enabled,
+        budgetLimitCents = budgetLimitCents,
+        minSellerTrustScore = minSellerTrustScore,
     )
 }
 
