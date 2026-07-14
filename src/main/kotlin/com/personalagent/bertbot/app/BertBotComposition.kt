@@ -441,7 +441,7 @@ internal class BertBotRequestContextBuilder(
         memoryRuntime.memoryWorker.scheduleIfNeeded()
 
         val knownProfile = memoryRuntime.userProfileStore.current()
-        val profileSummary = knownProfile.displayName?.let { name -> listOf("Known user name: $name") } ?: emptyList()
+        val profileSummary = buildProfileSummary(knownProfile)
         val requestTraceId = traceCorrelationId?.let { "mcp-$it-${TracingContext().traceId}" } ?: TracingContext().traceId
         val initialState =
             BertBotState(
@@ -462,6 +462,25 @@ internal class BertBotRequestContextBuilder(
             requestTraceId = requestTraceId,
         )
     }
+}
+
+internal fun buildProfileSummary(profile: UserProfile): List<String> {
+    val summary = mutableListOf<String>()
+    profile.displayName?.let { name -> summary += "Known user name: $name" }
+    if (profile.preferredBrands.isNotEmpty()) {
+        summary += "Preferred brands: ${profile.preferredBrands.sorted().joinToString(", ")}"
+    }
+    if (profile.preferredSizes.isNotEmpty()) {
+        summary += "Preferred sizes: ${profile.preferredSizes.sorted().joinToString(", ")}"
+    }
+    if (profile.preferredStores.isNotEmpty()) {
+        summary += "Preferred stores: ${profile.preferredStores.sorted().joinToString(", ")}"
+    }
+    profile.budgetLimitCents?.let { cents -> summary += "Shopping budget limit: $cents¢" }
+    if (profile.shoppingNotes.isNotEmpty()) {
+        summary += "Shopping notes: ${profile.shoppingNotes.sorted().joinToString("; ")}"
+    }
+    return summary
 }
 
 internal object BertBotConnectorRuntimeFactory {
