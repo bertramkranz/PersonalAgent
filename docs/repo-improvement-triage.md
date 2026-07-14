@@ -21,7 +21,7 @@ Summary: 39 unique items -> IMPLEMENTED: 4, OPEN: 8, PARTIAL: 27.
 - Provide Example Environment File: Both example env files exist.
 
 ## Open
-- Add dedicated repo improvement researcher sub-agent: No dedicated repo-improvement researcher sub-agent found.
+- Add dedicated repo improvement researcher sub-agent: Sub-agent config exists (`repo_improvement_researcher`) but is disabled by default.
 - Consolidate .env Files: Multiple env file variants intentionally remain.
 - Consolidate Environment Files: Multiple env file variants intentionally remain.
 - Consolidate Environment Variables: Multiple env file variants intentionally remain.
