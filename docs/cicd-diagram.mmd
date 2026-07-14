@@ -3,7 +3,7 @@ flowchart TD
     %% 2026-07-13: deploy-cloud-run-main workflow now builds Cloud Run env vars via shell arrays for safer YAML maintenance.
     %% 2026-07-13: Slack/WhatsApp secrets are optional and only injected when corresponding repo vars are set.
     %% 2026-07-13: deploy workflow now preflights optional secret names and runtime service account references before build/deploy.
-    %% 2026-07-14: Optional secret-name vars support a 'disabled' sentinel to intentionally skip validation and secret injection, and deploy-cloud-run-main injects BERTBOT_TELEGRAM_BOT_TOKEN from Secret Manager.
+    %% 2026-07-13: Optional secret-name vars support a 'disabled' sentinel to intentionally skip validation and secret injection.
     %% 2026-07-14: codeql.yml build step now uses --no-build-cache so the Kotlin compiler is always invoked and CodeQL can intercept compilation.
     %% 2026-07-14: deploy-cloud-run-main supports optional TELEGRAM_BOT_TOKEN_SECRET_NAME and injects BERTBOT_TELEGRAM_BOT_TOKEN only when configured.
     %% ── Entry points ──────────────────────────────────────────────────────────
