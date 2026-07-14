@@ -46,12 +46,17 @@ internal fun buildInitializeResultPayload(
     return result
 }
 
+internal data class OptionalToolDefinitions(
+    val macrofactorToolDefinitions: List<JsonObject> = emptyList(),
+    val googleWorkspaceToolDefinitions: List<JsonObject> = emptyList(),
+    val continuousResearchToolDefinitions: List<JsonObject> = emptyList(),
+    val shoppingToolDefinitions: List<JsonObject> = emptyList(),
+)
+
 internal fun buildToolsListResultPayload(
     includeIngestionTools: Boolean,
     toolNames: McpToolNames,
-    macrofactorToolDefinitions: List<JsonObject> = emptyList(),
-    googleWorkspaceToolDefinitions: List<JsonObject> = emptyList(),
-    continuousResearchToolDefinitions: List<JsonObject> = emptyList(),
+    optionalToolDefinitions: OptionalToolDefinitions = OptionalToolDefinitions(),
 ): JsonObject {
     val result = JsonObject()
     val tools = JsonArray()
@@ -60,9 +65,10 @@ internal fun buildToolsListResultPayload(
         ingestionToolDefinitions(toolNames).forEach { tool -> tools.add(tool) }
     }
 
-    macrofactorToolDefinitions.forEach { tool -> tools.add(tool) }
-    googleWorkspaceToolDefinitions.forEach { tool -> tools.add(tool) }
-    continuousResearchToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.macrofactorToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.googleWorkspaceToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.continuousResearchToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.shoppingToolDefinitions.forEach { tool -> tools.add(tool) }
 
     result.add("tools", tools)
     return result
