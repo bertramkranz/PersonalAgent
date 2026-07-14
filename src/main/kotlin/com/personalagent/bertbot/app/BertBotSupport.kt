@@ -54,7 +54,13 @@ internal data class ShoppingRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_SHOPPING_ENABLED,
     val budgetLimitCents: Long = DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS,
     val minSellerTrustScore: Double = DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE,
-)
+    val stores: List<ShoppingStoreRuntimeConfiguration> = emptyList(),
+) {
+    val hasEnabledStore: Boolean
+        get() = stores.any { it.enabled }
+    val enabledStoresSortedByPriority: List<ShoppingStoreRuntimeConfiguration>
+        get() = stores.filter { it.enabled }.sortedBy { it.priority }
+}
 
 internal data class MacrofactorRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_MACROFACTOR_ENABLED,
@@ -123,15 +129,6 @@ internal data class ShoppingStoreRuntimeConfiguration(
     val region: String? = null,
     val currency: String? = null,
 )
-
-internal data class ShoppingRuntimeConfiguration(
-    val stores: List<ShoppingStoreRuntimeConfiguration> = emptyList(),
-) {
-    val hasEnabledStore: Boolean
-        get() = stores.any { it.enabled }
-    val enabledStoresSortedByPriority: List<ShoppingStoreRuntimeConfiguration>
-        get() = stores.filter { it.enabled }.sortedBy { it.priority }
-}
 
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
@@ -563,11 +560,40 @@ internal fun resolveShoppingRuntimeConfiguration(
             ?.toDoubleOrNull()
             ?.coerceIn(0.0, 1.0)
             ?: DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE
-
+    val stores =
+        (1..MAX_SHOPPING_STORES).mapNotNull { index ->
+            val enabledRaw =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_ENABLED", environment, dotEnvValues)
+                    ?: return@mapNotNull null
+            val enabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
+            val mode =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_MODE", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: DEFAULT_SHOPPING_STORE_MODE
+            val priority =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_PRIORITY", environment, dotEnvValues)
+                    ?.toIntOrNull()
+                    ?: DEFAULT_SHOPPING_STORE_PRIORITY
+            val region =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_REGION", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+            val currency =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_CURRENCY", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+            ShoppingStoreRuntimeConfiguration(
+                index = index,
+                enabled = enabled,
+                mode = mode,
+                priority = priority,
+                region = region,
+                currency = currency,
+            )
+        }
     return ShoppingRuntimeConfiguration(
         enabled = enabled,
         budgetLimitCents = budgetLimitCents,
         minSellerTrustScore = minSellerTrustScore,
+        stores = stores,
     )
 }
 
@@ -661,48 +687,6 @@ internal fun resolveCheckpointRollbackPolicyConfiguration(
         requireConfirm = requireConfirm,
         allowInProtectedEnvironment = allowInProtectedEnvironment,
     )
-}
-
-internal fun resolveShoppingRuntimeConfiguration(): ShoppingRuntimeConfiguration =
-    resolveShoppingRuntimeConfiguration(
-        environment = System.getenv(),
-        dotEnvValues = loadDotEnvValues(),
-    )
-
-internal fun resolveShoppingRuntimeConfiguration(
-    environment: Map<String, String>,
-    dotEnvValues: Map<String, String>,
-): ShoppingRuntimeConfiguration {
-    val stores =
-        (1..MAX_SHOPPING_STORES).mapNotNull { index ->
-            val enabledRaw =
-                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_ENABLED", environment, dotEnvValues)
-                    ?: return@mapNotNull null
-            val enabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
-            val mode =
-                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_MODE", environment, dotEnvValues)
-                    ?.takeIf { it.isNotBlank() }
-                    ?: DEFAULT_SHOPPING_STORE_MODE
-            val priority =
-                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_PRIORITY", environment, dotEnvValues)
-                    ?.toIntOrNull()
-                    ?: DEFAULT_SHOPPING_STORE_PRIORITY
-            val region =
-                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_REGION", environment, dotEnvValues)
-                    ?.takeIf { it.isNotBlank() }
-            val currency =
-                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_CURRENCY", environment, dotEnvValues)
-                    ?.takeIf { it.isNotBlank() }
-            ShoppingStoreRuntimeConfiguration(
-                index = index,
-                enabled = enabled,
-                mode = mode,
-                priority = priority,
-                region = region,
-                currency = currency,
-            )
-        }
-    return ShoppingRuntimeConfiguration(stores = stores)
 }
 
 private fun parseCommandArgs(value: String): List<String> {
