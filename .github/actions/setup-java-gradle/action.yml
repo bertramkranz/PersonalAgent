@@ -1,16 +1,8 @@
 name: Setup Java and Gradle
 
-description: Checkout repository, optionally validate the Gradle wrapper, set up JDK 17, and make gradlew executable.
+description: Optionally validate the Gradle wrapper, set up JDK 17, and make gradlew executable.
 
 inputs:
-  fetch-depth:
-    description: Fetch depth for checkout.
-    required: false
-    default: "0"
-  ref:
-    description: Optional ref to checkout.
-    required: false
-    default: ""
   validate-wrapper:
     description: Run Gradle wrapper validation.
     required: false
@@ -19,19 +11,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Checkout (default ref)
-      if: inputs.ref == ''
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      with:
-        fetch-depth: ${{ inputs.fetch-depth }}
-
-    - name: Checkout (custom ref)
-      if: inputs.ref != ''
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      with:
-        ref: ${{ inputs.ref }}
-        fetch-depth: ${{ inputs.fetch-depth }}
-
     - name: Validate Gradle wrapper
       if: inputs.validate-wrapper == 'true'
       uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4

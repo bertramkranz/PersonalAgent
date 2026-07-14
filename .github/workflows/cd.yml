@@ -19,10 +19,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.tag_ref || github.ref }}
+
       - name: Set up repository and Java toolchain
         uses: ./.github/actions/setup-java-gradle
         with:
-          ref: ${{ github.event.inputs.tag_ref || github.ref }}
           validate-wrapper: "true"
 
       - name: Build distributions
