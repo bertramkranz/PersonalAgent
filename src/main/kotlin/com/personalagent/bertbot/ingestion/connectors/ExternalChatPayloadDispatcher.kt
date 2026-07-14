@@ -6,6 +6,7 @@ import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 
 private const val EXTERNAL_CHAT_WORKING_STATUS_MESSAGE = "Working on it now. I will send the final answer shortly."
+private const val EXTERNAL_CHAT_FOLLOWUP_UNAVAILABLE_MESSAGE = "I couldn't produce a final answer for that request."
 
 class ExternalChatPayloadDispatcher(
     private val connectors: BertBotExternalConnectors,
@@ -47,7 +48,13 @@ class ExternalChatPayloadDispatcher(
         val status = SlackReplyPayload(channel = event.event.channel, text = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE, threadTs = event.event.threadTs)
         runCatching { followupSender.sendSlack(status) }
         asyncRunner.submit {
-            val finalReply = adapter.onEvent(event, dryRun) ?: return@submit
+            val finalReply =
+                adapter.onEvent(event, dryRun)
+                    ?: SlackReplyPayload(
+                        channel = event.event.channel,
+                        text = EXTERNAL_CHAT_FOLLOWUP_UNAVAILABLE_MESSAGE,
+                        threadTs = event.event.threadTs,
+                    )
             runCatching { followupSender.sendSlack(finalReply) }
         }
         return null
@@ -73,7 +80,14 @@ class ExternalChatPayloadDispatcher(
             )
         runCatching { followupSender.sendWhatsApp(status) }
         asyncRunner.submit {
-            val finalReply = adapter.onConversationEvent(event, dryRun) ?: return@submit
+            val finalReply =
+                adapter.onConversationEvent(event, dryRun)
+                    ?: WhatsAppReplyPayload(
+                        businessPhoneNumberId = event.businessPhoneNumberId,
+                        conversationId = event.conversationId,
+                        text = EXTERNAL_CHAT_FOLLOWUP_UNAVAILABLE_MESSAGE,
+                        toPhoneNumber = event.message.from,
+                    )
             runCatching { followupSender.sendWhatsApp(finalReply) }
         }
         return null
@@ -93,7 +107,13 @@ class ExternalChatPayloadDispatcher(
         val status = DiscordReplyPayload(channelId = event.channelId, content = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE, messageReferenceId = event.messageId)
         runCatching { followupSender.sendDiscord(status) }
         asyncRunner.submit {
-            val finalReply = adapter.onMessage(event, dryRun) ?: return@submit
+            val finalReply =
+                adapter.onMessage(event, dryRun)
+                    ?: DiscordReplyPayload(
+                        channelId = event.channelId,
+                        content = EXTERNAL_CHAT_FOLLOWUP_UNAVAILABLE_MESSAGE,
+                        messageReferenceId = event.messageId,
+                    )
             runCatching { followupSender.sendDiscord(finalReply) }
         }
         return null
