@@ -29,6 +29,24 @@ At a high level, BertBot:
 
 That design makes the path through the system easy to inspect in traces and interaction diagrams.
 
+## Shopping Workflow Stages
+
+BertBot supports a structured shopping assistance workflow. Each stage corresponds to a user intent that routes through the same graph pipeline:
+
+- **onboarding**: User sets up shopping preferences and profile constraints (budget, preferred sellers, categories).
+- **recommendation**: Agent suggests products based on profile, constraints, and current context.
+- **compare**: Agent produces a structured comparison of candidate products.
+- **cart_prepare**: Agent prepares a proposed cart for user review. Requires explicit confirmation before any state change.
+- **checkout_prepare**: Agent prepares a checkout summary for user review. Never autonomously finalises a purchase.
+
+Safety invariants apply to all shopping stages:
+
+- State-changing actions (`cart_prepare`, `checkout_prepare`) always require explicit user confirmation.
+- Budget and seller-threshold checks run before any cart or checkout preparation.
+- Final checkout is never performed autonomously.
+
+When a direct MCP shopping integration is unavailable, BertBot can advertise Playwright browser automation as a fallback capability through the coder sub-agent. This fallback is optional and must be explicitly enabled in sub-agent configuration. The `RuntimeCapabilitySnapshot` reports both the Playwright sub-agent advertisement and the direct Playwright fallback availability so the system prompt stays accurate.
+
 ## Persistence Model
 
 Local development defaults write to `state/` and `logs/`.
@@ -38,7 +56,16 @@ Local development defaults write to `state/` and `logs/`.
 - Profile data retains structured personal facts.
 - Trace logs and Mermaid output make orchestration behavior inspectable.
 
-Deployed environments can switch the same persistence surfaces to JDBC or PostgreSQL backends through configuration.
+Deployed environments can switch the same persistence surfaces to JDBC or PostgreSQL backends through configuration. The active backend is included in the `RuntimeCapabilitySnapshot` and reported by the `bertbot_status` MCP tool and the capability status response so both operators and the LLM know which store is in use.
+
+## Configurable Stores
+
+Every persistence surface (state, checkpoints, episodic memory, semantic memory, profile, ingestion consent, ingestion source state, research recommendations) supports two backends selectable via `BERTBOT_STATE_STORE`:
+
+- `file` — local file-backed JSON storage, suitable for development and single-node deployments.
+- `jdbc` / `postgres` / `postgresql` — relational backend for multi-instance or cloud deployments.
+
+See [configuration.md](configuration.md) for variable names and [deployment.md](deployment.md) for container and Cloud Run wiring.
 
 ## Extension Points
 

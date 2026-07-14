@@ -8,6 +8,7 @@
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
+%% 2026-07-14: Shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) added to architecture. RuntimeCapabilitySnapshot now includes persistenceBackend and playwrightFallbackAvailable fields. Capability status response reports store backend and Playwright fallback status.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -115,6 +116,22 @@ flowchart TD
         DetektReport[Detekt XML Report\n(build/reports/detekt)]
     end
 
+    subgraph ShoppingWorkflow
+        ShoppingOnboarding[onboarding\n(set preferences & profile)]
+        ShoppingRecommend[recommendation\n(suggest products)]
+        ShoppingCompare[compare\n(structured product comparison)]
+        ShoppingCartPrepare[cart_prepare\n(propose cart, require confirm)]
+        ShoppingCheckoutPrepare[checkout_prepare\n(summarise order, require confirm)]
+        PlaywrightFallback[Playwright fallback\n(optional browser automation)]
+    end
+
+    subgraph ConfigurableStores
+        StoreSelector[BERTBOT_STATE_STORE\n(file or jdbc/postgres)]
+        FileStore[(File-backed JSON\nstate/ directory)]
+        JdbcStore[(JDBC / PostgreSQL\ncloud store)]
+        CapabilitySnapshot[RuntimeCapabilitySnapshot\n(persistenceBackend + playwrightFallbackAvailable)]
+    end
+
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
@@ -209,6 +226,20 @@ flowchart TD
 
     MCP --> GoogleWorkspaceToolRouter
     GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
+
+    RuntimeCore --> ShoppingOnboarding
+    RuntimeCore --> ShoppingRecommend
+    RuntimeCore --> ShoppingCompare
+    RuntimeCore --> ShoppingCartPrepare
+    RuntimeCore --> ShoppingCheckoutPrepare
+    ShoppingCartPrepare -.->|optional fallback| PlaywrightFallback
+    ShoppingCheckoutPrepare -.->|optional fallback| PlaywrightFallback
+
+    StoreSelector --> FileStore
+    StoreSelector --> JdbcStore
+    RuntimeFactory --> StoreSelector
+    StoreSelector --> CapabilitySnapshot
+    RuntimeFlags --> CapabilitySnapshot
 
     JaCoCo --> SonarQube
     DetektReport --> SonarQube
