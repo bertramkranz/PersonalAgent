@@ -98,6 +98,24 @@ internal data class CheckpointRollbackPolicyConfiguration(
         get() = environment.lowercase() in PROTECTED_RUNTIME_ENVIRONMENTS
 }
 
+internal data class ShoppingStoreRuntimeConfiguration(
+    val index: Int,
+    val enabled: Boolean = DEFAULT_SHOPPING_STORE_ENABLED,
+    val mode: String = DEFAULT_SHOPPING_STORE_MODE,
+    val priority: Int = DEFAULT_SHOPPING_STORE_PRIORITY,
+    val region: String? = null,
+    val currency: String? = null,
+)
+
+internal data class ShoppingRuntimeConfiguration(
+    val stores: List<ShoppingStoreRuntimeConfiguration> = emptyList(),
+) {
+    val hasEnabledStore: Boolean
+        get() = stores.any { it.enabled }
+    val enabledStoresSortedByPriority: List<ShoppingStoreRuntimeConfiguration>
+        get() = stores.filter { it.enabled }.sortedBy { it.priority }
+}
+
 internal const val DEFAULT_AI_PROVIDER = "openai"
 internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
 internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -152,6 +170,10 @@ internal const val DEFAULT_CHECKPOINT_ROLLBACK_ENABLED = true
 internal const val DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM = true
 internal const val DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED = false
 internal val PROTECTED_RUNTIME_ENVIRONMENTS = setOf("prod", "production", "staging", "preprod")
+internal const val DEFAULT_SHOPPING_STORE_ENABLED = false
+internal const val DEFAULT_SHOPPING_STORE_MODE = "browse"
+internal const val DEFAULT_SHOPPING_STORE_PRIORITY = 100
+internal const val MAX_SHOPPING_STORES = 9
 
 internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
@@ -622,6 +644,48 @@ internal fun resolveCheckpointRollbackPolicyConfiguration(
     )
 }
 
+internal fun resolveShoppingRuntimeConfiguration(): ShoppingRuntimeConfiguration =
+    resolveShoppingRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveShoppingRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): ShoppingRuntimeConfiguration {
+    val stores =
+        (1..MAX_SHOPPING_STORES).mapNotNull { index ->
+            val enabledRaw =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_ENABLED", environment, dotEnvValues)
+                    ?: return@mapNotNull null
+            val enabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
+            val mode =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_MODE", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: DEFAULT_SHOPPING_STORE_MODE
+            val priority =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_PRIORITY", environment, dotEnvValues)
+                    ?.toIntOrNull()
+                    ?: DEFAULT_SHOPPING_STORE_PRIORITY
+            val region =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_REGION", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+            val currency =
+                resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_CURRENCY", environment, dotEnvValues)
+                    ?.takeIf { it.isNotBlank() }
+            ShoppingStoreRuntimeConfiguration(
+                index = index,
+                enabled = enabled,
+                mode = mode,
+                priority = priority,
+                region = region,
+                currency = currency,
+            )
+        }
+    return ShoppingRuntimeConfiguration(stores = stores)
+}
+
 private fun parseCommandArgs(value: String): List<String> {
     return value
         .split(',')
@@ -717,6 +781,7 @@ internal fun buildSystemPrompt(
     - configured but disabled sub-agents: ${renderStateListForSystemContext(config.subAgents.filterNot { definition -> definition.enabled }.map { definition -> definition.id })}
     - google workspace mcp configured: ${runtimeCapabilities.googleWorkspaceConfigured}
     - google workspace mcp tool access available: ${runtimeCapabilities.googleWorkspaceToolAccessAvailable}
+    - shopping store provider available: ${runtimeCapabilities.shoppingProviderAvailable}
     - playwright capability advertised by enabled sub-agents: ${config.enabledSubAgents().any { definition -> definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) } }}
     - google workspace operator sub-agent enabled: ${config.enabledSubAgents().any { definition -> definition.id == "google_workspace_operator" }}
 
@@ -817,6 +882,7 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
 internal data class RuntimeCapabilitySnapshot(
     val googleWorkspaceConfigured: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
     val googleWorkspaceToolAccessAvailable: Boolean = false,
+    val shoppingProviderAvailable: Boolean = resolveShoppingRuntimeConfiguration().hasEnabledStore,
 )
 
 internal fun summarizeMacrofactorAvailability(
@@ -838,6 +904,12 @@ internal fun summarizeGoogleWorkspaceAvailability(
         !configuration.enabled -> "disabled"
         router?.toolDefinitions()?.isNullOrEmpty() != false -> "configured but unavailable"
         else -> "enabled"
+    }
+
+internal fun summarizeShoppingAvailability(configuration: ShoppingRuntimeConfiguration): String =
+    when {
+        !configuration.hasEnabledStore -> "disabled"
+        else -> "enabled (${configuration.enabledStoresSortedByPriority.size} store(s) active)"
     }
 
 internal data class AssistantResponseEnvelope(
