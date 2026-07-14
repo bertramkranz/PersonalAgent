@@ -870,7 +870,9 @@ internal fun buildSystemPrompt(
     - google workspace mcp tool access available: ${runtimeCapabilities.googleWorkspaceToolAccessAvailable}
     - shopping store provider available: ${runtimeCapabilities.shoppingProviderAvailable}
     - playwright capability advertised by enabled sub-agents: ${config.enabledSubAgents().any { definition -> definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) } }}
+    - playwright fallback available: ${runtimeCapabilities.playwrightFallbackAvailable}
     - google workspace operator sub-agent enabled: ${config.enabledSubAgents().any { definition -> definition.id == "google_workspace_operator" }}
+    - persistence store backend: ${runtimeCapabilities.persistenceBackend}
 
     Capability-answer policy:
     - If the user asks what you can access or do, answer from this runtime snapshot.
@@ -891,28 +893,10 @@ internal fun buildCapabilityStatusResponse(
     userMessage: String,
     runtimeCapabilities: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
 ): String? {
-    val normalized = userMessage.lowercase()
-    val isCapabilityQuestion =
-        normalized.contains("capabilit") ||
-            normalized.contains("what can you access") ||
-            normalized.contains("sub-agent") ||
-            normalized.contains("sub agent") ||
-            normalized.contains("subagents") ||
-            (
-                listOf("playwright", "google workspace", "documents").any { token -> normalized.contains(token) } &&
-                    listOf("can you", "do you", "access", "enabled", "disabled").any { token -> normalized.contains(token) }
-            )
-
-    if (!isCapabilityQuestion) {
+    if (!isCapabilityQuestion(userMessage)) {
         return null
     }
 
-    val googleWorkspaceStatus =
-        when {
-            runtimeCapabilities.googleWorkspaceToolAccessAvailable -> "enabled"
-            runtimeCapabilities.googleWorkspaceConfigured -> "configured but unavailable"
-            else -> "disabled"
-        }
     val playwrightEnabled =
         config.enabledSubAgents().any { definition ->
             definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) }
@@ -930,13 +914,45 @@ internal fun buildCapabilityStatusResponse(
     return buildString {
         appendLine("Capability status snapshot:")
         appendLine("- workspace.read_file (allowed file roots): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
-        appendLine("- Google Workspace MCP: $googleWorkspaceStatus")
+        appendLine("- Google Workspace MCP: ${summarizeGoogleWorkspaceCapability(runtimeCapabilities)}")
         appendLine("- Playwright capability: ${if (playwrightEnabled) "enabled" else "disabled"}")
+        appendLine("- Playwright fallback: ${summarizePlaywrightFallback(runtimeCapabilities, playwrightEnabled)}")
+        appendLine("- Persistence store: ${runtimeCapabilities.persistenceBackend}")
         appendLine()
         appendLine("Sub-agents:")
         append(subAgentLines)
     }.trim()
 }
+
+private fun isCapabilityQuestion(userMessage: String): Boolean {
+    val normalized = userMessage.lowercase()
+    val directKeywords =
+        listOf("capabilit", "what can you access", "sub-agent", "sub agent", "subagents", "persist")
+    if (directKeywords.any { normalized.contains(it) }) {
+        return true
+    }
+
+    val featureTokens = listOf("playwright", "google workspace", "documents", "store backend", "state store")
+    val qualifierTokens = listOf("can you", "do you", "access", "enabled", "disabled", "configured", "using", "active")
+    return featureTokens.any { normalized.contains(it) } && qualifierTokens.any { normalized.contains(it) }
+}
+
+private fun summarizeGoogleWorkspaceCapability(runtimeCapabilities: RuntimeCapabilitySnapshot): String =
+    when {
+        runtimeCapabilities.googleWorkspaceToolAccessAvailable -> "enabled"
+        runtimeCapabilities.googleWorkspaceConfigured -> "configured but unavailable"
+        else -> "disabled"
+    }
+
+private fun summarizePlaywrightFallback(
+    runtimeCapabilities: RuntimeCapabilitySnapshot,
+    playwrightEnabled: Boolean,
+): String =
+    when {
+        runtimeCapabilities.playwrightFallbackAvailable -> "available"
+        playwrightEnabled -> "agent-advertised (no direct fallback configured)"
+        else -> "disabled"
+    }
 
 internal fun buildGoogleWorkspaceUnavailableResponse(
     userMessage: String,
@@ -969,6 +985,8 @@ internal fun buildGoogleWorkspaceUnavailableResponse(
 internal data class RuntimeCapabilitySnapshot(
     val googleWorkspaceConfigured: Boolean = resolveGoogleWorkspaceRuntimeConfiguration().enabled,
     val googleWorkspaceToolAccessAvailable: Boolean = false,
+    val persistenceBackend: String = resolvePersistenceRuntimeConfiguration().backend,
+    val playwrightFallbackAvailable: Boolean = false,
     val shoppingProviderAvailable: Boolean = resolveShoppingRuntimeConfiguration().hasEnabledStore,
 )
 

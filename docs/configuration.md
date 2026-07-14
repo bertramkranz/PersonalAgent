@@ -204,6 +204,55 @@ Used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`:
 | `BERTBOT_WHATSAPP_APP_SECRET` | Meta app secret for HMAC verification |
 | `BERTBOT_WHATSAPP_VERIFY_TOKEN` | WhatsApp subscription verification token |
 
+## Shopping Workflow Configuration
+
+BertBot handles shopping assistance stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) through the standard agent pipeline — no additional variables are required beyond the core LLM and persistence settings.
+
+Shopping safety invariants are enforced at the agent level:
+
+- `cart_prepare` and `checkout_prepare` always request explicit user confirmation before any state change.
+- Budget and seller-threshold constraints come from the user profile stored in the configured persistence backend.
+- Final checkout is never performed autonomously.
+
+To enable Playwright browser automation as a shopping fallback, ensure the coder sub-agent is enabled in `BertBotAgentConfig` and the Playwright MCP or tool is available at runtime. The `RuntimeCapabilitySnapshot` reports `playwrightFallbackAvailable` separately from the sub-agent advertisement; set this to `true` only when a direct Playwright integration is wired into the runtime.
+
+## Cloud Secret Wiring
+
+When deploying to Cloud Run or a similar platform, inject secrets as environment variables from your secret manager. The following variables contain credentials and must never be hardcoded:
+
+| Variable | Secret type |
+| --- | --- |
+| `BERTBOT_AI_API_KEY` | OpenAI API key |
+| `BERTBOT_STATE_JDBC_URL` | Full JDBC connection string (may embed password) |
+| `BERTBOT_STATE_JDBC_USER` | Database username |
+| `BERTBOT_STATE_JDBC_PASSWORD` | Database password |
+| `BERTBOT_TELEGRAM_SECRET_TOKEN` | Telegram webhook secret |
+| `BERTBOT_SLACK_SIGNING_SECRET` | Slack signing secret |
+| `BERTBOT_WHATSAPP_APP_SECRET` | WhatsApp HMAC app secret |
+| `BERTBOT_MACROFACTOR_USERNAME` | MacroFactor account email |
+| `BERTBOT_MACROFACTOR_PASSWORD` | MacroFactor account password |
+
+Cloud Run example (gcloud):
+
+```bash
+gcloud run deploy bertbot \
+  --set-secrets "BERTBOT_AI_API_KEY=bertbot-openai-key:latest" \
+  --set-secrets "BERTBOT_STATE_JDBC_URL=bertbot-jdbc-url:latest" \
+  --set-secrets "BERTBOT_STATE_JDBC_USER=bertbot-jdbc-user:latest" \
+  --set-secrets "BERTBOT_STATE_JDBC_PASSWORD=bertbot-jdbc-password:latest" \
+  --set-secrets "BERTBOT_TELEGRAM_SECRET_TOKEN=bertbot-telegram-secret:latest"
+```
+
+Local development with `.env` (never commit this file):
+
+```bash
+BERTBOT_AI_API_KEY=sk-...
+BERTBOT_STATE_STORE=file
+BERTBOT_STATE_JDBC_URL=
+BERTBOT_STATE_JDBC_USER=
+BERTBOT_STATE_JDBC_PASSWORD=
+```
+
 ## Practical Config Profiles
 
 Local CLI or MCP development:
@@ -222,3 +271,4 @@ Container deployment:
 
 - Start from [../.env.compose.example](../.env.compose.example).
 - Keep runtime mode and persistence aligned with the service role.
+

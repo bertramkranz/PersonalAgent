@@ -10,6 +10,7 @@
 %% 2026-07-14: ExternalChatPayloadDispatcher now emits platform fallback final messages even when adapter generation throws, preventing status-only dead ends.
 %% 2026-07-14: Polymarket runtime tool schemas now publish strict operation enums per API family to prevent unsupported operation calls in webhook tool-calling loops.
 %% 2026-07-14: ToolCallingSkill now performs deterministic operation inference for operation-enum tools (Polymarket) using user-intent keyword aliases and argument hints before executing tool calls.
+%% 2026-07-14: Shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) added to architecture. RuntimeCapabilitySnapshot now includes persistenceBackend, playwrightFallbackAvailable, and shoppingProviderAvailable fields. Capability status response reports store backend, Playwright fallback, and store provider status.
 %% 2026-07-14: Optional Playwright browser store adapter added (disabled by default). Supports api/browser/hybrid per-store mode with AllowedBrowserActionPolicy allowlist and graceful recommendation-only fallback.
 %% 2026-07-14: ShoppingToolRouter added with operations search/details/compare/cart_prepare/checkout_prepare; hard-blocks place_order; enforces budget and seller-trust guardrails; requires confirmation_token for state-changing ops.
 %% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
@@ -135,6 +136,22 @@ flowchart TD
         DetektReport[Detekt XML Report\n(build/reports/detekt)]
     end
 
+    subgraph ShoppingWorkflow
+        ShoppingOnboarding[onboarding\n(set preferences & profile)]
+        ShoppingRecommend[recommendation\n(suggest products)]
+        ShoppingCompare[compare\n(structured product comparison)]
+        ShoppingCartPrepare[cart_prepare\n(propose cart, require confirm)]
+        ShoppingCheckoutPrepare[checkout_prepare\n(summarise order, require confirm)]
+        PlaywrightFallback[Playwright fallback\n(optional browser automation)]
+    end
+
+    subgraph ConfigurableStores
+        StoreSelector[BERTBOT_STATE_STORE\n(file or jdbc/postgres)]
+        FileStore[(File-backed JSON\nstate/ directory)]
+        JdbcStore[(JDBC / PostgreSQL\ncloud store)]
+        CapabilitySnapshot[RuntimeCapabilitySnapshot\n(persistenceBackend + playwrightFallbackAvailable)]
+    end
+
     CLI --> RuntimeFactory
     Headless --> RuntimeFactory
     MCP --> RuntimeFactory
@@ -230,6 +247,19 @@ flowchart TD
     MCP --> GoogleWorkspaceToolRouter
     GoogleWorkspaceToolRouter --> GoogleWorkspaceMcp
 
+    RuntimeCore --> ShoppingOnboarding
+    RuntimeCore --> ShoppingRecommend
+    RuntimeCore --> ShoppingCompare
+    RuntimeCore --> ShoppingCartPrepare
+    RuntimeCore --> ShoppingCheckoutPrepare
+    ShoppingCartPrepare -.->|optional fallback| PlaywrightFallback
+    ShoppingCheckoutPrepare -.->|optional fallback| PlaywrightFallback
+
+    StoreSelector --> FileStore
+    StoreSelector --> JdbcStore
+    RuntimeFactory --> StoreSelector
+    StoreSelector --> CapabilitySnapshot
+    RuntimeFlags --> CapabilitySnapshot
     StoreAdapterResolver --> HybridStoreAdapter
     StoreAdapterResolver --> BrowserActionPolicy
     HybridStoreAdapter --> NoopBrowserAdapter

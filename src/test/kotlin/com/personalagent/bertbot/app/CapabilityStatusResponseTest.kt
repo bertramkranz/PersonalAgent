@@ -3,6 +3,7 @@ package com.personalagent.bertbot.app
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import kotlin.test.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CapabilityStatusResponseTest {
@@ -58,5 +59,75 @@ class CapabilityStatusResponseTest {
         assertNotNull(response)
         assertTrue(response.contains("tool bridge is currently unavailable"))
         assertTrue(response.contains("check your calendar"))
+    }
+
+    @Test
+    fun `capability response includes persistence store backend`() {
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "What persistence backend are you using?",
+                RuntimeCapabilitySnapshot(
+                    persistenceBackend = "file",
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(response.contains("Persistence store: file"))
+    }
+
+    @Test
+    fun `capability response includes jdbc persistence backend when configured`() {
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "What state store backend is configured?",
+                RuntimeCapabilitySnapshot(
+                    persistenceBackend = "postgresql",
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(response.contains("Persistence store: postgresql"))
+    }
+
+    @Test
+    fun `capability response includes playwright fallback status when available`() {
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "Is Playwright fallback enabled?",
+                RuntimeCapabilitySnapshot(
+                    playwrightFallbackAvailable = true,
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(response.contains("Playwright fallback: available"))
+    }
+
+    @Test
+    fun `capability response indicates playwright fallback disabled when not configured`() {
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "Is Playwright fallback enabled?",
+                RuntimeCapabilitySnapshot(
+                    playwrightFallbackAvailable = false,
+                ),
+            )
+
+        assertNotNull(response)
+        assertTrue(
+            response.contains("Playwright fallback: agent-advertised") ||
+                response.contains("Playwright fallback: disabled"),
+        )
+    }
+
+    @Test
+    fun `non-capability question returns null and does not include store info`() {
+        val response = buildCapabilityStatusResponse(BertBotAgentConfig(), "What is the weather today?")
+
+        assertNull(response)
     }
 }

@@ -130,3 +130,36 @@ BertBot emits structured tracing for graph execution and delegation lifecycles.
 - A Mermaid interaction view is written to `state/bertbot-interactions.mmd` by default.
 
 Use these artifacts to inspect node transitions, delegation, and runtime flow after a request completes.
+
+## Store Backend And Mode Flags
+
+All run modes support the same configurable persistence backends. Select a backend with `BERTBOT_STATE_STORE`:
+
+| Value | When to use |
+| --- | --- |
+| `file` | Local development, single-node deployments. Files written to `state/` by default. |
+| `jdbc` / `postgres` / `postgresql` | Cloud or multi-instance deployments. Requires JDBC connection settings. |
+
+For local runs (CLI, headless, MCP) keep `BERTBOT_STATE_STORE=file`. For webhook or Discord deployments on a hosted platform, use the JDBC backend so state survives container restarts.
+
+### Minimum JDBC credentials
+
+```bash
+BERTBOT_STATE_STORE=postgresql
+BERTBOT_STATE_JDBC_URL=jdbc:postgresql://localhost:5432/bertbot
+BERTBOT_STATE_JDBC_USER=bertbot
+BERTBOT_STATE_JDBC_PASSWORD=yourpassword
+```
+
+The store backend is reported in the `bertbot_status` MCP tool output and in the capability status response so you can verify the active backend without restarting.
+
+## Shopping Workflow Mode Guidance
+
+The shopping workflow stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) work in every run mode:
+
+- **MCP mode**: Send shopping prompts via `ask_bertbot`. All five stages route through the same pipeline and always produce a user-visible response.
+- **Webhook mode**: Shopping messages arrive via the configured chat connector. The `ingestion_chat_manual` MCP tool can replay a shopping message for local testing.
+- **Headless mode**: Pass a shopping prompt with `--prompt` to exercise a single stage, useful for CI smoke tests.
+
+When Playwright browser automation is configured as a fallback for shopping integrations, ensure the coder sub-agent is enabled and the Playwright MCP is reachable. The `playwrightFallbackAvailable` field in `RuntimeCapabilitySnapshot` controls whether the system prompt advertises the direct fallback.
+
