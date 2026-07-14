@@ -139,11 +139,11 @@ data class BertBotAgentConfig(
             ),
             ToolDefinition(
                 name = "workspace.search",
-                description = "Search files and content in the current project workspace",
+                description = "Search files and content in allowed file roots such as the project workspace, state, and logs",
             ),
             ToolDefinition(
                 name = "workspace.read_file",
-                description = "Read source code and markdown configuration files from the workspace",
+                description = "Read files from allowed file roots such as the project workspace, state, and logs",
             ),
             ToolDefinition(
                 name = "terminal.run",

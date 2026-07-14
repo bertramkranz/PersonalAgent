@@ -47,6 +47,8 @@ Local MCP server:
 .\gradlew.bat runMcpServer --no-daemon
 ```
 
+The built-in file tools support an optional `root` argument with `workspace` (default), `state`, and `logs`. See [docs/run-modes.md](docs/run-modes.md) for example `tools/call` payloads.
+
 ### Verify It Works
 
 ```bash

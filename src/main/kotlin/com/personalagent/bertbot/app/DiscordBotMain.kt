@@ -2,12 +2,15 @@ package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.DiscordIntegrationConfig
+import com.personalagent.bertbot.ingestion.connectors.DaemonThreadExternalChatAsyncRunner
 import com.personalagent.bertbot.ingestion.connectors.DiscordMessagePayload
 import com.personalagent.bertbot.ingestion.connectors.DiscordReplyPayload
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
 import net.dv8tion.jda.api.requests.GatewayIntent
+
+private const val DISCORD_WORKING_STATUS_MESSAGE = "Working on it now. I will send the final answer shortly."
 
 fun main() {
     val discordRuntimeConfig = resolveDiscordBotRuntimeConfig()
@@ -63,6 +66,8 @@ private class DiscordMessageListener(
     private val runtime: BertBotRuntime,
     private val config: BertBotAgentConfig,
 ) : ListenerAdapter() {
+    private val asyncRunner = DaemonThreadExternalChatAsyncRunner
+
     override fun onMessageReceived(event: MessageReceivedEvent) {
         if (event.author.isBot) {
             return
@@ -91,11 +96,14 @@ private class DiscordMessageListener(
         }
 
         val adapter = runtime.connectors().discord ?: return
-        val reply = adapter.onMessage(payload, discordConfig.connector.dryRunDefault) ?: return
-        if (resolveDiscordReplyMode(event.messageId, reply) == DiscordReplyMode.REPLY_TO_MESSAGE) {
-            event.message.reply(reply.content).queue()
-        } else {
-            event.channel.sendMessage(reply.content).queue()
+        event.message.reply(DISCORD_WORKING_STATUS_MESSAGE).queue()
+        asyncRunner.submit {
+            val reply = adapter.onMessage(payload, discordConfig.connector.dryRunDefault) ?: return@submit
+            if (resolveDiscordReplyMode(event.messageId, reply) == DiscordReplyMode.REPLY_TO_MESSAGE) {
+                event.message.reply(reply.content).queue()
+            } else {
+                event.channel.sendMessage(reply.content).queue()
+            }
         }
     }
 }

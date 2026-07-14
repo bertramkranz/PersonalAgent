@@ -84,21 +84,24 @@ private fun baseToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
         ),
         buildToolDefinition(
             toolNames.workspaceListDir,
-            "List files and directories under a workspace-relative path.",
+            "List files and directories under an allowed file root.",
         ) {
-            property("path", "string", "Workspace-relative directory path. Defaults to '.'.")
+            property("root", "string", "Optional allowed root name: workspace, state, logs. Defaults to workspace.")
+            property("path", "string", "Root-relative directory path. Defaults to '.'.")
         },
         buildToolDefinition(
             toolNames.workspaceReadFile,
-            "Read a file from the workspace by relative path.",
+            "Read a file from an allowed file root by relative path.",
         ) {
-            property("path", "string", "Workspace-relative file path.")
+            property("root", "string", "Optional allowed root name: workspace, state, logs. Defaults to workspace.")
+            property("path", "string", "Root-relative file path.")
             required("path")
         },
         buildToolDefinition(
             toolNames.workspaceSearch,
-            "Search workspace files for a text query.",
+            "Search files under an allowed file root for a text query.",
         ) {
+            property("root", "string", "Optional allowed root name: workspace, state, logs. Defaults to workspace.")
             property("query", "string", "Case-insensitive text to search for.")
             property("maxResults", "number", "Maximum number of matches to return (default 20).")
             required("query")

@@ -5,8 +5,13 @@ import com.google.gson.JsonParser
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 
+private const val EXTERNAL_CHAT_WORKING_STATUS_MESSAGE = "Working on it now. I will send the final answer shortly."
+private const val EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE = "I could not produce a final answer for that request. Please try again."
+
 class ExternalChatPayloadDispatcher(
     private val connectors: BertBotExternalConnectors,
+    private val followupSender: ExternalChatFollowupSender = NoopExternalChatFollowupSender,
+    private val asyncRunner: ExternalChatAsyncRunner = DaemonThreadExternalChatAsyncRunner,
     private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) {
     fun handleTelegramUpdateJson(
@@ -15,8 +20,24 @@ class ExternalChatPayloadDispatcher(
     ): String? {
         val adapter = connectors.telegram ?: return null
         val update = parseTelegramUpdate(rawJson) ?: return null
-        val reply = adapter.onUpdate(update, dryRun) ?: return null
-        return buildTelegramInlineReply(reply)
+        if (!followupSender.canSendTelegram()) {
+            val reply = adapter.onUpdate(update, dryRun) ?: return null
+            return buildTelegramInlineReply(reply)
+        }
+
+        val message = update.message ?: return null
+        asyncRunner.submit {
+            val finalReply =
+                adapter.onUpdate(update, dryRun)
+                    ?: TelegramReplyPayload(
+                        chatId = message.chat.id,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        replyToMessageId = message.messageId,
+                    )
+            runCatching { followupSender.sendTelegram(finalReply) }
+        }
+        val status = TelegramReplyPayload(chatId = message.chat.id, text = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE, replyToMessageId = message.messageId)
+        return buildTelegramInlineReply(status)
     }
 
     fun handleSlackEventJson(
@@ -25,8 +46,24 @@ class ExternalChatPayloadDispatcher(
     ): String? {
         val adapter = connectors.slack ?: return null
         val event = parseSlackEnvelope(rawJson) ?: return null
-        val reply = adapter.onEvent(event, dryRun) ?: return null
-        return codec.encode(reply)
+        if (!followupSender.canSendSlack()) {
+            val reply = adapter.onEvent(event, dryRun) ?: return null
+            return codec.encode(reply)
+        }
+
+        val status = SlackReplyPayload(channel = event.event.channel, text = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE, threadTs = event.event.threadTs)
+        runCatching { followupSender.sendSlack(status) }
+        asyncRunner.submit {
+            val finalReply =
+                adapter.onEvent(event, dryRun)
+                    ?: SlackReplyPayload(
+                        channel = event.event.channel,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        threadTs = event.event.threadTs,
+                    )
+            runCatching { followupSender.sendSlack(finalReply) }
+        }
+        return null
     }
 
     fun handleWhatsAppConversationJson(
@@ -35,8 +72,31 @@ class ExternalChatPayloadDispatcher(
     ): String? {
         val adapter = connectors.whatsapp ?: return null
         val event = parseWhatsAppConversation(rawJson) ?: return null
-        val reply = adapter.onConversationEvent(event, dryRun) ?: return null
-        return codec.encode(reply)
+        if (!followupSender.canSendWhatsApp()) {
+            val reply = adapter.onConversationEvent(event, dryRun) ?: return null
+            return codec.encode(reply)
+        }
+
+        val status =
+            WhatsAppReplyPayload(
+                businessPhoneNumberId = event.businessPhoneNumberId,
+                conversationId = event.conversationId,
+                text = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE,
+                toPhoneNumber = event.message.from,
+            )
+        runCatching { followupSender.sendWhatsApp(status) }
+        asyncRunner.submit {
+            val finalReply =
+                adapter.onConversationEvent(event, dryRun)
+                    ?: WhatsAppReplyPayload(
+                        businessPhoneNumberId = event.businessPhoneNumberId,
+                        conversationId = event.conversationId,
+                        text = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        toPhoneNumber = event.message.from,
+                    )
+            runCatching { followupSender.sendWhatsApp(finalReply) }
+        }
+        return null
     }
 
     fun handleDiscordMessageJson(
@@ -45,8 +105,24 @@ class ExternalChatPayloadDispatcher(
     ): String? {
         val adapter = connectors.discord ?: return null
         val event = parseDiscordMessage(rawJson) ?: return null
-        val reply = adapter.onMessage(event, dryRun) ?: return null
-        return codec.encode(reply)
+        if (!followupSender.canSendDiscord()) {
+            val reply = adapter.onMessage(event, dryRun) ?: return null
+            return codec.encode(reply)
+        }
+
+        val status = DiscordReplyPayload(channelId = event.channelId, content = EXTERNAL_CHAT_WORKING_STATUS_MESSAGE, messageReferenceId = event.messageId)
+        runCatching { followupSender.sendDiscord(status) }
+        asyncRunner.submit {
+            val finalReply =
+                adapter.onMessage(event, dryRun)
+                    ?: DiscordReplyPayload(
+                        channelId = event.channelId,
+                        content = EXTERNAL_CHAT_NO_FINAL_RESPONSE_MESSAGE,
+                        messageReferenceId = event.messageId,
+                    )
+            runCatching { followupSender.sendDiscord(finalReply) }
+        }
+        return null
     }
 }
 

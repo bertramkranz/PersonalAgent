@@ -32,6 +32,9 @@ class SystemPromptBuilderTest {
         assertTrue(prompt.contains("configured but disabled sub-agents: [\"repo_improvement_researcher\"]"))
         assertTrue(prompt.contains("google workspace mcp configured:"))
         assertTrue(prompt.contains("google workspace mcp tool access available:"))
+        assertTrue(prompt.contains("Delegation contract:"))
+        assertTrue(prompt.contains("task-scoped specialists"))
+        assertTrue(prompt.contains("Default to plain-language prose in user-facing replies."))
     }
 
     @Test

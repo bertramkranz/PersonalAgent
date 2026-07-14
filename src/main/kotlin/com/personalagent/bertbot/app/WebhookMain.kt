@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.app
 
+import com.personalagent.bertbot.ingestion.connectors.NoopExternalChatFollowupSender
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
@@ -83,6 +84,7 @@ fun main() {
     val webhookConfig = resolveWebhookServerConfig()
     val securityConfig = resolveWebhookSecurityConfig()
     val agentConfig = resolveWebhookAgentConfig()
+    val followupConfig = resolveExternalChatFollowupRuntimeConfig()
     val workspaceRoot = resolveWorkspaceRoot()
 
     val googleWorkspaceRuntime = resolveGoogleWorkspaceRuntimeConfiguration()
@@ -105,7 +107,8 @@ fun main() {
         return
     }
 
-    val dispatcher = runtime.externalPayloadDispatcher()
+    val followupSender = createWebhookFollowupSender(followupConfig)
+    val dispatcher = runtime.externalPayloadDispatcher(followupSender)
     val rateLimiter = createRequestRateLimiter(securityConfig)
     val router = WebhookRequestRouter(webhookConfig, securityConfig, dispatcher, rateLimiter)
 
@@ -124,6 +127,7 @@ fun main() {
     println("Proxy header trust enabled: ${securityConfig.trustProxyHeaders}")
     println("IP allowlist entries: ${securityConfig.allowedIpCidrs.size}")
     println("Rate limit: ${securityConfig.rateLimitMaxRequests} requests/${securityConfig.rateLimitWindowSeconds}s")
+    println("External follow-up sender configured: ${followupSender !is NoopExternalChatFollowupSender}")
     println("Google Workspace MCP: ${summarizeGoogleWorkspaceAvailability(googleWorkspaceRuntime, googleWorkspaceRouter)}")
 
     Runtime.getRuntime().addShutdownHook(

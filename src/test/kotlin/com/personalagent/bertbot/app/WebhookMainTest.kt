@@ -139,6 +139,28 @@ class WebhookMainTest {
     }
 
     @Test
+    fun `resolve external chat followup config reads platform credentials`() {
+        val config =
+            resolveExternalChatFollowupRuntimeConfig(
+                environment =
+                    mapOf(
+                        "BERTBOT_TELEGRAM_BOT_TOKEN" to "telegram-token",
+                        "BERTBOT_SLACK_BOT_TOKEN" to "slack-token",
+                        "BERTBOT_WHATSAPP_ACCESS_TOKEN" to "wa-token",
+                        "BERTBOT_WHATSAPP_API_VERSION" to "v23.0",
+                        "BERTBOT_DISCORD_BOT_TOKEN" to "discord-token",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals("telegram-token", config.telegramBotToken)
+        assertEquals("slack-token", config.slackBotToken)
+        assertEquals("wa-token", config.whatsAppAccessToken)
+        assertEquals("v23.0", config.whatsAppApiVersion)
+        assertEquals("discord-token", config.discordBotToken)
+    }
+
+    @Test
     fun `router routes platform endpoints and returns status codes`() {
         val config = WebhookServerConfig(dryRun = true)
         val router =
