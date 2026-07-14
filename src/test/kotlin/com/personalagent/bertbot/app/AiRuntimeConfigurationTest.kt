@@ -5,6 +5,7 @@ import com.personalagent.bertbot.config.BertBotAgentConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AiRuntimeConfigurationTest {
     @Test
@@ -242,6 +243,32 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `shopping configuration prefers environment values for top-level settings`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "true",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "3456",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.8",
+                        "BERTBOT_SHOPPING_STORE_1_ENABLED" to "true",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "false",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "9999",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.2",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(3456L, configuration.budgetLimitCents)
+        assertEquals(0.8, configuration.minSellerTrustScore)
+        assertEquals(1, configuration.stores.size)
+        assertEquals(true, configuration.stores.single().enabled)
+    }
+
+    @Test
     fun `google workspace configuration supports explicit empty args override`() {
         val configuration =
             resolveGoogleWorkspaceRuntimeConfiguration(
@@ -391,6 +418,33 @@ class AiRuntimeConfigurationTest {
         assertEquals(false, configuration.requireConfirm)
         assertEquals(true, configuration.allowInProtectedEnvironment)
         assertEquals(true, configuration.isProtectedEnvironment)
+    }
+
+    @Test
+    fun `shopping configuration resolves global settings and store entries together`() {
+        val configuration =
+            resolveShoppingRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "true",
+                        "BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS" to "25000",
+                        "BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE" to "0.8",
+                        "BERTBOT_SHOPPING_STORE_1_ENABLED" to "true",
+                        "BERTBOT_SHOPPING_STORE_1_PRIORITY" to "5",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SHOPPING_ENABLED" to "false",
+                        "BERTBOT_SHOPPING_STORE_1_PRIORITY" to "99",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(25000L, configuration.budgetLimitCents)
+        assertEquals(0.8, configuration.minSellerTrustScore)
+        assertEquals(1, configuration.stores.size)
+        assertTrue(configuration.hasEnabledStore)
+        assertEquals(5, configuration.stores.single().priority)
     }
 
     @Test
