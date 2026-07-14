@@ -1,6 +1,7 @@
 %% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
 %% 2026-07-13: Calendar response formatting now performs MCP envelope unwrapping and readable event rendering in ToolCallingSkill.
 %% 2026-07-13: Runtime tool-calling now uses explicit integration registry and validates required sub-agent -> tool integration coverage at startup.
+%% 2026-07-14: MacrofactorToolRouter wired into RuntimeFactory as a RuntimeToolIntegration via buildRuntimeToolIntegrations.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -194,6 +195,7 @@ flowchart TD
     ResearchRouter --> ResearchService
 
     MCP --> MacrofactorToolRouter
+    RuntimeFactory --> MacrofactorToolRouter
     MacrofactorToolRouter --> MacrofactorMcp
 
     MCP --> GoogleWorkspaceToolRouter

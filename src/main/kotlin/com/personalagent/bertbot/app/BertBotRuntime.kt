@@ -387,9 +387,17 @@ internal object BertBotRuntimeFactory {
                 enablePeriodicScheduler = enablePeriodicResearchScheduler,
                 llmGateway = llmGateway,
             )
+        val macrofactorToolRouter = createMacrofactorToolRouterOrNull(resolveMacrofactorRuntimeConfiguration())
         val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
         val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
-        val toolCallingSkill = buildToolCallingSkillOrNull(googleWorkspaceRouter, polymarketToolRouter, llmGateway, runtimeConfig)
+        val toolCallingSkill =
+            buildToolCallingSkillOrNull(
+                googleWorkspaceRouter = googleWorkspaceRouter,
+                polymarketToolRouter = polymarketToolRouter,
+                macrofactorToolRouter = macrofactorToolRouter,
+                llmGateway = llmGateway,
+                config = runtimeConfig,
+            )
         val runtimeCapabilitySnapshot =
             RuntimeCapabilitySnapshot(
                 googleWorkspaceConfigured = googleWorkspaceRouter != null,
@@ -464,10 +472,16 @@ internal val TOOL_BACKED_SUB_AGENT_REQUIREMENTS: List<ToolBackedSubAgentRequirem
 private fun buildToolCallingSkillOrNull(
     googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
     polymarketToolRouter: PolymarketToolRouter?,
+    macrofactorToolRouter: MacrofactorToolRouter?,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
     config: BertBotAgentConfig,
 ): ToolCallingSkill? {
-    val integrations = buildRuntimeToolIntegrations(googleWorkspaceRouter, polymarketToolRouter)
+    val integrations =
+        buildRuntimeToolIntegrations(
+            googleWorkspaceRouter = googleWorkspaceRouter,
+            polymarketToolRouter = polymarketToolRouter,
+            macrofactorToolRouter = macrofactorToolRouter,
+        )
     validateToolBackedSubAgentCoverage(config, integrations)
     if (integrations.isEmpty()) return null
 
@@ -491,8 +505,18 @@ private fun buildToolCallingSkillOrNull(
 internal fun buildRuntimeToolIntegrations(
     googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
     polymarketToolRouter: PolymarketToolRouter?,
+    macrofactorToolRouter: MacrofactorToolRouter? = null,
 ): List<RuntimeToolIntegration> {
     val integrations = mutableListOf<RuntimeToolIntegration>()
+
+    if (macrofactorToolRouter != null) {
+        integrations +=
+            RuntimeToolIntegration(
+                id = "macrofactor",
+                toolDefinitionsProvider = macrofactorToolRouter::toolDefinitions,
+                toolExecutor = { toolName, params -> macrofactorToolRouter.handle(toolName, params) },
+            )
+    }
 
     if (googleWorkspaceRouter != null) {
         integrations +=
@@ -514,6 +538,11 @@ internal fun buildRuntimeToolIntegrations(
     }
 
     return integrations
+}
+
+internal fun createMacrofactorToolRouterOrNull(configuration: MacrofactorRuntimeConfiguration): MacrofactorToolRouter? {
+    if (!configuration.enabled) return null
+    return MacrofactorToolRouter(configuration)
 }
 
 internal fun createPolymarketToolRouterOrNull(config: BertBotAgentConfig): PolymarketToolRouter? {
