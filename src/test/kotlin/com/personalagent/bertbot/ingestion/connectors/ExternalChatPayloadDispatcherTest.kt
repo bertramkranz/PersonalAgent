@@ -1,10 +1,16 @@
 package com.personalagent.bertbot.ingestion.connectors
 
 import com.google.gson.JsonParser
+import com.google.gson.JsonObject
+import com.personalagent.bertbot.app.MacrofactorRuntimeConfiguration
+import com.personalagent.bertbot.app.MacrofactorToolRouter
+import com.personalagent.bertbot.app.MacrofactorMcpTransport
+import com.personalagent.bertbot.app.buildRuntimeToolIntegrations
 import com.personalagent.bertbot.ingestion.ExternalChatOutcome
 import com.personalagent.bertbot.ingestion.IngestionDecision
 import com.personalagent.bertbot.ingestion.IngestionOutcome
 import com.personalagent.bertbot.ingestion.NormalizedOutboundMessage
+import kotlin.test.assertContains
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -12,6 +18,145 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExternalChatPayloadDispatcherTest {
+    @Test
+    fun `dispatcher returns macrofactor configured but unavailable response for telegram webhook`() {
+        val macrofactorRouter =
+            MacrofactorToolRouter(
+                runtimeConfiguration =
+                    MacrofactorRuntimeConfiguration(
+                        enabled = true,
+                        username = "tester",
+                        password = "tester",
+                        toolNamePrefix = "macrofactor_",
+                    ),
+                transport =
+                    object : MacrofactorMcpTransport {
+                        override fun listTools() = null
+
+                        override fun callTool(
+                            toolName: String,
+                            arguments: JsonObject,
+                        ): Pair<Boolean, String> = true to "unexpected"
+                    },
+            )
+        val integration =
+            buildRuntimeToolIntegrations(
+                googleWorkspaceRouter = null,
+                polymarketToolRouter = null,
+                macrofactorToolRouter = macrofactorRouter,
+            ).single()
+
+        val telegramAdapter =
+            TelegramConnectorAdapter(
+                TelegramChatBridge { inbound, _ ->
+                    val params = JsonObject().apply { add("arguments", JsonObject()) }
+                    val macrofactorOutcome = integration.toolExecutor("macrofactor_get_targets", params)
+                    ExternalChatOutcome(
+                        inbound = inbound,
+                        ingestion = IngestionOutcome(inbound, IngestionDecision.APPROVED),
+                        outbound =
+                            NormalizedOutboundMessage(
+                                source = inbound.source,
+                                text = macrofactorOutcome?.second ?: "Tool not found",
+                                replyToMessageId = inbound.messageId,
+                            ),
+                    )
+                },
+            )
+        val dispatcher =
+            ExternalChatPayloadDispatcher(
+                connectors = BertBotExternalConnectors(telegram = telegramAdapter),
+            )
+
+        val rawJson =
+            """
+            {
+              "update_id": 3004,
+              "message": {
+                "message_id": 91,
+                "date": 1700000000,
+                "chat": { "id": "chat-mf-unavailable" },
+                "text": "get my macrofactor targets"
+              }
+            }
+            """.trimIndent()
+
+        val replyJson = dispatcher.handleTelegramUpdateJson(rawJson)
+
+        assertNotNull(replyJson)
+        val parsed = JsonParser.parseString(replyJson).asJsonObject
+        assertEquals("sendMessage", parsed.get("method").asString)
+        assertEquals("chat-mf-unavailable", parsed.get("chat_id").asString)
+        assertContains(
+            parsed.get("text").asString,
+            "MacroFactor tool discovery failed",
+        )
+    }
+
+    @Test
+    fun `dispatcher returns macrofactor tool-path response for telegram webhook`() {
+        val macrofactorRouter =
+            MacrofactorToolRouter(
+                runtimeConfiguration =
+                    MacrofactorRuntimeConfiguration(
+                        enabled = true,
+                        toolNamePrefix = "macrofactor_",
+                    ),
+            )
+        val integration =
+            buildRuntimeToolIntegrations(
+                googleWorkspaceRouter = null,
+                polymarketToolRouter = null,
+                macrofactorToolRouter = macrofactorRouter,
+            ).single()
+
+        val telegramAdapter =
+            TelegramConnectorAdapter(
+                TelegramChatBridge { inbound, _ ->
+                    val params = JsonObject().apply { add("arguments", JsonObject()) }
+                    val macrofactorOutcome = integration.toolExecutor("macrofactor_get_targets", params)
+                    ExternalChatOutcome(
+                        inbound = inbound,
+                        ingestion = IngestionOutcome(inbound, IngestionDecision.APPROVED),
+                        outbound =
+                            NormalizedOutboundMessage(
+                                source = inbound.source,
+                                text = macrofactorOutcome?.second ?: "Tool not found",
+                                replyToMessageId = inbound.messageId,
+                            ),
+                    )
+                },
+            )
+        val dispatcher =
+            ExternalChatPayloadDispatcher(
+                connectors = BertBotExternalConnectors(telegram = telegramAdapter),
+            )
+
+        val rawJson =
+            """
+            {
+              "update_id": 3003,
+              "message": {
+                "message_id": 90,
+                "date": 1700000000,
+                "chat": { "id": "chat-mf" },
+                "text": "get my macrofactor targets"
+              }
+            }
+            """.trimIndent()
+
+        val replyJson = dispatcher.handleTelegramUpdateJson(rawJson)
+
+        assertNotNull(replyJson)
+        val parsed = JsonParser.parseString(replyJson).asJsonObject
+        assertEquals("sendMessage", parsed.get("method").asString)
+        assertEquals("chat-mf", parsed.get("chat_id").asString)
+        assertContains(
+            parsed.get("text").asString,
+            "MacroFactor tools are enabled but missing credentials",
+        )
+    }
+
     @Test
     fun `dispatcher routes telegram webhook json and returns reply json`() {
         val telegramAdapter =

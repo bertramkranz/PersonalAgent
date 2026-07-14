@@ -12,6 +12,55 @@ import kotlin.test.assertTrue
 
 class BertBotRuntimeToolIntegrationsTest {
     @Test
+    fun `macrofactor integration is skipped when macrofactor runtime is disabled`() {
+        val router = createMacrofactorToolRouterOrNull(MacrofactorRuntimeConfiguration(enabled = false))
+
+        assertNull(router)
+    }
+
+    @Test
+    fun `build runtime tool integrations includes macrofactor tools`() {
+        val macrofactorRouter = macrofactorToolRouterWithSingleTool()
+
+        val integrations =
+            buildRuntimeToolIntegrations(
+                googleWorkspaceRouter = null,
+                polymarketToolRouter = null,
+                macrofactorToolRouter = macrofactorRouter,
+            )
+
+        assertEquals(1, integrations.size)
+        assertEquals("macrofactor", integrations.single().id)
+
+        val names =
+            integrations
+                .single()
+                .toolDefinitionsProvider()
+                .mapNotNull { definition -> definition.get("name")?.asString }
+                .toSet()
+
+        assertEquals(setOf("macrofactor_get_targets"), names)
+    }
+
+    @Test
+    fun `macrofactor integration executes known tool names`() {
+        val macrofactorRouter = macrofactorToolRouterWithSingleTool()
+        val integration =
+            buildRuntimeToolIntegrations(
+                googleWorkspaceRouter = null,
+                polymarketToolRouter = null,
+                macrofactorToolRouter = macrofactorRouter,
+            ).single()
+
+        val params = JsonObject().apply { add("arguments", JsonObject()) }
+        val outcome = integration.toolExecutor("macrofactor_get_targets", params)
+
+        assertNotNull(outcome)
+        assertEquals(false, outcome.first)
+        assertContains(outcome.second, "protein=180")
+    }
+
+    @Test
     fun `polymarket integration is skipped when polymarket sub-agent is disabled`() {
         val defaultConfig = BertBotAgentConfig()
         val configWithoutPolymarket =
@@ -94,5 +143,36 @@ class BertBotRuntimeToolIntegrationsTest {
             val requiredArgs = schema.getAsJsonArray("required").map { element -> element.asString }
             assertTrue(requiredArgs.contains("operation"))
         }
+    }
+
+    private fun macrofactorToolRouterWithSingleTool(): MacrofactorToolRouter {
+        val runtimeConfiguration =
+            MacrofactorRuntimeConfiguration(
+                enabled = true,
+                username = "tester",
+                password = "tester",
+                toolNamePrefix = "macrofactor_",
+            )
+        val transport =
+            object : MacrofactorMcpTransport {
+                override fun listTools(): List<MacrofactorDiscoveredTool> =
+                    listOf(
+                        MacrofactorDiscoveredTool(
+                            name = "get_targets",
+                            description = "Fetches daily nutrition targets.",
+                            inputSchema =
+                                JsonObject().apply {
+                                    addProperty("type", "object")
+                                },
+                        ),
+                    )
+
+                override fun callTool(
+                    toolName: String,
+                    arguments: JsonObject,
+                ): Pair<Boolean, String> = false to "protein=180 carbs=220 fat=70"
+            }
+
+        return MacrofactorToolRouter(runtimeConfiguration = runtimeConfiguration, transport = transport)
     }
 }
