@@ -732,7 +732,7 @@ internal fun buildCapabilityStatusResponse(
 private fun isCapabilityQuestion(userMessage: String): Boolean {
     val normalized = userMessage.lowercase()
     val directKeywords =
-        listOf("capabilit", "what can you access", "sub-agent", "sub agent", "subagents", "persist", "persistence")
+        listOf("capabilit", "what can you access", "sub-agent", "sub agent", "subagents", "persist")
     if (directKeywords.any { normalized.contains(it) }) {
         return true
     }

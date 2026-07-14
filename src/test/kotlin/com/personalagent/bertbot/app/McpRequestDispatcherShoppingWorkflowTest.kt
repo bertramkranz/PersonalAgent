@@ -139,14 +139,11 @@ class McpRequestDispatcherShoppingWorkflowTest {
 
     @Test
     fun `shopping workflow prompts in webhook mode produce outbound responses`() {
-        var capturedMessage: com.personalagent.bertbot.ingestion.NormalizedIngestionMessage? = null
-
         val dispatcher =
             McpRequestDispatcher(
                 respondToPrompt = { _, _ -> "Handled your shopping request." },
                 ingestionControlPlane = null,
                 externalChatResponder = { message, dryRun ->
-                    capturedMessage = message
                     com.personalagent.bertbot.ingestion.ExternalChatOutcome(
                         inbound = message,
                         ingestion =
