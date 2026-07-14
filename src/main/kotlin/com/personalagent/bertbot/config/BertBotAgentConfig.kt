@@ -306,6 +306,25 @@ data class BertBotAgentConfig(
                     ),
                 enabled = false,
             ),
+            SubAgentConfigDefinition(
+                id = "personal_shopper",
+                name = "Personal Shopper",
+                description = "Assists with product discovery, price comparison, and purchase research across configured shopping store providers. Requires explicit confirmation for state-changing actions and never performs autonomous checkout.",
+                skills =
+                    setOf(
+                        "shopping",
+                        "product",
+                        "price",
+                        "purchase",
+                        "cart",
+                        "order",
+                        "retail",
+                        "compare",
+                        "store",
+                        "buy",
+                    ),
+                enabled = false,
+            ),
         ),
 ) {
     init {
