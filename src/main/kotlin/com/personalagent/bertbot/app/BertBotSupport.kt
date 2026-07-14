@@ -657,10 +657,13 @@ private fun parseStoreModes(value: String): Map<String, StoreAdapterMode> =
             val parts = segment.trim().split(':')
             if (parts.size != 2) return@mapNotNull null
             val storeName = parts[0].trim().takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val mode = runCatching { StoreAdapterMode.valueOf(parts[1].trim().uppercase()) }.getOrNull() ?: return@mapNotNull null
+            val mode = parseStoreAdapterMode(parts[1]) ?: return@mapNotNull null
             storeName to mode
         }
         .toMap()
+
+private fun parseStoreAdapterMode(raw: String): StoreAdapterMode? =
+    runCatching { StoreAdapterMode.valueOf(raw.trim().uppercase()) }.getOrNull()
 
 internal fun resolveTraceFilePath(
     environment: Map<String, String> = System.getenv(),

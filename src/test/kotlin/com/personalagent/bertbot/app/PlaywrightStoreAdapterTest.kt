@@ -188,6 +188,28 @@ class PlaywrightStoreAdapterTest {
     }
 
     @Test
+    fun `resolveStoreAdapter with real browser adapter in browser mode returns browser result`() {
+        val config = PlaywrightStoreRuntimeConfiguration(enabled = true, defaultMode = StoreAdapterMode.BROWSER)
+        val realBrowserAdapter =
+            object : BrowserStoreAdapter {
+                override fun execute(
+                    action: String,
+                    params: JsonObject,
+                ): Pair<Boolean, String> = false to "browser-page-content"
+            }
+        val adapter =
+            resolveStoreAdapter(
+                "myStore",
+                config,
+                { _, _ -> false to "api-ok" },
+                realBrowserAdapter,
+            )
+        val (isError, message) = adapter.execute("read", JsonObject())
+        assertFalse(isError, "Real browser adapter should succeed")
+        assertEquals("browser-page-content", message)
+    }
+
+    @Test
     fun `resolveStoreAdapter returns hybrid adapter when mode is hybrid`() {
         val config = PlaywrightStoreRuntimeConfiguration(enabled = true, defaultMode = StoreAdapterMode.HYBRID)
         val adapter =

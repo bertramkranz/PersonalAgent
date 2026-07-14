@@ -67,7 +67,8 @@ internal class ApiStoreAdapter(
     override fun execute(
         action: String,
         params: JsonObject,
-    ): Pair<Boolean, String> = executor(action, params) ?: (true to "API store returned no result for action '$action'.")
+    ): Pair<Boolean, String> =
+        executor(action, params) ?: (true to "API store returned no result for action '$action'.")
 }
 
 /**
