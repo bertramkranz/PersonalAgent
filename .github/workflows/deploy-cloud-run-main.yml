@@ -48,7 +48,7 @@ jobs:
       - name: Validate required deployment vars
         run: |
           set -euo pipefail
-          required=(GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REGISTRY_REPO GCP_CLOUDSQL_INSTANCE)
+          required=(GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REGISTRY_REPO)
           for key in "${required[@]}"; do
             if [ -z "${!key:-}" ]; then
               echo "Missing required repository variable: ${key}" >&2
@@ -161,12 +161,9 @@ jobs:
           set -euo pipefail
 
           image_uri="${{ steps.image.outputs.image_uri }}"
-          cloudsql_conn="${GCP_PROJECT_ID}:${GCP_REGION}:${GCP_CLOUDSQL_INSTANCE}"
-          jdbc_url="jdbc:postgresql:///${BERTBOT_DB_NAME}?cloudSqlInstance=${cloudsql_conn}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
 
           secret_mappings=(
             "BERTBOT_AI_API_KEY=${AI_API_KEY_SECRET_NAME}:latest"
-            "BERTBOT_STATE_JDBC_PASSWORD=${DB_PASSWORD_SECRET_NAME}:latest"
             "BERTBOT_TELEGRAM_SECRET_TOKEN=${TELEGRAM_SECRET_TOKEN_SECRET_NAME}:latest"
           )
 
@@ -208,12 +205,11 @@ jobs:
 
           env_vars=(
             "BERTBOT_RUN_MODE=webhook"
-            "BERTBOT_STATE_STORE=postgres"
+            "BERTBOT_STATE_STORE=file"
             "BERTBOT_WEBHOOK_HOST=0.0.0.0"
+            "BERTBOT_WEBHOOK_PORT=${CLOUD_RUN_CONTAINER_PORT}"
             "BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true"
             "BERTBOT_INGESTION_REQUIRE_APPROVAL=false"
-            "BERTBOT_STATE_JDBC_URL=${jdbc_url}"
-            "BERTBOT_STATE_JDBC_USER=${BERTBOT_DB_USER}"
             "BERTBOT_GOOGLE_WORKSPACE_ENABLED=${BERTBOT_GOOGLE_WORKSPACE_ENABLED}"
             "BERTBOT_GOOGLE_WORKSPACE_COMMAND=node"
             "BERTBOT_GOOGLE_WORKSPACE_ARGS=/opt/google-workspace-extension/workspace-server/dist/index.js"
@@ -233,7 +229,6 @@ jobs:
             --memory 1Gi
             --concurrency 1
             --min-instances 1
-            --add-cloudsql-instances "${cloudsql_conn}"
             --set-env-vars "$(IFS=,; echo "${env_vars[*]}")"
             --set-secrets "$(IFS=,; echo "${secret_mappings[*]}")"
           )
