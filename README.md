@@ -27,6 +27,10 @@ BERTBOT_AI_MODEL=gpt-4o-mini
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
+For Docker Compose deployments, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead.
+
+See [docs/configuration.md](docs/configuration.md) for the full env file ownership model and how to run `scripts/check-env-drift.sh` to detect template drift.
+
 ### Run Locally
 
 Interactive CLI:

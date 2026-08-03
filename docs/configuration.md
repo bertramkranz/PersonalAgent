@@ -2,16 +2,42 @@
 
 BertBot reads configuration from process environment variables first and then falls back to `.env` in the repository root.
 
+## Env File Ownership
+
+| File | Scope | Purpose |
+| --- | --- | --- |
+| `.env.example` | Local development | Authoritative template for Gradle-based development (CLI, MCP, headless). Copy to `.env` and edit. |
+| `.env` | Local development | Gitignored runtime values for local development. Never commit this file. |
+| `.env.compose.example` | Docker Compose / containerised deployment | Authoritative template for self-hosted Docker deployments. Copy to `.env.compose` and edit. |
+| `.env.compose` | Docker Compose / containerised deployment | Gitignored runtime values for compose deployments. Never commit this file. |
+
+Key differences between the two templates are intentional:
+
+- `BERTBOT_STATE_STORE` defaults to `file` locally and `postgres` in compose.
+- `BERTBOT_OLLAMA_BASE_URL` uses `localhost` locally and the Docker service hostname `ollama` in compose.
+- `BERTBOT_GOOGLE_WORKSPACE_ENABLED` and `BERTBOT_MACROFACTOR_ENABLED` default to `true` locally and `false` in compose; enable only when the corresponding credentials are available.
+
+## Drift Check
+
+Run `scripts/check-env-drift.sh` to verify that both templates define the same set of active keys:
+
+```bash
+bash scripts/check-env-drift.sh
+```
+
+The script exits 0 when both files are aligned and 1 when any key is missing from either template. Run it after adding or removing env vars from either template to keep them in sync.
+
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
 Template defaults in [../.env.example](../.env.example) are intentionally conservative:
 
-- `BERTBOT_GOOGLE_WORKSPACE_ENABLED=false`
 - `BERTBOT_SLACK_ENABLED=false`
 - `BERTBOT_WHATSAPP_ENABLED=false`
+- `BERTBOT_DISCORD_ENABLED=false`
 - `BERTBOT_INGESTION_REQUIRE_APPROVAL=false`
+- `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=false`
 
-This keeps local startup simple while still allowing immediate Telegram webhook replies when enabled.
+Google Workspace and MacroFactor proxy tools are enabled by default in `.env.example` (disabled in `.env.compose.example` until credentials are configured).
 
 See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
 
