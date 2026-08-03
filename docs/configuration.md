@@ -2,6 +2,26 @@
 
 BertBot reads configuration from process environment variables first and then falls back to `.env` in the repository root.
 
+## Environment File Usage
+
+Each environment file has a single owner and runtime context. Do not mix these files across contexts.
+
+| File | Purpose | When to use |
+| --- | --- | --- |
+| `.env.example` | Local development template | One-time: copy to `.env` before the first local Gradle run |
+| `.env` | Local runtime configuration | Loaded automatically by all Gradle run modes |
+| `.env.compose.example` | Docker Compose template | One-time: copy to `.env.compose` before the first compose run |
+| `.env.compose` | Compose runtime configuration | Loaded by `docker-compose.yml` via `env_file` |
+| Secret Manager / platform env | Deployed runtime credentials | Injected as environment variables by Cloud Run at deploy time; no file used |
+
+**Ownership rules:**
+
+- Local Gradle runs (CLI, headless, MCP, webhook, Discord): use `.env` only.
+- Docker Compose runs: use `.env.compose` only.
+- Cloud Run and other hosted deployments: do not use a file; inject all variables through the platform secret or environment mechanism.
+
+Neither `.env` nor `.env.compose` should ever be committed. Both are excluded by `.gitignore`.
+
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
 Template defaults in [../.env.example](../.env.example) are intentionally conservative:
@@ -255,20 +275,28 @@ BERTBOT_STATE_JDBC_PASSWORD=
 
 ## Practical Config Profiles
 
+See [Environment File Usage](#environment-file-usage) for the authoritative mapping of files to runtime contexts.
+
 Local CLI or MCP development:
 
-- Use `.env` from the repository root.
+- Copy [../.env.example](../.env.example) to `.env` (one-time).
 - Keep `BERTBOT_STATE_STORE=file`.
-- Launch commands from the repository root so workspace-relative paths resolve correctly.
+- Launch all commands from the repository root so workspace-relative paths resolve correctly.
+- Do **not** use `.env.compose` for local Gradle runs.
 
-Webhook deployment:
+Webhook deployment (local):
 
-- Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`.
-- Configure connector-specific verification secrets.
-- Use PostgreSQL-backed persistence.
+- Use `.env` from the repository root.
+- Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true` and configure connector-specific verification secrets.
 
-Container deployment:
+Docker Compose deployment:
 
-- Start from [../.env.compose.example](../.env.compose.example).
-- Keep runtime mode and persistence aligned with the service role.
+- Copy [../.env.compose.example](../.env.compose.example) to `.env.compose` (one-time).
+- Do **not** use `.env` for compose runs; `docker-compose.yml` loads `.env.compose` via `env_file`.
+- Keep runtime mode and persistence backend aligned with the service role (`BERTBOT_STATE_STORE=postgres`).
+
+Cloud Run or hosted deployment:
+
+- Do **not** use a local env file; inject all variables through Secret Manager or the platform environment mechanism.
+- See [deployment.md](deployment.md) for Cloud Run secret wiring details.
 
