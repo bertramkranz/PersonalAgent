@@ -48,7 +48,7 @@ jobs:
       - name: Validate required deployment vars
         run: |
           set -euo pipefail
-          required=(GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REGISTRY_REPO GCP_CLOUDSQL_INSTANCE)
+          required=(GCP_PROJECT_ID GCP_REGION GCP_ARTIFACT_REGISTRY_REPO)
           for key in "${required[@]}"; do
             if [ -z "${!key:-}" ]; then
               echo "Missing required repository variable: ${key}" >&2
@@ -161,14 +161,28 @@ jobs:
           set -euo pipefail
 
           image_uri="${{ steps.image.outputs.image_uri }}"
-          cloudsql_conn="${GCP_PROJECT_ID}:${GCP_REGION}:${GCP_CLOUDSQL_INSTANCE}"
-          jdbc_url="jdbc:postgresql:///${BERTBOT_DB_NAME}?cloudSqlInstance=${cloudsql_conn}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+          cloudsql_configured="false"
+          cloudsql_conn=""
+          jdbc_url=""
+
+          if [ -n "${GCP_CLOUDSQL_INSTANCE:-}" ]; then
+            cloudsql_conn="${GCP_PROJECT_ID}:${GCP_REGION}:${GCP_CLOUDSQL_INSTANCE}"
+            if gcloud sql instances describe "${GCP_CLOUDSQL_INSTANCE}" --project "${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+              cloudsql_configured="true"
+              jdbc_url="jdbc:postgresql:///${BERTBOT_DB_NAME}?cloudSqlInstance=${cloudsql_conn}&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+            else
+              echo "Warning: Cloud SQL instance '${GCP_CLOUDSQL_INSTANCE}' is unavailable; falling back to file-backed state." >&2
+            fi
+          fi
 
           secret_mappings=(
             "BERTBOT_AI_API_KEY=${AI_API_KEY_SECRET_NAME}:latest"
-            "BERTBOT_STATE_JDBC_PASSWORD=${DB_PASSWORD_SECRET_NAME}:latest"
             "BERTBOT_TELEGRAM_SECRET_TOKEN=${TELEGRAM_SECRET_TOKEN_SECRET_NAME}:latest"
           )
+
+          if [ "${cloudsql_configured}" = "true" ]; then
+            secret_mappings+=("BERTBOT_STATE_JDBC_PASSWORD=${DB_PASSWORD_SECRET_NAME}:latest")
+          fi
 
           if [ -n "${TELEGRAM_BOT_TOKEN_SECRET_NAME:-}" ]; then
             if [ "${TELEGRAM_BOT_TOKEN_SECRET_NAME,,}" != "disabled" ]; then
@@ -208,18 +222,26 @@ jobs:
 
           env_vars=(
             "BERTBOT_RUN_MODE=webhook"
-            "BERTBOT_STATE_STORE=postgres"
             "BERTBOT_WEBHOOK_HOST=0.0.0.0"
+            "BERTBOT_WEBHOOK_PORT=${CLOUD_RUN_CONTAINER_PORT}"
             "BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true"
             "BERTBOT_INGESTION_REQUIRE_APPROVAL=false"
-            "BERTBOT_STATE_JDBC_URL=${jdbc_url}"
-            "BERTBOT_STATE_JDBC_USER=${BERTBOT_DB_USER}"
             "BERTBOT_GOOGLE_WORKSPACE_ENABLED=${BERTBOT_GOOGLE_WORKSPACE_ENABLED}"
             "BERTBOT_GOOGLE_WORKSPACE_COMMAND=node"
             "BERTBOT_GOOGLE_WORKSPACE_ARGS=/opt/google-workspace-extension/workspace-server/dist/index.js"
             "BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS=120"
             "GEMINI_CLI_WORKSPACE_FORCE_FILE_STORAGE=true"
           )
+
+          if [ "${cloudsql_configured}" = "true" ]; then
+            env_vars+=(
+              "BERTBOT_STATE_STORE=postgres"
+              "BERTBOT_STATE_JDBC_URL=${jdbc_url}"
+              "BERTBOT_STATE_JDBC_USER=${BERTBOT_DB_USER}"
+            )
+          else
+            env_vars+=("BERTBOT_STATE_STORE=file")
+          fi
 
           deploy_args=(
             run deploy "${CLOUD_RUN_SERVICE}"
@@ -233,10 +255,13 @@ jobs:
             --memory 1Gi
             --concurrency 1
             --min-instances 1
-            --add-cloudsql-instances "${cloudsql_conn}"
             --set-env-vars "$(IFS=,; echo "${env_vars[*]}")"
             --set-secrets "$(IFS=,; echo "${secret_mappings[*]}")"
           )
+
+          if [ "${cloudsql_configured}" = "true" ]; then
+            deploy_args+=(--add-cloudsql-instances "${cloudsql_conn}")
+          fi
 
           if [ "${CLOUD_RUN_ALLOW_UNAUTHENTICATED}" = "true" ]; then
             deploy_args+=(--allow-unauthenticated)
