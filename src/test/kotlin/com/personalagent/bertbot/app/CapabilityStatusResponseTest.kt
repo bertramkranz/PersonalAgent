@@ -17,7 +17,7 @@ class CapabilityStatusResponseTest {
         assertTrue(response.contains("- philosopher: enabled"))
         assertTrue(response.contains("- psychologist: enabled"))
         assertTrue(response.contains("- google_workspace_operator: enabled"))
-        assertTrue(response.contains("- repo_improvement_researcher: disabled"))
+        assertTrue(response.contains("- repo_improvement_researcher: enabled"))
     }
 
     @Test
