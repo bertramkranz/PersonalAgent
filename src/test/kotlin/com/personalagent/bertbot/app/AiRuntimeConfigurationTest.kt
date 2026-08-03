@@ -401,7 +401,7 @@ class AiRuntimeConfigurationTest {
                         "BERTBOT_RUNTIME_ENV" to "production",
                         "BERTBOT_CHECKPOINT_ROLLBACK_ENABLED" to "true",
                         "BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM" to "false",
-                        "BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED" to "true",
+                        "BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED" to "1",
                     ),
                 dotEnvValues =
                     mapOf(

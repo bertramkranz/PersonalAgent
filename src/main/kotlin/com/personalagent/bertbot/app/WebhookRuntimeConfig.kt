@@ -52,8 +52,8 @@ internal fun resolveWebhookAgentConfig(
 ): BertBotAgentConfig {
     fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
     val enableTelegram = env("BERTBOT_TELEGRAM_ENABLED").toBooleanEnv(defaultValue = true)
-    val enableSlack = env("BERTBOT_SLACK_ENABLED").toBooleanEnv(defaultValue = true)
-    val enableWhatsApp = env("BERTBOT_WHATSAPP_ENABLED").toBooleanEnv(defaultValue = true)
+    val enableSlack = env("BERTBOT_SLACK_ENABLED").toBooleanEnv(defaultValue = false)
+    val enableWhatsApp = env("BERTBOT_WHATSAPP_ENABLED").toBooleanEnv(defaultValue = false)
     val enableDiscord = env("BERTBOT_DISCORD_ENABLED").toBooleanEnv(defaultValue = false)
 
     val ingestionEnabled = enableTelegram || enableSlack || enableWhatsApp || enableDiscord
@@ -124,15 +124,6 @@ private fun normalizeWebhookPath(
         return fallback
     }
     return if (raw.startsWith('/')) raw else "/$raw"
-}
-
-private fun String?.toBooleanEnv(defaultValue: Boolean): Boolean {
-    val value = this?.trim()?.lowercase() ?: return defaultValue
-    return when (value) {
-        "1", "true", "yes", "on" -> true
-        "0", "false", "no", "off" -> false
-        else -> defaultValue
-    }
 }
 
 private fun parseCsvSet(raw: String?): Set<String> =

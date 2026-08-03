@@ -288,12 +288,10 @@ internal fun resolvePersistenceRuntimeConfiguration(
         )
     val checkpointAutoSaveEnabled =
         resolveRuntimeSetting("BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED
+            .toBooleanEnv(DEFAULT_CHECKPOINT_AUTOSAVE_ENABLED)
     val eventSourcingEnabled =
         resolveRuntimeSetting("BERTBOT_EVENT_SOURCING_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_EVENT_SOURCING_ENABLED
+            .toBooleanEnv(DEFAULT_EVENT_SOURCING_ENABLED)
     val stateEventFilePath =
         resolvePersistencePathSetting(
             "BERTBOT_STATE_EVENT_FILE_PATH",
@@ -454,8 +452,7 @@ internal fun resolveMacrofactorRuntimeConfiguration(
 ): MacrofactorRuntimeConfiguration {
     val enabled =
         resolveRuntimeSetting("BERTBOT_MACROFACTOR_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_MACROFACTOR_ENABLED
+            .toBooleanEnv(DEFAULT_MACROFACTOR_ENABLED)
 
     val command =
         resolveRuntimeSetting("BERTBOT_MACROFACTOR_COMMAND", environment, dotEnvValues)
@@ -501,8 +498,7 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
 ): GoogleWorkspaceRuntimeConfiguration {
     val enabled =
         resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_GOOGLE_WORKSPACE_ENABLED
+            .toBooleanEnv(DEFAULT_GOOGLE_WORKSPACE_ENABLED)
 
     val command =
         resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_COMMAND", environment, dotEnvValues)
@@ -546,8 +542,7 @@ internal fun resolveShoppingRuntimeConfiguration(
 ): ShoppingRuntimeConfiguration {
     val enabled =
         resolveRuntimeSetting("BERTBOT_SHOPPING_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_SHOPPING_ENABLED
+            .toBooleanEnv(DEFAULT_SHOPPING_ENABLED)
 
     val budgetLimitCents =
         resolveRuntimeSetting("BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS", environment, dotEnvValues)
@@ -565,7 +560,7 @@ internal fun resolveShoppingRuntimeConfiguration(
             val enabledRaw =
                 resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_ENABLED", environment, dotEnvValues)
                     ?: return@mapNotNull null
-            val enabled = enabledRaw.toBooleanStrictOrNull() ?: DEFAULT_SHOPPING_STORE_ENABLED
+            val enabled = enabledRaw.toBooleanEnv(DEFAULT_SHOPPING_STORE_ENABLED)
             val mode =
                 resolveRuntimeSetting("BERTBOT_SHOPPING_STORE_${index}_MODE", environment, dotEnvValues)
                     ?.takeIf { it.isNotBlank() }
@@ -609,8 +604,7 @@ internal fun resolveKoogFeatureRuntimeConfiguration(
 ): KoogFeatureRuntimeConfiguration {
     val chatMemoryEnabled =
         resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_KOOG_CHAT_MEMORY_ENABLED
+            .toBooleanEnv(DEFAULT_KOOG_CHAT_MEMORY_ENABLED)
     val chatMemoryWindowSize =
         resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE", environment, dotEnvValues)
             ?.toIntOrNull()
@@ -618,8 +612,7 @@ internal fun resolveKoogFeatureRuntimeConfiguration(
             ?: DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE
     val longTermMemoryEnabled =
         resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED
+            .toBooleanEnv(DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED)
     val longTermMemoryTopK =
         resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K", environment, dotEnvValues)
             ?.toIntOrNull()
@@ -635,8 +628,7 @@ internal fun resolveKoogFeatureRuntimeConfiguration(
             ?: DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION
     val openTelemetryVerbose =
         resolveRuntimeSetting("BERTBOT_KOOG_OTEL_VERBOSE", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE
+            .toBooleanEnv(DEFAULT_KOOG_OPEN_TELEMETRY_VERBOSE)
     val openTelemetryOtlpEndpoint =
         resolveRuntimeSetting("BERTBOT_KOOG_OTEL_OTLP_ENDPOINT", environment, dotEnvValues)
             ?.takeIf { it.isNotBlank() }
@@ -670,16 +662,13 @@ internal fun resolveCheckpointRollbackPolicyConfiguration(
             ?: DEFAULT_RUNTIME_ENVIRONMENT
     val rollbackEnabled =
         resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_CHECKPOINT_ROLLBACK_ENABLED
+            .toBooleanEnv(DEFAULT_CHECKPOINT_ROLLBACK_ENABLED)
     val requireConfirm =
         resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM
+            .toBooleanEnv(DEFAULT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM)
     val allowInProtectedEnvironment =
         resolveRuntimeSetting("BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED
+            .toBooleanEnv(DEFAULT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED)
 
     return CheckpointRollbackPolicyConfiguration(
         environment = runtimeEnvironment,
@@ -708,8 +697,7 @@ internal fun resolvePlaywrightStoreRuntimeConfiguration(
 ): PlaywrightStoreRuntimeConfiguration {
     val enabled =
         resolveRuntimeSetting("BERTBOT_PLAYWRIGHT_STORE_ENABLED", environment, dotEnvValues)
-            ?.toBooleanStrictOrNull()
-            ?: DEFAULT_PLAYWRIGHT_STORE_ENABLED
+            .toBooleanEnv(DEFAULT_PLAYWRIGHT_STORE_ENABLED)
 
     val defaultMode =
         resolveRuntimeSetting("BERTBOT_PLAYWRIGHT_STORE_DEFAULT_MODE", environment, dotEnvValues)

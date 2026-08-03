@@ -2,13 +2,45 @@
 
 BertBot reads configuration from process environment variables first and then falls back to `.env` in the repository root.
 
+## Environment File Usage
+
+Each environment file has a single owner and runtime context. Do not mix these files across contexts.
+
+| File | Purpose | When to use |
+| --- | --- | --- |
+| `.env.example` | Local development template | One-time: copy to `.env` before the first local Gradle run |
+| `.env` | Local runtime configuration | Loaded automatically by all Gradle run modes |
+| `.env.compose.example` | Docker Compose template | One-time: copy to `.env.compose` before the first compose run |
+| `.env.compose` | Compose runtime configuration | Loaded by `docker-compose.yml` via `env_file` |
+| Secret Manager / platform env | Deployed runtime credentials | Injected as environment variables by Cloud Run at deploy time; no file used |
+
+**Ownership rules:**
+
+- Local Gradle runs (CLI, headless, MCP, webhook, Discord): use `.env` only.
+- Docker Compose runs: use `.env.compose` only.
+- Cloud Run and other hosted deployments: do not use a file; inject all variables through the platform secret or environment mechanism.
+
+Neither `.env` nor `.env.compose` should ever be committed. Both are excluded by `.gitignore`.
+
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
 Template defaults in [../.env.example](../.env.example) are intentionally conservative: most optional integrations default to disabled; Telegram is the exception and defaults to enabled so webhook replies work immediately once a bot token is set.
 
 For Docker Compose deployment, copy [../.env.compose.example](../.env.compose.example) to `.env.compose`. Compose-specific overrides in that file are annotated with `[compose override]`; all other keys share the same semantics as in `.env.example`.
 
-See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
+See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.  For Koog beta dependency pinning and upgrade rules, see [koog-beta-upgrade-policy.md](koog-beta-upgrade-policy.md).
+
+## Environment Variable Parsing
+
+All settings follow the same precedence order:
+
+1. **Process environment** – highest priority.
+2. **`.env` file** in the repository root – fallback when the process environment value is blank or absent.
+3. **Compiled default** – applied when neither source provides a value.
+
+Boolean settings accept both the strict tokens (`true` / `false`) and the common shell idioms
+`1` / `0`, `yes` / `no`, and `on` / `off` (case-insensitive).  Any unrecognised value falls back to
+the compiled default.
 
 ## Environment Key Matrix
 
@@ -235,10 +267,12 @@ Backend selection:
 | Variable | Purpose | Notes |
 | --- | --- | --- |
 | `BERTBOT_STATE_STORE` | Select persistence backend | `file` by default; `jdbc`, `postgres`, `postgresql` for deployed environments |
+| `BERTBOT_JSON_CODEC` | JSON serialisation codec | `gson` (default) or `kotlinx` |
 
 File-backed paths:
 
 - `BERTBOT_STATE_FILE_PATH`
+- `BERTBOT_CHECKPOINT_FILE_PATH`
 - `BERTBOT_MEMORY_EPISODIC_FILE_PATH`
 - `BERTBOT_MEMORY_SEMANTIC_FILE_PATH`
 - `BERTBOT_PROFILE_FILE_PATH`
@@ -247,8 +281,7 @@ File-backed paths:
 - `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH`
 - `BERTBOT_TRACE_FILE_PATH`
 - `BERTBOT_INTERACTIONS_FILE_PATH`
-- `BERTBOT_CHECKPOINT_FILE_PATH`
-- `BERTBOT_STATE_EVENT_FILE_PATH`
+- `BERTBOT_STATE_EVENT_FILE_PATH` – event-sourcing log (used when `BERTBOT_EVENT_SOURCING_ENABLED=true`)
 
 JDBC or PostgreSQL settings:
 
@@ -256,15 +289,15 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_STATE_JDBC_USER`
 - `BERTBOT_STATE_JDBC_PASSWORD`
 - `BERTBOT_STATE_JDBC_TABLE`
-- `BERTBOT_CHECKPOINT_JDBC_TABLE`
-- `BERTBOT_STATE_EVENT_JDBC_TABLE`
+- `BERTBOT_CHECKPOINT_JDBC_TABLE` – defaults to `bertbot_checkpoint_snapshot`
+- `BERTBOT_STATE_EVENT_JDBC_TABLE` – defaults to `bertbot_state_event`
 - `BERTBOT_MEMORY_EPISODIC_JDBC_TABLE`
 - `BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE`
 - `BERTBOT_PROFILE_JDBC_TABLE`
 - `BERTBOT_INGESTION_CONSENT_JDBC_TABLE`
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE`
 
-Local Gradle runs can stay on the default file backend. Containerized runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
+Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 
 ## Checkpoint And Event Sourcing
 
@@ -419,22 +452,31 @@ BERTBOT_STATE_JDBC_PASSWORD=
 
 ## Practical Config Profiles
 
+See [Environment File Usage](#environment-file-usage) for the authoritative mapping of files to runtime contexts.
+
 Local CLI or MCP development:
 
-- Copy [../.env.example](../.env.example) to `.env` and set `BERTBOT_AI_API_KEY`.
+- Copy [../.env.example](../.env.example) to `.env` (one-time) and set `BERTBOT_AI_API_KEY`.
 - Keep `BERTBOT_STATE_STORE=file`.
-- Launch commands from the repository root so workspace-relative paths resolve correctly.
+- Launch all commands from the repository root so workspace-relative paths resolve correctly.
+- Do **not** use `.env.compose` for local Gradle runs.
 
-Webhook deployment:
+Webhook deployment (local):
 
-- Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`.
-- Configure connector-specific verification secrets.
+- Use `.env` from the repository root.
+- Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true` and configure connector-specific verification secrets.
 - Use PostgreSQL-backed persistence.
 - Set `BERTBOT_RUNTIME_ENV=production` to enable checkpoint rollback protection.
 
-Container deployment:
+Docker Compose deployment:
 
-- Copy [../.env.compose.example](../.env.compose.example) to `.env.compose`.
+- Copy [../.env.compose.example](../.env.compose.example) to `.env.compose` (one-time).
+- Do **not** use `.env` for compose runs; `docker-compose.yml` loads `.env.compose` via `env_file`.
+- Keep runtime mode and persistence backend aligned with the service role (`BERTBOT_STATE_STORE=postgres`).
 - Fill in `BERTBOT_AI_API_KEY` and connector credentials.
-- Runtime mode, persistence backend, and JDBC connection are already set to compose-appropriate defaults.
 - Keys annotated `[compose override]` in the template differ from `.env.example`; all others are identical.
+
+Cloud Run or hosted deployment:
+
+- Do **not** use a local env file; inject all variables through Secret Manager or the platform environment mechanism.
+- See [deployment.md](deployment.md) for Cloud Run secret wiring details.
