@@ -31,13 +31,29 @@ internal fun resolveRuntimeSettingAllowBlank(
     return null
 }
 
-internal fun loadDotEnvValues(): Map<String, String> {
-    val envFile = File(".env")
+internal fun loadDotEnvValues(envFile: File = File(".env")): Map<String, String> {
     if (!envFile.exists()) {
         return emptyMap()
     }
 
     return envFile.readLines().asSequence().mapNotNull { parseDotEnvEntry(it) }.toMap()
+}
+
+/**
+ * Parses [this] string as a boolean environment variable value.
+ *
+ * Accepts permissive truthy tokens (`"1"`, `"true"`, `"yes"`, `"on"`) and falsy tokens
+ * (`"0"`, `"false"`, `"no"`, `"off"`) case-insensitively.  Any other value — including
+ * `null` — returns [defaultValue].  This function is intentionally lenient so that common
+ * shell idioms (e.g. `VAR=1` or `VAR=yes`) behave consistently across all run modes.
+ */
+internal fun String?.toBooleanEnv(defaultValue: Boolean): Boolean {
+    val value = this?.trim()?.lowercase() ?: return defaultValue
+    return when (value) {
+        "1", "true", "yes", "on" -> true
+        "0", "false", "no", "off" -> false
+        else -> defaultValue
+    }
 }
 
 private fun parseDotEnvEntry(line: String): Pair<String, String>? {

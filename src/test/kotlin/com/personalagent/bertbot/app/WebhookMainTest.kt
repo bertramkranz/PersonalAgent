@@ -59,13 +59,13 @@ class WebhookMainTest {
     }
 
     @Test
-    fun `resolve webhook agent config enables all connectors by default`() {
+    fun `resolve webhook agent config enables telegram by default and disables other connectors`() {
         val config = resolveWebhookAgentConfig(environment = emptyMap(), dotEnvValues = emptyMap())
 
         assertTrue(config.ingestion.policy.enabled)
         assertTrue(config.ingestion.telegram.connector.enabled)
-        assertTrue(config.ingestion.slack.connector.enabled)
-        assertTrue(config.ingestion.whatsapp.connector.enabled)
+        assertFalse(config.ingestion.slack.connector.enabled)
+        assertFalse(config.ingestion.whatsapp.connector.enabled)
         assertFalse(config.ingestion.discord.connector.enabled)
         assertTrue(config.ingestion.policy.requireApproval)
     }
