@@ -18,6 +18,8 @@ BertBot is a graph-based personal assistant orchestration agent built to stay co
 
 ### Environment Setup
 
+For local Gradle runs (CLI, headless, MCP, webhook, Discord):
+
 1. Copy [.env.example](.env.example) to `.env`.
 2. Set at least:
 
@@ -26,6 +28,8 @@ BERTBOT_AI_PROVIDER=openai
 BERTBOT_AI_MODEL=gpt-4o-mini
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
+
+For Docker Compose runs, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead. See [docs/configuration.md](docs/configuration.md#environment-file-usage) for the full file-to-context mapping.
 
 ### Run Locally
 
