@@ -294,17 +294,19 @@ data class BertBotAgentConfig(
                 description = "Continuously researches repository and ecosystem improvements with Kotlin, MCP, AI, security, productivity, and performance focus",
                 skills =
                     setOf(
+                        "repo improvement",
+                        "repository improvement",
+                        "improvement researcher",
+                        "ecosystem upgrade",
+                        "dependency upgrade",
+                        "scout",
                         "research",
-                        "kotlin",
                         "mcp",
-                        "ai",
-                        "security",
                         "productivity",
                         "performance",
                         "cost",
                         "optimization",
                     ),
-                enabled = false,
             ),
             SubAgentConfigDefinition(
                 id = "personal_shopper",
