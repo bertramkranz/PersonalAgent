@@ -4,16 +4,136 @@ BertBot reads configuration from process environment variables first and then fa
 
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
-Template defaults in [../.env.example](../.env.example) are intentionally conservative:
+Template defaults in [../.env.example](../.env.example) are intentionally conservative: all optional integrations default to disabled, keeping local startup simple while still allowing immediate Telegram webhook replies when enabled.
 
-- `BERTBOT_GOOGLE_WORKSPACE_ENABLED=false`
-- `BERTBOT_SLACK_ENABLED=false`
-- `BERTBOT_WHATSAPP_ENABLED=false`
-- `BERTBOT_INGESTION_REQUIRE_APPROVAL=false`
-
-This keeps local startup simple while still allowing immediate Telegram webhook replies when enabled.
+For Docker Compose deployment, copy [../.env.compose.example](../.env.compose.example) to `.env.compose`. Compose-specific overrides in that file are annotated with `[compose override]`; all other keys share the same semantics as in `.env.example`.
 
 See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
+
+## Environment Key Matrix
+
+The table below lists every recognized env key, its code default, and the value set in each example template. Keys absent from a template use the code default. `[required]` means the variable has no usable default and must be set.
+
+| Key | Code default | `.env.example` | `.env.compose.example` | Notes |
+| --- | --- | --- | --- | --- |
+| `BERTBOT_AI_PROVIDER` | `openai` | `openai` | `openai` | `openai` or `ollama` |
+| `BERTBOT_AI_MODEL` | `gpt-4o-mini` | `gpt-4o-mini` | `gpt-4o-mini` | |
+| `BERTBOT_AI_API_KEY` | — | `[required]` | `[required]` | Required for OpenAI |
+| `BERTBOT_OLLAMA_BASE_URL` | `http://localhost:11434` | `http://localhost:11434` | `http://ollama:11434` | [compose override] Docker service hostname |
+| `BERTBOT_OLLAMA_TIMEOUT_SECONDS` | `120` | `120` | `120` | |
+| `BERTBOT_WORKSPACE_ROOT` | `.` | `.` | `.` | |
+| `BERTBOT_MACROFACTOR_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_MACROFACTOR_COMMAND` | `npx` | `npx` | `npx` | |
+| `BERTBOT_MACROFACTOR_ARGS` | `-y,sjawhar-macrofactor` | `-y,sjawhar-macrofactor` | `-y,sjawhar-macrofactor` | |
+| `BERTBOT_MACROFACTOR_USERNAME` | — | `` | `` | |
+| `BERTBOT_MACROFACTOR_PASSWORD` | — | `` | `` | |
+| `BERTBOT_MACROFACTOR_TIMEOUT_SECONDS` | `45` | `45` | `45` | |
+| `BERTBOT_MACROFACTOR_TOOL_NAME_PREFIX` | `macrofactor_` | `macrofactor_` | `macrofactor_` | |
+| `BERTBOT_MACROFACTOR_LIVE_TEST` | `false` | `false` | `false` | Test-only |
+| `BERTBOT_MACROFACTOR_LIVE_TOOL` | — | `` | `` | Test-only |
+| `BERTBOT_MACROFACTOR_LIVE_ARGS_JSON` | — | `{}` | `{}` | Test-only |
+| `BERTBOT_MACROFACTOR_EXPECTED_TOOL` | — | `` | `` | Test-only |
+| `BERTBOT_MACROFACTOR_EXPECTED_ARG` | — | `` | `` | Test-only |
+| `BERTBOT_GOOGLE_WORKSPACE_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_GOOGLE_WORKSPACE_COMMAND` | `npx` | `npx` | `npx` | |
+| `BERTBOT_GOOGLE_WORKSPACE_ARGS` | `…workspace#v0.0.8…` | same | same | |
+| `BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS` | `60` | `60` | `60` | |
+| `BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX` | `google_workspace_` | `google_workspace_` | `google_workspace_` | |
+| `BERTBOT_SHOPPING_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS` | `10000` | `10000` | `10000` | |
+| `BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE` | `0.7` | `0.7` | `0.7` | |
+| `BERTBOT_SHOPPING_STORE_N_ENABLED` | `false` | commented out | commented out | N = 1–9 |
+| `BERTBOT_SHOPPING_STORE_N_MODE` | `browse` | commented out | commented out | |
+| `BERTBOT_SHOPPING_STORE_N_PRIORITY` | `100` | commented out | commented out | |
+| `BERTBOT_SHOPPING_STORE_N_REGION` | — | commented out | commented out | |
+| `BERTBOT_SHOPPING_STORE_N_CURRENCY` | — | commented out | commented out | |
+| `BERTBOT_PLAYWRIGHT_STORE_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_PLAYWRIGHT_STORE_DEFAULT_MODE` | `api` | `api` | `api` | `api`, `browser`, or `hybrid` |
+| `BERTBOT_PLAYWRIGHT_STORE_MODES` | — | `` | `` | Per-store overrides |
+| `BERTBOT_PLAYWRIGHT_STORE_ALLOWED_BROWSER_ACTIONS` | built-in set | `` | `` | Blank = use built-in defaults |
+| `BERTBOT_STATE_STORE` | `file` | `file` | `postgres` | [compose override] |
+| `BERTBOT_JSON_CODEC` | `gson` | `gson` | `gson` | `gson` or `kotlinx` |
+| `BERTBOT_STATE_FILE_PATH` | `state/bertbot-state.json` | same | same | |
+| `BERTBOT_MEMORY_EPISODIC_FILE_PATH` | `state/bertbot-memory.txt` | same | same | |
+| `BERTBOT_MEMORY_SEMANTIC_FILE_PATH` | `state/bertbot-semantic-memory.txt` | same | same | |
+| `BERTBOT_PROFILE_FILE_PATH` | `state/bertbot-profile.json` | same | same | |
+| `BERTBOT_INGESTION_CONSENT_FILE_PATH` | `state/bertbot-ingestion-consent.json` | same | same | |
+| `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` | `state/bertbot-ingestion-source-state.json` | same | same | |
+| `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` | `state/bertbot-research-recommendations.json` | same | same | |
+| `BERTBOT_TRACE_FILE_PATH` | `logs/bertbot-trace.jsonl` | same | same | |
+| `BERTBOT_INTERACTIONS_FILE_PATH` | `state/bertbot-interactions.mmd` | same | same | |
+| `BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_CHECKPOINT_FILE_PATH` | `state/bertbot-checkpoints.json` | same | same | |
+| `BERTBOT_EVENT_SOURCING_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_STATE_EVENT_FILE_PATH` | `state/bertbot-state-events.json` | same | same | |
+| `BERTBOT_STATE_JDBC_URL` | — | `` | `jdbc:postgresql://postgres:5432/bertbot` | [compose override] |
+| `BERTBOT_STATE_JDBC_USER` | — | `` | `bertbot` | [compose override] |
+| `BERTBOT_STATE_JDBC_PASSWORD` | — | `` | `bertbot` | [compose override] |
+| `BERTBOT_STATE_JDBC_TABLE` | `bertbot_state_snapshot` | same | same | |
+| `BERTBOT_CHECKPOINT_JDBC_TABLE` | `bertbot_checkpoint_snapshot` | same | same | |
+| `BERTBOT_STATE_EVENT_JDBC_TABLE` | `bertbot_state_event` | same | same | |
+| `BERTBOT_MEMORY_EPISODIC_JDBC_TABLE` | `bertbot_memory_episodic_snapshot` | same | same | |
+| `BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE` | `bertbot_memory_semantic_snapshot` | same | same | |
+| `BERTBOT_PROFILE_JDBC_TABLE` | `bertbot_profile_snapshot` | same | same | |
+| `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` | `bertbot_ingestion_consent_snapshot` | same | same | |
+| `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` | `bertbot_ingestion_source_state_snapshot` | same | same | |
+| `BERTBOT_RUNTIME_ENV` | `dev` | `dev` | `production` | [compose override] |
+| `BERTBOT_CHECKPOINT_ROLLBACK_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM` | `true` | `true` | `true` | |
+| `BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED` | `false` | `false` | `false` | Set `true` to allow rollback in prod/staging |
+| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | `50` | `50` | `50` | |
+| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | `5` | `5` | `5` | |
+| `BERTBOT_KOOG_OTEL_SERVICE_NAME` | `personalagent-bertbot` | same | same | |
+| `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | `0.1.0` | same | same | |
+| `BERTBOT_KOOG_OTEL_VERBOSE` | `false` | `false` | `false` | |
+| `BERTBOT_KOOG_OTEL_OTLP_ENDPOINT` | — | `` | `` | Blank disables OTel export |
+| `BERTBOT_RESEARCH_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_RESEARCH_EVENT_DRIVEN_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_RESEARCH_PERIODIC_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_RESEARCH_LLM_ASSISTED_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_RESEARCH_INCLUDE_EXTERNAL_SIGNALS` | `true` | `true` | `true` | |
+| `BERTBOT_RESEARCH_PERIODIC_INTERVAL_SECONDS` | `21600` | `21600` | `21600` | |
+| `BERTBOT_RESEARCH_MIN_INTERVAL_SECONDS` | `300` | `300` | `300` | |
+| `BERTBOT_RESEARCH_MAX_RECOMMENDATIONS_PER_CYCLE` | `8` | `8` | `8` | |
+| `BERTBOT_RESEARCH_FAILURE_COOLDOWN_SECONDS` | `900` | `900` | `900` | |
+| `BERTBOT_POLYMARKET_GAMMA_BASE_URL` | `https://gamma-api.polymarket.com` | same | same | |
+| `BERTBOT_POLYMARKET_CLOB_BASE_URL` | `https://clob.polymarket.com` | same | same | |
+| `BERTBOT_POLYMARKET_DATA_BASE_URL` | `https://data-api.polymarket.com` | same | same | |
+| `BERTBOT_WEBHOOK_HOST` | `0.0.0.0` | `0.0.0.0` | `0.0.0.0` | Also hardcoded in compose services |
+| `BERTBOT_WEBHOOK_PORT` | `8088` | `8088` | `8088` | Also hardcoded in compose services |
+| `BERTBOT_WEBHOOK_TELEGRAM_PATH` | `/webhook/telegram` | same | same | |
+| `BERTBOT_WEBHOOK_SLACK_PATH` | `/webhook/slack` | same | same | |
+| `BERTBOT_WEBHOOK_WHATSAPP_PATH` | `/webhook/whatsapp` | same | same | |
+| `BERTBOT_WEBHOOK_HEALTH_PATH` | `/health` | same | same | |
+| `BERTBOT_WEBHOOK_DRY_RUN` | `false` | `false` | `false` | |
+| `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES` | `false` | `false` | `false` | Set `true` in production |
+| `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS` | `false` | `false` | `false` | |
+| `BERTBOT_WEBHOOK_ALLOWED_IPS` | — | `` | `` | |
+| `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` | `60` | `60` | `60` | |
+| `BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS` | `120` | `120` | `120` | |
+| `BERTBOT_TELEGRAM_ENABLED` | `false` | `true` | `true` | |
+| `BERTBOT_SLACK_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_WHATSAPP_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_DISCORD_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_TELEGRAM_API_BASE_URL` | `https://api.telegram.org` | `` | `` | Optional custom Telegram server |
+| `BERTBOT_TELEGRAM_BOT_TOKEN` | — | `[required]` | `[required]` | |
+| `BERTBOT_SLACK_BOT_TOKEN` | — | placeholder | placeholder | Required when Slack enabled |
+| `BERTBOT_WHATSAPP_ACCESS_TOKEN` | — | placeholder | placeholder | Required when WhatsApp enabled |
+| `BERTBOT_WHATSAPP_API_VERSION` | — | `v22.0` | `v22.0` | |
+| `BERTBOT_DISCORD_BOT_TOKEN` | — | placeholder | placeholder | Required when Discord enabled |
+| `BERTBOT_DISCORD_GUILD_ID` | — | `` | `` | |
+| `BERTBOT_DISCORD_APPROVED_CHANNEL_IDS` | — | `` | `` | |
+| `BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS` | — | `` | `` | |
+| `BERTBOT_SLACK_WORKSPACE_ID` | — | `` | `` | |
+| `BERTBOT_WHATSAPP_BUSINESS_PHONE_ID` | — | `` | `` | |
+| `BERTBOT_INGESTION_REQUIRE_APPROVAL` | `false` | `false` | `false` | |
+| `BERTBOT_TELEGRAM_SECRET_TOKEN` | — | placeholder | placeholder | Required when signatures enabled |
+| `BERTBOT_SLACK_SIGNING_SECRET` | — | placeholder | placeholder | Required when signatures enabled |
+| `BERTBOT_SLACK_MAX_REQUEST_AGE_SECONDS` | `300` | `300` | `300` | |
+| `BERTBOT_WHATSAPP_APP_SECRET` | — | placeholder | placeholder | Required when signatures enabled |
+| `BERTBOT_WHATSAPP_VERIFY_TOKEN` | — | placeholder | placeholder | Required for WhatsApp subscription |
 
 ## Minimal Local Setup
 
@@ -78,6 +198,9 @@ Shopping store configuration (supports up to 9 numbered stores; replace `N` with
 
 | Variable | Purpose | Notes |
 | --- | --- | --- |
+| `BERTBOT_SHOPPING_ENABLED` | Master toggle for the personal-shopper sub-agent | Default `false`; must be `true` to activate |
+| `BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS` | Maximum spend per order in cents | Default `10000`; `-1` for unlimited |
+| `BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE` | Minimum seller trust score (0.0–1.0) | Default `0.7` |
 | `BERTBOT_SHOPPING_STORE_N_ENABLED` | Enable this shopping store slot | Required to activate the slot; default `false` |
 | `BERTBOT_SHOPPING_STORE_N_MODE` | Operating mode for the store | e.g. `browse`; default `browse` |
 | `BERTBOT_SHOPPING_STORE_N_PRIORITY` | Sort priority (lower = higher precedence) | Default `100` |
@@ -124,6 +247,8 @@ File-backed paths:
 - `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH`
 - `BERTBOT_TRACE_FILE_PATH`
 - `BERTBOT_INTERACTIONS_FILE_PATH`
+- `BERTBOT_CHECKPOINT_FILE_PATH`
+- `BERTBOT_STATE_EVENT_FILE_PATH`
 
 JDBC or PostgreSQL settings:
 
@@ -131,6 +256,8 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_STATE_JDBC_USER`
 - `BERTBOT_STATE_JDBC_PASSWORD`
 - `BERTBOT_STATE_JDBC_TABLE`
+- `BERTBOT_CHECKPOINT_JDBC_TABLE`
+- `BERTBOT_STATE_EVENT_JDBC_TABLE`
 - `BERTBOT_MEMORY_EPISODIC_JDBC_TABLE`
 - `BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE`
 - `BERTBOT_PROFILE_JDBC_TABLE`
@@ -138,6 +265,41 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE`
 
 Local Gradle runs can stay on the default file backend. Containerized runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
+
+## Checkpoint And Event Sourcing
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED` | Auto-save a checkpoint after each run | Default `false` |
+| `BERTBOT_CHECKPOINT_FILE_PATH` | File path for checkpoint snapshots | Default `state/bertbot-checkpoints.json` |
+| `BERTBOT_CHECKPOINT_JDBC_TABLE` | JDBC table for checkpoint snapshots | Default `bertbot_checkpoint_snapshot` |
+| `BERTBOT_EVENT_SOURCING_ENABLED` | Append state-change events to an event log | Default `false` |
+| `BERTBOT_STATE_EVENT_FILE_PATH` | File path for the state event log | Default `state/bertbot-state-events.json` |
+| `BERTBOT_STATE_EVENT_JDBC_TABLE` | JDBC table for state events | Default `bertbot_state_event` |
+
+## Runtime Environment And Checkpoint Rollback
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_RUNTIME_ENV` | Runtime environment tag | `dev` (default), `staging`, `production`; affects rollback protection |
+| `BERTBOT_CHECKPOINT_ROLLBACK_ENABLED` | Allow checkpoint rollback via MCP tool | Default `true` |
+| `BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM` | Require user confirmation before rollback | Default `true` |
+| `BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED` | Allow rollback in production or staging environments | Default `false`; set `true` only to override the protection |
+
+When `BERTBOT_RUNTIME_ENV` is `prod`, `production`, `staging`, or `preprod`, rollback is blocked unless `BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED=true`.
+
+## Koog Integration Settings
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | Enable in-context chat memory window | Default `true` |
+| `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | Number of past turns to include | Default `50` |
+| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | Enable long-term memory retrieval | Default `true` |
+| `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | Number of memories to retrieve per turn | Default `5` |
+| `BERTBOT_KOOG_OTEL_SERVICE_NAME` | OTel service name for traces | Default `personalagent-bertbot` |
+| `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | OTel service version | Default `0.1.0` |
+| `BERTBOT_KOOG_OTEL_VERBOSE` | Enable verbose OTel output | Default `false` |
+| `BERTBOT_KOOG_OTEL_OTLP_ENDPOINT` | OTLP exporter endpoint URL | Leave blank to disable OTel export |
 
 ## Research Overrides
 
@@ -206,12 +368,14 @@ Used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`:
 
 ## Shopping Workflow Configuration
 
-BertBot handles shopping assistance stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) through the standard agent pipeline — no additional variables are required beyond the core LLM and persistence settings.
+Set `BERTBOT_SHOPPING_ENABLED=true` and configure at least one store slot (`BERTBOT_SHOPPING_STORE_1_ENABLED=true`, etc.) to activate shopping. Startup fails with a clear error if the sub-agent is enabled without any active store slot.
+
+BertBot handles shopping assistance stages (onboarding, recommendation, compare, cart_prepare, checkout_prepare) through the standard agent pipeline.
 
 Shopping safety invariants are enforced at the agent level:
 
 - `cart_prepare` and `checkout_prepare` always request explicit user confirmation before any state change.
-- Budget and seller-threshold constraints come from the user profile stored in the configured persistence backend.
+- Budget (`BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS`) and seller-threshold (`BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE`) constraints are applied before any order action.
 - Final checkout is never performed autonomously.
 
 To enable Playwright browser automation as a shopping fallback, ensure the coder sub-agent is enabled in `BertBotAgentConfig` and the Playwright MCP or tool is available at runtime. The `RuntimeCapabilitySnapshot` reports `playwrightFallbackAvailable` separately from the sub-agent advertisement; set this to `true` only when a direct Playwright integration is wired into the runtime.
@@ -257,7 +421,7 @@ BERTBOT_STATE_JDBC_PASSWORD=
 
 Local CLI or MCP development:
 
-- Use `.env` from the repository root.
+- Copy [../.env.example](../.env.example) to `.env` and set `BERTBOT_AI_API_KEY`.
 - Keep `BERTBOT_STATE_STORE=file`.
 - Launch commands from the repository root so workspace-relative paths resolve correctly.
 
@@ -266,9 +430,11 @@ Webhook deployment:
 - Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`.
 - Configure connector-specific verification secrets.
 - Use PostgreSQL-backed persistence.
+- Set `BERTBOT_RUNTIME_ENV=production` to enable checkpoint rollback protection.
 
 Container deployment:
 
-- Start from [../.env.compose.example](../.env.compose.example).
-- Keep runtime mode and persistence aligned with the service role.
-
+- Copy [../.env.compose.example](../.env.compose.example) to `.env.compose`.
+- Fill in `BERTBOT_AI_API_KEY` and connector credentials.
+- Runtime mode, persistence backend, and JDBC connection are already set to compose-appropriate defaults.
+- Keys annotated `[compose override]` in the template differ from `.env.example`; all others are identical.
