@@ -12,6 +12,7 @@ The repository-local agent manifests live at:
 - [../.github/agents/repo-automation.agent.md](../.github/agents/repo-automation.agent.md)
 - [../.github/agents/test-orchestration.agent.md](../.github/agents/test-orchestration.agent.md)
 - [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md)
+- [../.github/agents/browser-automation.agent.md](../.github/agents/browser-automation.agent.md)
 
 Both agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
 
@@ -23,6 +24,8 @@ Use `@Test Orchestration` for verification-first workflows, targeted checks, and
 
 Use `@Repo Ops` for repeatable maintenance tasks like dependency hygiene, workflow upkeep, and repository health checks.
 
+Use `@Browser Automation` for checkpointed browser workflows and computer-use style web task execution.
+
 ## Agent Selection Matrix
 
 | If your task is primarily... | Use this agent | Why |
@@ -31,6 +34,7 @@ Use `@Repo Ops` for repeatable maintenance tasks like dependency hygiene, workfl
 | Multi-step implementation and execution | `@Repo Automation` | Focused on evidence-backed edits and workflow execution. |
 | Verification, focused checks, and failure triage | `@Test Orchestration` | Optimized for confidence-building validation and actionable test outcomes. |
 | Recurring maintenance and operational hygiene | `@Repo Ops` | Tailored for dependency, workflow, and repository-health upkeep. |
+| Browser-driven workflows and web task execution | `@Browser Automation` | Specialized for Playwright-backed interaction flows with explicit checkpoints. |
 
 When unsure, start with `@BertBot` and then switch to a specialized agent once the task shape is clear.
 
@@ -41,6 +45,8 @@ For multi-step repository maintenance or browser-assisted automation, use [../.g
 For focused build/test validation and check planning, use [../.github/skills/test-orchestration/SKILL.md](../.github/skills/test-orchestration/SKILL.md).
 
 For recurring maintenance and operational hygiene automation, use [../.github/skills/repo-ops/SKILL.md](../.github/skills/repo-ops/SKILL.md).
+
+For browser-driven workflows with explicit safety and checkpointing, use [../.github/skills/browser-automation/SKILL.md](../.github/skills/browser-automation/SKILL.md).
 
 The existing repo-specific review baseline is [../.github/skills/code-review/SKILL.md](../.github/skills/code-review/SKILL.md).
 

@@ -8,6 +8,7 @@ REQUIRED_AGENT_FILES=(
   ".github/agents/repo-automation.agent.md"
   ".github/agents/test-orchestration.agent.md"
   ".github/agents/repo-ops.agent.md"
+  ".github/agents/browser-automation.agent.md"
 )
 
 REQUIRED_SKILL_FILES=(
@@ -15,6 +16,7 @@ REQUIRED_SKILL_FILES=(
   ".github/skills/repo-automation/SKILL.md"
   ".github/skills/test-orchestration/SKILL.md"
   ".github/skills/repo-ops/SKILL.md"
+  ".github/skills/browser-automation/SKILL.md"
 )
 
 check_file_exists() {
