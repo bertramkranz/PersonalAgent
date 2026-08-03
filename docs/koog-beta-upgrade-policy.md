@@ -12,7 +12,7 @@ Stable Koog modules (`koog-agents`, `agents-features-memory`, `agents-features-o
 
 ## Pinning Policy
 
-- The beta version is always declared as an **exact version string** in `koogVersion` / `koogBetaVersion` in `build.gradle.kts`.  Floating ranges (`+`, `latest.release`, `beta+`) are not used.
+- Both `koogVersion` and `koogBetaVersion` in `build.gradle.kts` must always be declared as **exact version strings**.  The beta module is pinned via `koogBetaVersion`, and floating ranges (`+`, `latest.release`, `beta+`) are not used.
 - Both variables must be reviewed together whenever either is bumped, so the stable and beta module sets stay compatible.
 - Dependency updates are reviewed on a **monthly cadence** unless a blocking bug or security advisory forces an earlier upgrade.
 
@@ -63,11 +63,11 @@ Start BertBot in headless mode and confirm it initialises without errors:
 ./gradlew --no-daemon runHeadless
 ```
 
-Exit immediately once the startup banner appears.  Look for no `ClassNotFoundException`, `NoSuchMethodError`, or similar binary-incompatibility signals.
+Exit immediately once the startup banner appears.  Confirm that no `ClassNotFoundException`, `NoSuchMethodError`, or similar binary-incompatibility signals appear.
 
 ### 5. Review the diff
 
-Confirm the only change in `build.gradle.kts` is the `koogBetaVersion` value.  If the new release also changes the stable API surface used by `KoogRuntimeIntegration.kt` or `BertBotSupport.kt`, update those files in a separate follow-up PR and satisfy the Koog runtime DoD coupling rule (see [github-automation.md](github-automation.md)).
+Confirm the only change in `build.gradle.kts` is the `koogBetaVersion` value.  If the new release also changes the stable API surface used by `KoogRuntimeIntegration.kt` or `BertBotSupport.kt`, update those files in a separate follow-up PR and satisfy the CI-native DoD/path-coupled rules described in [github-automation.md](github-automation.md#ci-native-dod-enforcement).
 
 ### 6. Record the upgrade
 
