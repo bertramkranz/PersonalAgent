@@ -91,12 +91,12 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
-- `TELEGRAM_BOT_TOKEN_SECRET_NAME` (default empty; set only when Telegram bot token integration is enabled)
+- `TELEGRAM_BOT_TOKEN_SECRET_NAME` is fixed to `bertbot-telegram-bot-token` in the workflow default path.
 - `SLACK_SIGNING_SECRET_NAME` (default empty; set only when Slack integration is enabled)
 - `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` (default empty; when set, deploy uses this identity)
-- `CLOUD_RUN_CONTAINER_PORT` (default `8080`; override only if the service contract changes)
+- Cloud Run container port is fixed to `8080` in the workflow default path.
 - `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
 - `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME` (default empty, recommended single-secret bootstrap for Cloud Run)
 - `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
