@@ -88,9 +88,9 @@ This repository favors CI-native policy checks over manual pull-request template
 - It avoids looped reruns by skipping commits containing `[skip autofix]` and skipping bot-originated pushes.
 - It does not attempt semantic or behavior-changing auto-fixes.
 
-## Generated PR Merge Automation
+## PR Merge Automation
 
-The merge workflow is designed for trusted generated pull requests.
+The merge workflow is designed for eligible in-repository pull requests.
 
 - It automatically enables GitHub native auto-merge for eligible non-draft pull requests from this repository.
 - It re-runs action-required checks when needed.
