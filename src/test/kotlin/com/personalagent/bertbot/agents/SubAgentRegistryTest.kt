@@ -25,6 +25,7 @@ class SubAgentRegistryTest {
                 "philosopher",
                 "psychologist",
                 "google_workspace_operator",
+                "repo_improvement_researcher",
             ),
             ids,
         )
@@ -92,6 +93,25 @@ class SubAgentRegistryTest {
 
         assertNotNull(match)
         assertEquals("coder", match.id)
+    }
+
+    @Test
+    fun `registry routes repo improvement research tasks to repo improvement researcher`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Scout repo improvement opportunities and research ecosystem upgrade and optimization areas")
+
+        assertNotNull(match)
+        assertEquals("repo_improvement_researcher", match.id)
+    }
+
+    @Test
+    fun `registry does not match repo improvement researcher for unrelated tasks`() {
+        val registry = SubAgentRegistry()
+
+        val matches = registry.describeMatches("Write a function to sort a list of integers")
+
+        assertTrue(!matches.contains("Repo Improvement Researcher"))
     }
 
     @Test
