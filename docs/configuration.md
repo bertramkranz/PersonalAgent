@@ -15,6 +15,18 @@ This keeps local startup simple while still allowing immediate Telegram webhook 
 
 See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
 
+## Environment Variable Parsing
+
+All settings follow the same precedence order:
+
+1. **Process environment** – highest priority.
+2. **`.env` file** in the repository root – fallback when the process environment value is blank or absent.
+3. **Compiled default** – applied when neither source provides a value.
+
+Boolean settings accept both the strict tokens (`true` / `false`) and the common shell idioms
+`1` / `0`, `yes` / `no`, and `on` / `off` (case-insensitive).  Any unrecognised value falls back to
+the compiled default.
+
 ## Minimal Local Setup
 
 OpenAI example:
@@ -112,10 +124,12 @@ Backend selection:
 | Variable | Purpose | Notes |
 | --- | --- | --- |
 | `BERTBOT_STATE_STORE` | Select persistence backend | `file` by default; `jdbc`, `postgres`, `postgresql` for deployed environments |
+| `BERTBOT_JSON_CODEC` | JSON serialisation codec | `gson` (default) or `kotlinx` |
 
 File-backed paths:
 
 - `BERTBOT_STATE_FILE_PATH`
+- `BERTBOT_CHECKPOINT_FILE_PATH`
 - `BERTBOT_MEMORY_EPISODIC_FILE_PATH`
 - `BERTBOT_MEMORY_SEMANTIC_FILE_PATH`
 - `BERTBOT_PROFILE_FILE_PATH`
@@ -124,6 +138,14 @@ File-backed paths:
 - `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH`
 - `BERTBOT_TRACE_FILE_PATH`
 - `BERTBOT_INTERACTIONS_FILE_PATH`
+- `BERTBOT_STATE_EVENT_FILE_PATH` – event-sourcing log (used when `BERTBOT_EVENT_SOURCING_ENABLED=true`)
+
+Checkpoint and event-sourcing settings:
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED` | Auto-save a checkpoint after every turn | Default `false` |
+| `BERTBOT_EVENT_SOURCING_ENABLED` | Record individual state events for replay | Default `false` |
 
 JDBC or PostgreSQL settings:
 
@@ -131,13 +153,15 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_STATE_JDBC_USER`
 - `BERTBOT_STATE_JDBC_PASSWORD`
 - `BERTBOT_STATE_JDBC_TABLE`
+- `BERTBOT_CHECKPOINT_JDBC_TABLE` – defaults to `bertbot_checkpoint_snapshot`
+- `BERTBOT_STATE_EVENT_JDBC_TABLE` – defaults to `bertbot_state_event`
 - `BERTBOT_MEMORY_EPISODIC_JDBC_TABLE`
 - `BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE`
 - `BERTBOT_PROFILE_JDBC_TABLE`
 - `BERTBOT_INGESTION_CONSENT_JDBC_TABLE`
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE`
 
-Local Gradle runs can stay on the default file backend. Containerized runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
+Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 
 ## Research Overrides
 
