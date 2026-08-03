@@ -76,6 +76,10 @@ To add new behavior safely:
 - Preserve the package split across `graph.model`, `graph.nodes`, `graph.runtime`, and `graph.store`.
 - Add external control through configuration only when the runtime needs it.
 
+## Koog Beta Dependencies
+
+BertBot mixes stable and beta Koog modules.  The beta module (`agents-features-longterm-memory`) is always pinned to an exact version in `build.gradle.kts` under the `koogBetaVersion` variable.  See [koog-beta-upgrade-policy.md](koog-beta-upgrade-policy.md) for the pinning policy, upgrade checklist, and rollback steps.
+
 ## Diagrams
 
 - [architecture.mmd](architecture.mmd) is the diagram source for the main architecture view.
