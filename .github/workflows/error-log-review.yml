@@ -1,0 +1,72 @@
+name: Error Log Review
+
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Every Monday at 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: error-log-review
+  cancel-in-progress: true
+
+jobs:
+  error-log-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 1
+
+      - name: Download recent CI test-result artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/downloaded-artifacts
+          RUN_IDS="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --status success \
+            --limit 14 \
+            --json databaseId \
+            --jq '.[].databaseId')"
+          if [[ -z "$RUN_IDS" ]]; then
+            echo "No successful CI runs found — nothing to review."
+            exit 0
+          fi
+          DOWNLOADED=0
+          for RUN_ID in $RUN_IDS; do
+            TARGET="build/downloaded-artifacts/$RUN_ID"
+            mkdir -p "$TARGET"
+            if gh run download "$RUN_ID" \
+                --repo "$GITHUB_REPOSITORY" \
+                --name gradle-reports \
+                --dir "$TARGET" 2>/dev/null; then
+              DOWNLOADED=$((DOWNLOADED + 1))
+            else
+              # No gradle-reports artifact for this run (e.g. expired or absent)
+              rmdir "$TARGET" 2>/dev/null || true
+            fi
+          done
+          echo "Downloaded gradle-reports artifacts from $DOWNLOADED run(s)."
+
+      - name: Summarize error patterns
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/summarize-error-logs.py \
+            build/downloaded-artifacts \
+            build/reports/error-log-review
+
+      - name: Upload error log review report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: error-log-review-${{ github.run_id }}
+          path: build/reports/error-log-review/**
+          if-no-files-found: warn
