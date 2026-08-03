@@ -81,7 +81,7 @@ BertBot delegates specialized work to a fleet of sub-agents registered in `SubAg
 - **Philosopher** — ethics, meaning, and first-principles reasoning.
 - **Psychologist** — behavior insight, emotional framing, and communication dynamics.
 - **Google Workspace Operator** — Gmail, Calendar, Drive, Docs, Sheets, Slides, and Chat via Google Workspace MCP.
-- **Repo Improvement Researcher** — continuously scouts repository and ecosystem improvements; routes on repo improvement, ecosystem upgrade, dependency upgrade, scout, research, MCP, AI, productivity, performance, cost, and optimization keywords.
+- **Repo Improvement Researcher** — continuously scouts repository and ecosystem improvements; routes on repo improvement, ecosystem upgrade, dependency upgrade, scout, research, MCP, productivity, performance, cost, and optimization keywords.
 
 Disabled by default (require explicit opt-in via `subAgents` config override):
 
