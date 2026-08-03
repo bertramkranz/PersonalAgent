@@ -51,8 +51,9 @@ The script expects the image to already exist in Artifact Registry. It deploys w
 - `BERTBOT_RUN_MODE=webhook`
 - `BERTBOT_STATE_STORE=postgres`
 - `BERTBOT_WEBHOOK_HOST=0.0.0.0`
-- `BERTBOT_WEBHOOK_PORT=8088`
 - `BERTBOT_STATE_JDBC_URL=jdbc:postgresql:///bertbot?cloudSqlInstance=PROJECT:REGION:INSTANCE&socketFactory=com.google.cloud.sql.postgres.SocketFactory`
+
+Cloud Run port handling is now aligned to the platform `PORT` contract (default container port `8080`).
 
 ### GitHub Actions Auto Deploy (Main -> Cloud Run)
 
@@ -95,6 +96,7 @@ Optional GitHub repository variables:
 - `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` (default empty; when set, deploy uses this identity)
+- `CLOUD_RUN_CONTAINER_PORT` (default `8080`; override only if the service contract changes)
 - `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
 - `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME` (default empty, recommended single-secret bootstrap for Cloud Run)
 - `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
@@ -197,7 +199,8 @@ gcloud sql users create bertbot --instance=YOUR_CLOUDSQL_INSTANCE --password=YOU
 
 ### Hosted Deployment Notes
 
-- The app falls back to Cloud Run's `PORT` environment variable if `BERTBOT_WEBHOOK_PORT` is unset.
+- Cloud Run deploy paths now rely on the platform `PORT` environment variable contract by default (`8080`).
+- Keep `BERTBOT_WEBHOOK_PORT` unset in hosted deploys unless you intentionally manage a non-default container port.
 - Keep file-backed persistence for local development only.
 - Do not deploy the MCP stdio server or Discord gateway mode to Cloud Run.
 

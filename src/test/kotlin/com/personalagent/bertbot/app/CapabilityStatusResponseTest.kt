@@ -13,7 +13,7 @@ class CapabilityStatusResponseTest {
 
         assertNotNull(response)
         assertTrue(response.contains("Sub-agents:"))
-        assertTrue(response.contains("- polymarket_analyst: enabled"))
+        assertTrue(response.contains("- polymarket_analyst: disabled"))
         assertTrue(response.contains("- philosopher: enabled"))
         assertTrue(response.contains("- psychologist: enabled"))
         assertTrue(response.contains("- google_workspace_operator: enabled"))

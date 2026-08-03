@@ -117,9 +117,17 @@ class BertBotRuntimeToolIntegrationsTest {
 
     @Test
     fun `missing required tool-backed integration fails fast`() {
+        val configWithPolymarketEnabled =
+            BertBotAgentConfig(
+                subAgents =
+                    BertBotAgentConfig().subAgents.map { definition ->
+                        if (definition.id == "polymarket_analyst") definition.copy(enabled = true) else definition
+                    },
+            )
+
         val error =
             assertFailsWith<IllegalStateException> {
-                validateToolBackedSubAgentCoverage(BertBotAgentConfig(), emptyList())
+                validateToolBackedSubAgentCoverage(configWithPolymarketEnabled, emptyList())
             }
 
         assertContains(error.message ?: "", "polymarket_analyst->polymarket")

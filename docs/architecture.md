@@ -75,7 +75,6 @@ BertBot delegates specialized work to a fleet of sub-agents registered in `SubAg
 - **Planner** — prioritization, scheduling, task organization.
 - **Architect** — system design, dependency review, structural soundness.
 - **Analyst** — triage, metrics, evidence-driven recommendations.
-- **Polymarket Analyst** — prediction market odds, liquidity, and order-book analysis.
 - **Copywriter** — polished messaging, rewrites, and tone refinement.
 - **Red Team** — adversarial stress-testing, edge cases, and security risk surfacing.
 - **Philosopher** — ethics, meaning, and first-principles reasoning.
@@ -85,6 +84,7 @@ BertBot delegates specialized work to a fleet of sub-agents registered in `SubAg
 
 Disabled by default (require explicit opt-in via `subAgents` config override):
 
+- **Polymarket Analyst** — prediction market odds, liquidity, and order-book analysis.
 - **Personal Shopper** — product discovery, price comparison, and purchase research.
 
 ## Extension Points

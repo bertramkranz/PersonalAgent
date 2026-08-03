@@ -19,7 +19,6 @@ class SubAgentRegistryTest {
                 "planner",
                 "architect",
                 "analyst",
-                "polymarket_analyst",
                 "copywriter",
                 "red_teamer",
                 "philosopher",
@@ -57,7 +56,14 @@ class SubAgentRegistryTest {
 
     @Test
     fun `registry routes polymarket market analysis requests to polymarket analyst`() {
-        val registry = SubAgentRegistry()
+        val config =
+            BertBotAgentConfig(
+                subAgents =
+                    BertBotAgentConfig().subAgents.map { definition ->
+                        if (definition.id == "polymarket_analyst") definition.copy(enabled = true) else definition
+                    },
+            )
+        val registry = SubAgentRegistry(config)
 
         val match = registry.findBestMatch("Analyze Polymarket odds, open interest, and order book liquidity")
 

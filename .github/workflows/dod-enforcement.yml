@@ -26,6 +26,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate custom Copilot agent and skill manifests
+        run: |
+          set -euo pipefail
+          bash .github/scripts/validate-custom-copilot-assets.sh
+
+      - name: Regression test custom Copilot asset validator
+        run: |
+          set -euo pipefail
+          bash .github/scripts/test-validate-custom-copilot-assets.sh
+
       - name: Detect changed paths
         id: changes
         uses: dorny/paths-filter@v3

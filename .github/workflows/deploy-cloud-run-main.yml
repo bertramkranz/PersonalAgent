@@ -41,6 +41,7 @@ jobs:
       GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME'] || '' }}
       CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
       CLOUD_RUN_ALLOW_UNAUTHENTICATED: 'true'
+      CLOUD_RUN_CONTAINER_PORT: ${{ vars.CLOUD_RUN_CONTAINER_PORT || '8080' }}
       BERTBOT_GOOGLE_WORKSPACE_ENABLED: ${{ vars[format('{0}', 'BERTBOT_GOOGLE_WORKSPACE_ENABLED')] || 'true' }}
 
     steps:
@@ -209,7 +210,6 @@ jobs:
             "BERTBOT_RUN_MODE=webhook"
             "BERTBOT_STATE_STORE=postgres"
             "BERTBOT_WEBHOOK_HOST=0.0.0.0"
-            "BERTBOT_WEBHOOK_PORT=8088"
             "BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true"
             "BERTBOT_INGESTION_REQUIRE_APPROVAL=false"
             "BERTBOT_STATE_JDBC_URL=${jdbc_url}"
@@ -227,7 +227,7 @@ jobs:
             --region "${GCP_REGION}"
             --platform managed
             --execution-environment gen2
-            --port 8088
+            --port "${CLOUD_RUN_CONTAINER_PORT}"
             --cpu 1
             --no-cpu-throttling
             --memory 1Gi

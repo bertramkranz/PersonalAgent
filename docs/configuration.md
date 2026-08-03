@@ -354,6 +354,46 @@ When `BERTBOT_RUNTIME_ENV` is `prod`, `production`, `staging`, or `preprod`, rol
 - `BERTBOT_POLYMARKET_CLOB_BASE_URL`
 - `BERTBOT_POLYMARKET_DATA_BASE_URL`
 
+## Sub-Agent Defaults And Opt-In Strategy
+
+Default guidance for production-style setups:
+
+- Keep broadly useful sub-agents enabled by default (coding, planning, architecture, analysis, safety, workspace operations).
+- Keep niche or domain-specific sub-agents opt-in by default.
+
+Current opt-in sub-agents in default config:
+
+- `polymarket_analyst` (disabled by default).
+- `personal_shopper` (disabled by default, requires shopping store configuration).
+
+When enabling a niche sub-agent, pair that change with:
+
+1. A clear use case that is expected to recur.
+2. A matching verification or routing test update.
+3. Capability status validation so user-facing availability remains accurate.
+
+### Opt-In Examples
+
+There is no dedicated environment-variable switch for individual `subAgents`; opt-in is done through a `BertBotAgentConfig` override.
+
+Enable `polymarket_analyst` for local development:
+
+```kotlin
+val config =
+  BertBotAgentConfig(
+    subAgents =
+      BertBotAgentConfig().subAgents.map { definition ->
+        if (definition.id == "polymarket_analyst") definition.copy(enabled = true) else definition
+      },
+  )
+```
+
+Production-style guidance:
+
+- Keep `polymarket_analyst` disabled unless Polymarket analysis is a recurring requirement.
+- Keep `personal_shopper` disabled unless shopping stores are configured and explicitly needed.
+- If you enable either, update tests that assert enabled or disabled sub-agent defaults.
+
 ## Webhook Runtime Settings
 
 | Variable | Purpose |

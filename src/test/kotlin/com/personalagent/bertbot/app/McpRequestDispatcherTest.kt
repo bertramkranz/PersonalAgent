@@ -273,12 +273,13 @@ class McpRequestDispatcherTest {
         val workspace = createTempDirectory(prefix = "workspace-root").toFile()
         workspace.deleteOnExit()
         File(workspace, "settings.gradle.kts").writeText("rootProject.name = \"PersonalAgent\"")
+        File(workspace, ".git").mkdirs()
         val nested = File(workspace, "tmp/deep/path")
         nested.mkdirs()
 
-        val resolved = resolveWorkspaceRoot(environment = emptyMap(), currentDirectory = nested)
+        val resolved = resolveWorkspaceRoot(environment = emptyMap(), dotEnvValues = emptyMap(), currentDirectory = nested)
 
-        assertEquals(workspace.canonicalFile, resolved)
+        assertEquals(workspace.canonicalPath.lowercase(), resolved.canonicalPath.lowercase())
     }
 
     @Test

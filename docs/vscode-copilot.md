@@ -6,9 +6,43 @@ Related docs: [configuration.md](configuration.md) for provider settings, [run-m
 
 ## Agent Definition
 
-The repository-local agent manifest lives at [../.github/agents/bertbot.agent.md](../.github/agents/bertbot.agent.md).
+The repository-local agent manifests live at:
 
-It is intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
+- [../.github/agents/bertbot.agent.md](../.github/agents/bertbot.agent.md)
+- [../.github/agents/repo-automation.agent.md](../.github/agents/repo-automation.agent.md)
+- [../.github/agents/test-orchestration.agent.md](../.github/agents/test-orchestration.agent.md)
+- [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md)
+
+Both agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
+
+Use `@BertBot` for orchestration-heavy requests and cross-domain delegation.
+
+Use `@Repo Automation` for direct multi-step implementation, verification, and browser-assisted repository workflows.
+
+Use `@Test Orchestration` for verification-first workflows, targeted checks, and failure triage.
+
+Use `@Repo Ops` for repeatable maintenance tasks like dependency hygiene, workflow upkeep, and repository health checks.
+
+## Agent Selection Matrix
+
+| If your task is primarily... | Use this agent | Why |
+| --- | --- | --- |
+| Cross-domain planning, decomposition, or orchestration | `@BertBot` | Best default for routing complex objectives across capabilities. |
+| Multi-step implementation and execution | `@Repo Automation` | Focused on evidence-backed edits and workflow execution. |
+| Verification, focused checks, and failure triage | `@Test Orchestration` | Optimized for confidence-building validation and actionable test outcomes. |
+| Recurring maintenance and operational hygiene | `@Repo Ops` | Tailored for dependency, workflow, and repository-health upkeep. |
+
+When unsure, start with `@BertBot` and then switch to a specialized agent once the task shape is clear.
+
+## Custom Skills
+
+For multi-step repository maintenance or browser-assisted automation, use [../.github/skills/repo-automation/SKILL.md](../.github/skills/repo-automation/SKILL.md).
+
+For focused build/test validation and check planning, use [../.github/skills/test-orchestration/SKILL.md](../.github/skills/test-orchestration/SKILL.md).
+
+For recurring maintenance and operational hygiene automation, use [../.github/skills/repo-ops/SKILL.md](../.github/skills/repo-ops/SKILL.md).
+
+The existing repo-specific review baseline is [../.github/skills/code-review/SKILL.md](../.github/skills/code-review/SKILL.md).
 
 ## Starting The MCP Backend
 
