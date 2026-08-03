@@ -4,7 +4,7 @@ BertBot reads configuration from process environment variables first and then fa
 
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
-Template defaults in [../.env.example](../.env.example) are intentionally conservative: all optional integrations default to disabled, keeping local startup simple while still allowing immediate Telegram webhook replies when enabled.
+Template defaults in [../.env.example](../.env.example) are intentionally conservative: most optional integrations default to disabled; Telegram is the exception and defaults to enabled so webhook replies work immediately once a bot token is set.
 
 For Docker Compose deployment, copy [../.env.compose.example](../.env.compose.example) to `.env.compose`. Compose-specific overrides in that file are annotated with `[compose override]`; all other keys share the same semantics as in `.env.example`.
 
@@ -113,22 +113,22 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_WEBHOOK_ALLOWED_IPS` | — | `` | `` | |
 | `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` | `60` | `60` | `60` | |
 | `BERTBOT_WEBHOOK_RATE_LIMIT_MAX_REQUESTS` | `120` | `120` | `120` | |
-| `BERTBOT_TELEGRAM_ENABLED` | `false` | `true` | `true` | |
-| `BERTBOT_SLACK_ENABLED` | `false` | `false` | `false` | |
-| `BERTBOT_WHATSAPP_ENABLED` | `false` | `false` | `false` | |
+| `BERTBOT_TELEGRAM_ENABLED` | `true` | `true` | `true` | |
+| `BERTBOT_SLACK_ENABLED` | `true` | `false` | `false` | |
+| `BERTBOT_WHATSAPP_ENABLED` | `true` | `false` | `false` | |
 | `BERTBOT_DISCORD_ENABLED` | `false` | `false` | `false` | |
 | `BERTBOT_TELEGRAM_API_BASE_URL` | `https://api.telegram.org` | `` | `` | Optional custom Telegram server |
 | `BERTBOT_TELEGRAM_BOT_TOKEN` | — | `[required]` | `[required]` | |
 | `BERTBOT_SLACK_BOT_TOKEN` | — | placeholder | placeholder | Required when Slack enabled |
 | `BERTBOT_WHATSAPP_ACCESS_TOKEN` | — | placeholder | placeholder | Required when WhatsApp enabled |
-| `BERTBOT_WHATSAPP_API_VERSION` | — | `v22.0` | `v22.0` | |
+| `BERTBOT_WHATSAPP_API_VERSION` | `v22.0` | `v22.0` | `v22.0` | |
 | `BERTBOT_DISCORD_BOT_TOKEN` | — | placeholder | placeholder | Required when Discord enabled |
 | `BERTBOT_DISCORD_GUILD_ID` | — | `` | `` | |
 | `BERTBOT_DISCORD_APPROVED_CHANNEL_IDS` | — | `` | `` | |
 | `BERTBOT_DISCORD_APPROVED_DIRECT_MESSAGE_IDS` | — | `` | `` | |
 | `BERTBOT_SLACK_WORKSPACE_ID` | — | `` | `` | |
 | `BERTBOT_WHATSAPP_BUSINESS_PHONE_ID` | — | `` | `` | |
-| `BERTBOT_INGESTION_REQUIRE_APPROVAL` | `false` | `false` | `false` | |
+| `BERTBOT_INGESTION_REQUIRE_APPROVAL` | `true` | `false` | `false` | |
 | `BERTBOT_TELEGRAM_SECRET_TOKEN` | — | placeholder | placeholder | Required when signatures enabled |
 | `BERTBOT_SLACK_SIGNING_SECRET` | — | placeholder | placeholder | Required when signatures enabled |
 | `BERTBOT_SLACK_MAX_REQUEST_AGE_SECONDS` | `300` | `300` | `300` | |
