@@ -65,6 +65,7 @@ If `JAVA_HOME` is invalid, point it at a JDK 17 installation and open a new term
 - VS Code and custom Copilot agent setup: [docs/vscode-copilot.md](docs/vscode-copilot.md)
 - Architecture and extension points: [docs/architecture.md](docs/architecture.md)
 - Repository automation and Copilot review workflow: [docs/github-automation.md](docs/github-automation.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Start with [docs/index.md](docs/index.md) for the full docs index.
 

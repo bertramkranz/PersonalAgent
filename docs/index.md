@@ -11,6 +11,7 @@ This folder holds focused documentation that was moved out of the root README so
 - Use [vscode-copilot.md](vscode-copilot.md) when you are wiring BertBot into VS Code or Copilot MCP flows.
 - Use [architecture.md](architecture.md) when you are changing graph, runtime, persistence, or extension behavior.
 - Use [github-automation.md](github-automation.md) when you need CI/CD guardrails, secret scanning, or GitHub Copilot review workflow details.
+- Use [../CONTRIBUTING.md](../CONTRIBUTING.md) when you are setting up a local environment or preparing a pull request.
 
 ## Existing Diagrams
 
