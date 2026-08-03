@@ -15,6 +15,8 @@ flowchart TD
     %% 2026-08-03: dod-enforcement now validates required custom Copilot agent/skill manifests via .github/scripts/validate-custom-copilot-assets.sh before running path-coupled policy checks.
     %% 2026-08-03: dod-enforcement now also runs regression tests for the manifest validator script via .github/scripts/test-validate-custom-copilot-assets.sh.
     %% 2026-08-03: deploy-cloud-run-main.yml and scripts/deploy-cloud-run.ps1 now use Cloud Run container port defaults (8080/PORT contract) and no longer hardcode BERTBOT_WEBHOOK_PORT.
+    %% 2026-08-03: dod-enforcement now chmods custom validator scripts before execution to avoid Linux permission errors in CI.
+    %% 2026-08-03: merge-generated-prs-on-green now enables auto-merge for eligible non-draft in-repo PRs without requiring an auto-merge label.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
     DEP([Dependabot opens\na dependency PR])
@@ -36,7 +38,7 @@ flowchart TD
     end
 
     %% ── Merge ─────────────────────────────────────────────────────────────────
-    MERGE["merge-generated-prs-on-green.yml\nEnables squash auto-merge\n\nTrigger:\n  • pull_request_target\n    (opened, reopened, synchronize,\n     ready_for_review, labeled, unlabeled)\n\nRequires to arm auto-merge:\n  • PR open and not draft\n  • 'auto-merge' label present\n\nGitHub completes merge later when\nrequired branch-protection checks pass"]
+    MERGE["merge-generated-prs-on-green.yml\nEnables squash auto-merge\n\nTrigger:\n  • pull_request_target\n    (opened, reopened, synchronize,\n     ready_for_review, labeled, unlabeled)\n\nRequires to arm auto-merge:\n  • PR open and not draft\n  • PR head is from this repository\n\nGitHub completes merge later when\nrequired branch-protection checks pass"]
 
     %% ── Scheduled ────────────────────────────────────────────────────────────
     ERRLOG["error-log-review.yml\nWeekly error-pattern summary\n(downloads CI gradle-reports artifacts;\npublishes markdown report artifact)\n\nTrigger:\n  • schedule: Monday 07:00 UTC\n  • workflow_dispatch"]

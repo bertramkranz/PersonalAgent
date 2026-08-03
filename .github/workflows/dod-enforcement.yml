@@ -29,11 +29,13 @@ jobs:
       - name: Validate custom Copilot agent and skill manifests
         run: |
           set -euo pipefail
+          chmod +x .github/scripts/validate-custom-copilot-assets.sh
           bash .github/scripts/validate-custom-copilot-assets.sh
 
       - name: Regression test custom Copilot asset validator
         run: |
           set -euo pipefail
+          chmod +x .github/scripts/test-validate-custom-copilot-assets.sh
           bash .github/scripts/test-validate-custom-copilot-assets.sh
 
       - name: Detect changed paths
