@@ -29,7 +29,7 @@ BERTBOT_AI_MODEL=gpt-4o-mini
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
-For Docker Compose runs, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead. See [docs/configuration.md](docs/configuration.md#environment-file-usage) for the full file-to-context mapping.
+For Docker Compose runs, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead. See [docs/configuration.md](docs/configuration.md#environment-file-usage) for the full file-to-context mapping. Run [scripts/check-env-drift.sh](scripts/check-env-drift.sh) to verify template parity after env changes.
 
 ### Run Locally
 

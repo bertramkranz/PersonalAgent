@@ -22,6 +22,8 @@ Each environment file has a single owner and runtime context. Do not mix these f
 
 Neither `.env` nor `.env.compose` should ever be committed. Both are excluded by `.gitignore`.
 
+Use [../scripts/check-env-drift.sh](../scripts/check-env-drift.sh) after changing either template to verify active-key parity.
+
 To bootstrap local development, copy [../.env.example](../.env.example) to `.env` and set your provider-specific values.
 
 Template defaults in [../.env.example](../.env.example) are intentionally conservative: most optional integrations default to disabled; Telegram is the exception and defaults to enabled so webhook replies work immediately once a bot token is set.
