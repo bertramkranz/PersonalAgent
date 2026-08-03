@@ -12,6 +12,7 @@ This folder holds focused documentation that was moved out of the root README so
 - Use [architecture.md](architecture.md) when you are changing graph, runtime, persistence, or extension behavior.
 - Use [github-automation.md](github-automation.md) when you need CI/CD guardrails, secret scanning, or GitHub Copilot review workflow details.
 - Use [../CONTRIBUTING.md](../CONTRIBUTING.md) when you are setting up a local environment or preparing a pull request.
+- Use [koog-beta-upgrade-policy.md](koog-beta-upgrade-policy.md) when you are upgrading Koog beta modules or need to understand the pinning and rollback policy.
 
 ## Existing Diagrams
 
@@ -35,3 +36,8 @@ For repository changes:
 
 1. [architecture.md](architecture.md)
 2. [run-modes.md](run-modes.md)
+
+For dependency upgrades:
+
+1. [koog-beta-upgrade-policy.md](koog-beta-upgrade-policy.md)
+2. [architecture.md](architecture.md)

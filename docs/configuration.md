@@ -13,7 +13,7 @@ Template defaults in [../.env.example](../.env.example) are intentionally conser
 
 This keeps local startup simple while still allowing immediate Telegram webhook replies when enabled.
 
-See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.
+See [run-modes.md](run-modes.md) for runtime-specific commands, [deployment.md](deployment.md) for Docker Compose and Cloud Run guidance, and [vscode-copilot.md](vscode-copilot.md) for workspace MCP setup.  For Koog beta dependency pinning and upgrade rules, see [koog-beta-upgrade-policy.md](koog-beta-upgrade-policy.md).
 
 ## Minimal Local Setup
 
