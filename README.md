@@ -18,6 +18,8 @@ BertBot is a graph-based personal assistant orchestration agent built to stay co
 
 ### Environment Setup
 
+For local Gradle runs (CLI, headless, MCP, webhook, Discord):
+
 1. Copy [.env.example](.env.example) to `.env`.
 2. Set at least:
 
@@ -27,9 +29,7 @@ BERTBOT_AI_MODEL=gpt-4o-mini
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
-For Docker Compose deployments, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead.
-
-See [docs/configuration.md](docs/configuration.md) for the full env file ownership model and how to run `scripts/check-env-drift.sh` to detect template drift.
+For Docker Compose runs, copy [.env.compose.example](.env.compose.example) to `.env.compose` instead. See [docs/configuration.md](docs/configuration.md#environment-file-usage) for the full file-to-context mapping. Run [scripts/check-env-drift.sh](scripts/check-env-drift.sh) to verify template parity after env changes.
 
 ### Run Locally
 
@@ -69,6 +69,7 @@ If `JAVA_HOME` is invalid, point it at a JDK 17 installation and open a new term
 - VS Code and custom Copilot agent setup: [docs/vscode-copilot.md](docs/vscode-copilot.md)
 - Architecture and extension points: [docs/architecture.md](docs/architecture.md)
 - Repository automation and Copilot review workflow: [docs/github-automation.md](docs/github-automation.md)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Start with [docs/index.md](docs/index.md) for the full docs index.
 

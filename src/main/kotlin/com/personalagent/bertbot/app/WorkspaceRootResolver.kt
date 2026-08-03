@@ -17,10 +17,13 @@ internal fun findWorkspaceRootByMarkers(start: File): File? {
 
 internal fun resolveWorkspaceRoot(
     environment: Map<String, String> = System.getenv(),
+    dotEnvValues: Map<String, String> = loadDotEnvValues(),
     currentDirectory: File = File("."),
 ): File {
-    val configuredRoot = environment[McpConstants.WORKSPACE_ROOT_ENV_VAR]?.trim().orEmpty()
-    if (configuredRoot.isNotBlank()) {
+    val configuredRoot =
+        resolveRuntimeSetting(McpConstants.WORKSPACE_ROOT_ENV_VAR, environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+    if (configuredRoot != null) {
         val configured = File(configuredRoot)
         if (configured.exists() && configured.isDirectory) {
             return configured.canonicalFile
