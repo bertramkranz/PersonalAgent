@@ -19,9 +19,9 @@ Summary: 39 unique items -> IMPLEMENTED: 4, OPEN: 8, PARTIAL: 27.
 - Ensure Dependabot Configuration: Dependabot config exists.
 - Integrate Code Quality Tools: Detekt, Ktlint, and JaCoCo configured.
 - Provide Example Environment File: Both example env files exist.
+- Add dedicated repo improvement researcher sub-agent: `repo_improvement_researcher` sub-agent enabled by default with expanded routing skills (repo improvement, ecosystem upgrade, dependency upgrade, scout).
 
 ## Open
-- Add dedicated repo improvement researcher sub-agent: Sub-agent config exists (`repo_improvement_researcher`) but is disabled by default.
 - Consolidate .env Files: Multiple env file variants intentionally remain.
 - Consolidate Environment Files: Multiple env file variants intentionally remain.
 - Consolidate Environment Variables: Multiple env file variants intentionally remain.
