@@ -23,7 +23,7 @@ The monthly Code Maat workflow uploads repository-mining CSV reports and a short
 The weekly error-log-review workflow automatically surfaces recurring test failures from CI:
 
 - Runs every **Monday at 07:00 UTC** (also supports manual `workflow_dispatch`).
-- Downloads up to 14 recent successful `ci.yml` run artifacts (the `gradle-reports` artifact).
+- Downloads up to 14 recent completed `ci.yml` run artifacts (the `gradle-reports` artifact).
 - Parses JUnit XML test results for `failure` and `error` outcomes.
 - Groups results by test class and method name, ranking by occurrence count.
 - Publishes a markdown summary as the `error-log-review-<run-id>` artifact.
@@ -41,7 +41,7 @@ The `README.md` inside the artifact contains:
 
 | Section | What it tells you |
 |---|---|
-| Analyzed CI runs | How many recent successful CI runs were included in the scan. |
+| Analyzed CI runs | How many recent completed CI runs were included in the scan. |
 | Distinct failure patterns | Unique test class + method combinations that have failed at least once. |
 | Occurrences | How many times that failure appeared across the reviewed runs. |
 | Most recent run ID | Higher GitHub run ID = more recent. Investigate if this is close to the current run. |

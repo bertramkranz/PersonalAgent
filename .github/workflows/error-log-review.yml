@@ -32,12 +32,12 @@ jobs:
           RUN_IDS="$(gh run list \
             --repo "$GITHUB_REPOSITORY" \
             --workflow ci.yml \
-            --status success \
+            --status completed \
             --limit 14 \
             --json databaseId \
             --jq '.[].databaseId')"
           if [[ -z "$RUN_IDS" ]]; then
-            echo "No successful CI runs found — nothing to review."
+            echo "No completed CI runs found — nothing to review."
             exit 0
           fi
           DOWNLOADED=0
