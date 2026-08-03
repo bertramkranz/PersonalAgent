@@ -8,7 +8,7 @@ This guide explains how to set up a local environment, run the quality checks, a
 
 - Java 17 (Temurin/Adoptium recommended, set via `.sdkmanrc` or `JAVA_HOME`)
 - A configured LLM provider such as OpenAI or Ollama
-- PowerShell on Windows for the provided Gradle wrapper scripts
+- On Windows, use the provided `gradlew.bat` wrapper from Command Prompt or PowerShell
 
 ### Environment
 
