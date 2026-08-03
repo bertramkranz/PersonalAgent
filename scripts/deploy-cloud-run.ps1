@@ -19,10 +19,12 @@ param(
     [int]$ContainerPort = 8080,
     [string]$DatabaseName = "bertbot",
     [string]$DatabaseUser = "bertbot",
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification = 'Parameter value is a Secret Manager secret name, not a plaintext password.')]
     [string]$DatabasePasswordSecret = "bertbot-db-password",
     [string]$ServiceAccount,
     [string]$AiApiKeySecret = "bertbot-ai-api-key",
     [bool]$GoogleWorkspaceEnabled = $true,
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification = 'Parameter value is a Secret Manager secret name, not a secret payload.')]
     [string]$GoogleWorkspaceOauthCredentialsJsonB64Secret,
     [string]$GoogleWorkspaceTokenB64Secret,
     [string]$GoogleWorkspaceMasterKeyB64Secret,
