@@ -17,6 +17,8 @@ flowchart TD
     %% 2026-08-03: deploy-cloud-run-main.yml and scripts/deploy-cloud-run.ps1 now use Cloud Run container port defaults (8080/PORT contract) and no longer hardcode BERTBOT_WEBHOOK_PORT.
     %% 2026-08-03: dod-enforcement now chmods custom validator scripts before execution to avoid Linux permission errors in CI.
     %% 2026-08-03: merge-generated-prs-on-green now enables auto-merge for eligible non-draft in-repo PRs without requiring an auto-merge label.
+    %% 2026-08-03: deploy-cloud-run-main.yml now sets BERTBOT_WEBHOOK_PORT to CLOUD_RUN_CONTAINER_PORT to override image defaults and avoid startup probe failures.
+    %% 2026-08-03: deploy-cloud-run-main.yml now deploys with file-backed state by default so Cloud Run startup is resilient when Cloud SQL is unavailable.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
     DEP([Dependabot opens\na dependency PR])
