@@ -9,14 +9,16 @@ on:
       - ready_for_review
       - labeled
       - unlabeled
+      - closed
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: auto-merge-pr-${{ github.event.number }}
-  cancel-in-progress: true
+  group: auto-merge-open-pr-queue
+  cancel-in-progress: false
 
 jobs:
   merge-when-green:
@@ -32,41 +34,61 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
-            const pr = context.payload.pull_request;
-            const autoMergeLabel = 'auto-merge';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
-            function normalize(name) {
-              return String(name || '').trim().toLowerCase();
-            }
+            const openPulls = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              base: 'main',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 100,
+            });
 
-            const hasAutoMergeLabel = (pr.labels || []).some(
-              (label) => normalize(label.name) === autoMergeLabel
-            );
+            const eligible = openPulls
+              .filter((pr) => !pr.draft)
+              .sort((a, b) => {
+                const createdDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                return createdDiff !== 0 ? createdDiff : a.number - b.number;
+              });
 
-            if (pr.state !== 'open') {
-              core.info(`PR #${pr.number}: skipping because it is '${pr.state}'.`);
+            if (eligible.length === 0) {
+              core.info('No eligible open non-draft PRs found.');
               core.setOutput('should_merge', 'false');
               return;
             }
 
-            if (pr.draft) {
-              core.info(`PR #${pr.number}: skipping because it is still a draft.`);
-              core.setOutput('should_merge', 'false');
-              return;
-            }
+            const queueNumbers = eligible.map((pr) => pr.number);
+            const nextPr = eligible[0];
 
-            if (!hasAutoMergeLabel) {
-              core.info(`PR #${pr.number}: skipping because '${autoMergeLabel}' label is not present.`);
-              core.setOutput('should_merge', 'false');
-              return;
-            }
-
-            core.info(`PR #${pr.number}: enabling approval and GitHub native auto-merge.`);
+            core.info(`Ordered merge queue: ${queueNumbers.join(', ')}`);
+            core.info(`Next PR to arm for auto-merge: #${nextPr.number}`);
             core.setOutput('should_merge', 'true');
+            core.setOutput('target_pr_number', String(nextPr.number));
+            core.setOutput('queued_pr_numbers', queueNumbers.slice(1).join(' '));
 
-      - name: Enable GitHub auto-merge
+      - name: Disable auto-merge on queued PRs
+        if: ${{ steps.evaluate.outputs.should_merge == 'true' && steps.evaluate.outputs.queued_pr_numbers != '' }}
+        run: |
+          for pr in ${{ steps.evaluate.outputs.queued_pr_numbers }}; do
+            if [[ "$(gh pr view "$pr" --json autoMergeRequest --jq '.autoMergeRequest != null')" == "true" ]]; then
+              echo "Disabling auto-merge for queued PR #$pr to preserve ordering."
+              gh pr merge "$pr" --disable-auto
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Enable GitHub auto-merge for next queued PR
         if: ${{ steps.evaluate.outputs.should_merge == 'true' }}
         run: |
-          gh pr merge ${{ github.event.number }} --auto --squash
+          target_pr="${{ steps.evaluate.outputs.target_pr_number }}"
+          if [[ "$(gh pr view "$target_pr" --json autoMergeRequest --jq '.autoMergeRequest != null')" == "true" ]]; then
+            echo "Auto-merge already enabled for PR #$target_pr."
+          else
+            gh pr merge "$target_pr" --auto --squash
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
