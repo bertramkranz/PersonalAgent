@@ -4,7 +4,7 @@ This repository includes GitHub workflow automation for merge guardrails, secret
 
 ## Workflow Overview
 
-- `.github/workflows/bootstrap-repo-guardrails.yml`: ensures repository guardrails such as the `auto-merge` label exist.
+- `.github/workflows/bootstrap-repo-guardrails.yml`: reapplies branch-protection required checks and review policy for `main`.
 - `.github/workflows/dod-enforcement.yml`: enforces Definition-of-Done style CI policy checks on pushes and pull requests, including path-coupled test expectations.
 - `.github/workflows/autofix-on-push.yml`: applies safe formatting auto-fixes (`ktlintFormat`) on non-main branch pushes and commits them back automatically.
 - `.github/workflows/merge-generated-prs-on-green.yml`: approves and enables GitHub native auto-merge for eligible pull requests when required checks pass.
@@ -92,7 +92,7 @@ This repository favors CI-native policy checks over manual pull-request template
 
 The merge workflow is designed for trusted generated pull requests.
 
-- It uses the `auto-merge` label as the main opt-in signal.
+- It automatically enables GitHub native auto-merge for eligible non-draft pull requests from this repository.
 - It re-runs action-required checks when needed.
 - It auto-approves when the configured automation identity is allowed to do so.
 - It enables GitHub native auto-merge after required checks are green.

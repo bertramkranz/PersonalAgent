@@ -33,15 +33,6 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const pr = context.payload.pull_request;
-            const autoMergeLabel = 'auto-merge';
-
-            function normalize(name) {
-              return String(name || '').trim().toLowerCase();
-            }
-
-            const hasAutoMergeLabel = (pr.labels || []).some(
-              (label) => normalize(label.name) === autoMergeLabel
-            );
 
             if (pr.state !== 'open') {
               core.info(`PR #${pr.number}: skipping because it is '${pr.state}'.`);
@@ -55,13 +46,13 @@ jobs:
               return;
             }
 
-            if (!hasAutoMergeLabel) {
-              core.info(`PR #${pr.number}: skipping because '${autoMergeLabel}' label is not present.`);
+            if (pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.info(`PR #${pr.number}: skipping because head repository is external.`);
               core.setOutput('should_merge', 'false');
               return;
             }
 
-            core.info(`PR #${pr.number}: enabling approval and GitHub native auto-merge.`);
+            core.info(`PR #${pr.number}: enabling GitHub native auto-merge.`);
             core.setOutput('should_merge', 'true');
 
       - name: Enable GitHub auto-merge

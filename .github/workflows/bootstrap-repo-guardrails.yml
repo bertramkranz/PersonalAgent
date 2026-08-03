@@ -25,25 +25,6 @@ jobs:
             const repo = context.repo.repo;
             const branch = ${{ toJSON(inputs.branch) }};
 
-            // Ensure the auto-merge label exists
-            try {
-              await github.rest.issues.getLabel({ owner, repo, name: 'auto-merge' });
-              core.info('Label "auto-merge" already exists.');
-            } catch (err) {
-              if (err.status === 404) {
-                await github.rest.issues.createLabel({
-                  owner,
-                  repo,
-                  name: 'auto-merge',
-                  color: '0075ca',
-                  description: 'Eligible for automated merge when CI passes',
-                });
-                core.info('Created label "auto-merge".');
-              } else {
-                throw err;
-              }
-            }
-
             // Configure branch protection.
             // These contexts are consumed directly by
             // .github/workflows/merge-generated-prs-on-green.yml when deciding
@@ -64,7 +45,7 @@ jobs:
               },
               enforce_admins: false,
               required_pull_request_reviews: {
-                required_approving_review_count: 1,
+                required_approving_review_count: 0,
                 dismiss_stale_reviews: true,
                 require_code_owner_reviews: false,
               },
