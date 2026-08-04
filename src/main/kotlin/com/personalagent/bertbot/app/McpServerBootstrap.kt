@@ -36,16 +36,77 @@ internal object McpServerBootstrap {
             } else {
                 null
             }
-        val shoppingToolRouter =
-            if (input.shoppingRuntimeConfiguration.enabled) {
-                ShoppingToolRouter(input.shoppingRuntimeConfiguration)
-            } else {
-                null
-            }
+        val shoppingToolRouter = createShoppingToolRouterOrNull(input.shoppingRuntimeConfiguration)
+        val polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
         val continuousResearchToolRouter =
             startup.runtime
                 ?.researchService()
                 ?.let { service -> ContinuousResearchToolRouter(service) }
+        val capabilityRegistry =
+            CapabilityRegistry(
+                capabilities =
+                    listOfNotNull(
+                        macrofactorToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "macrofactor",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "macrofactor",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        googleWorkspaceToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "google_workspace",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "google_workspace",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        CapabilityDefinition(
+                            id = "polymarket",
+                            router =
+                                FunctionToolRouter(
+                                    id = "polymarket",
+                                    definitionsProvider = { polymarketToolDefinitions(polymarketToolRouter) },
+                                    executor = { toolName, params ->
+                                        if (!isPolymarketToolName(toolName)) {
+                                            null
+                                        } else {
+                                            polymarketToolRouter.handle(toolName.orEmpty(), params)
+                                        }
+                                    },
+                                ),
+                        ),
+                        continuousResearchToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "continuous_research",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "continuous_research",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        shoppingToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "shopping",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "shopping",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                    ),
+            )
 
         val statusProvider =
             McpStatusProviderFactory.create(
@@ -79,7 +140,7 @@ internal object McpServerBootstrap {
                 workspaceRoot = input.workspaceRoot,
                 macrofactorToolRouter = macrofactorToolRouter,
                 googleWorkspaceToolRouter = googleWorkspaceToolRouter,
-                polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
+                polymarketToolRouter = polymarketToolRouter,
                 continuousResearchToolRouter = continuousResearchToolRouter,
                 shoppingToolRouter = shoppingToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
@@ -89,6 +150,7 @@ internal object McpServerBootstrap {
                 checkpointById = startup.runtime?.let { runtime -> { checkpointId, scopeKey -> runtime.checkpointById(checkpointId, scopeKey ?: "global") } },
                 rollbackToCheckpoint = startup.runtime?.let { runtime -> { checkpointId, scopeKey -> runtime.rollbackToCheckpoint(checkpointId, scopeKey ?: "global") } },
                 checkpointRollbackPolicy = checkpointRollbackPolicy,
+                capabilityRegistry = capabilityRegistry,
                 statusProvider = statusProvider,
             )
 

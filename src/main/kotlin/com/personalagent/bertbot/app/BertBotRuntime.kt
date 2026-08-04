@@ -8,6 +8,7 @@ import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
 import com.personalagent.bertbot.agents.ToolCallingSkill
 import com.personalagent.bertbot.config.BertBotAgentConfig
+import com.personalagent.bertbot.config.ExecutionProfileFallbackBehavior
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
@@ -48,6 +49,7 @@ internal class BertBotRuntime(
     private val stateEventStore: StateEventStore? = null,
     private val stateReplayService: StateReplayService? = null,
     private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
+    private val toolCapabilityRegistry: CapabilityRegistry? = null,
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
     private val runtimeCapabilitySnapshotProvider: (() -> RuntimeCapabilitySnapshot)? = null,
     private val telemetry: RuntimeTelemetry = NoOpRuntimeTelemetry,
@@ -134,22 +136,13 @@ internal class BertBotRuntime(
                     }
                 val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
                 val response =
-                    if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
-                        TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
-                        "Your name is ${requestContext.knownProfile.displayName}."
-                    } else if (toolCallingSkill != null) {
-                        toolCallingSkill.invoke(systemPrompt, userMessage, tracingContext)
-                    } else {
-                        assistantResponseSkill
-                            .invoke(
-                                input =
-                                    SelfCorrectingSkillRequest(
-                                        systemPrompt = systemPrompt,
-                                        userPrompt = userMessage,
-                                    ),
-                                tracingContext = tracingContext,
-                            ).response
-                    }
+                    generateAssistantResponse(
+                        userMessage = userMessage,
+                        requestContext = requestContext,
+                        state = state,
+                        systemPrompt = systemPrompt,
+                        tracingContext = tracingContext,
+                    )
 
                 runCatching {
                     interactionGraphWriter.write(
@@ -300,6 +293,89 @@ internal class BertBotRuntime(
         return normalized.replace("|", "_")
     }
 
+    private fun generateAssistantResponse(
+        userMessage: String,
+        requestContext: BertBotRequestContext,
+        state: BertBotState,
+        systemPrompt: String,
+        tracingContext: TracingContext,
+    ): String {
+        if (isNameRecallQuestion(userMessage) && !requestContext.knownProfile.displayName.isNullOrBlank()) {
+            TraceLogger.info(tracingContext, "profile_lookup", "resolved_name=true")
+            return "Your name is ${requestContext.knownProfile.displayName}."
+        }
+
+        if (toolCallingSkill == null) {
+            return assistantResponseSkill
+                .invoke(
+                    input =
+                        SelfCorrectingSkillRequest(
+                            systemPrompt = systemPrompt,
+                            userPrompt = userMessage,
+                        ),
+                    tracingContext = tracingContext,
+                ).response
+        }
+
+        val allowedCapabilityIds = resolveAllowedCapabilityIdsForSelectedSubAgent(state.selectedSubAgent)
+        val filteredDefinitions =
+            when {
+                toolCapabilityRegistry == null -> null
+                allowedCapabilityIds == null -> null
+                else -> toolCapabilityRegistry.toolDefinitionsForCapabilities(allowedCapabilityIds)
+            }
+
+        return toolCallingSkill.invoke(
+            systemPrompt = systemPrompt,
+            userPrompt = userMessage,
+            tracingContext = tracingContext,
+            dynamicToolDefinitions = filteredDefinitions,
+            dynamicToolExecutor =
+                if (toolCapabilityRegistry == null) {
+                    null
+                } else {
+                    { name, args -> executeProfileScopedTool(name, args, state.selectedSubAgent, allowedCapabilityIds) }
+                },
+        )
+    }
+
+    private fun resolveAllowedCapabilityIdsForSelectedSubAgent(selectedSubAgentId: String?): Set<String>? {
+        val registry = toolCapabilityRegistry ?: return null
+        val profile = config.executionProfileFor(selectedSubAgentId) ?: return null
+        val availableIds = registry.capabilityIds()
+        val declared = (profile.requiredCapabilities + profile.optionalCapabilities).filterTo(mutableSetOf()) { it in availableIds }
+        if (declared.isNotEmpty()) {
+            return declared
+        }
+
+        return when (profile.fallbackBehavior) {
+            ExecutionProfileFallbackBehavior.DENY_OUTSIDE_PROFILE -> emptySet()
+            ExecutionProfileFallbackBehavior.ALLOW_ALL,
+            ExecutionProfileFallbackBehavior.WARN_ONLY,
+            -> null
+        }
+    }
+
+    private fun executeProfileScopedTool(
+        name: String,
+        args: JsonObject,
+        selectedSubAgentId: String?,
+        allowedCapabilityIds: Set<String>?,
+    ): String {
+        val registry = toolCapabilityRegistry ?: return "Tool '$name' not found"
+        if (allowedCapabilityIds != null) {
+            val capabilityId = registry.capabilityIdForToolName(name)
+            if (capabilityId != null && capabilityId !in allowedCapabilityIds) {
+                val profileId = selectedSubAgentId ?: "unscoped"
+                return "Tool '$name' is not available for sub-agent profile '$profileId'."
+            }
+        }
+
+        val params = JsonObject()
+        params.add("arguments", args)
+        return registry.execute(name, params, allowedCapabilityIds)?.second ?: "Tool '$name' not found"
+    }
+
     private companion object {
         private const val DEFAULT_PERSISTENCE_SCOPE_KEY = "global"
     }
@@ -390,14 +466,22 @@ internal object BertBotRuntimeFactory {
                 enablePeriodicScheduler = enablePeriodicResearchScheduler,
                 llmGateway = llmGateway,
             )
+        val shoppingRuntimeConfiguration = resolveShoppingRuntimeConfiguration()
+        validateShoppingConfiguration(runtimeConfig, shoppingRuntimeConfiguration)
         val macrofactorToolRouter = createMacrofactorToolRouterOrNull(resolveMacrofactorRuntimeConfiguration())
         val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
-        val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
-        val toolCallingSkill =
-            buildToolCallingSkillOrNull(
+        val shoppingToolRouter = createShoppingToolRouterOrNull(shoppingRuntimeConfiguration)
+        val capabilityRegistry =
+            buildCapabilityRegistry(
                 googleWorkspaceRouter = googleWorkspaceRouter,
                 polymarketToolRouter = polymarketToolRouter,
                 macrofactorToolRouter = macrofactorToolRouter,
+                shoppingToolRouter = shoppingToolRouter,
+            )
+        val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
+        val toolCallingSkill =
+            buildToolCallingSkillOrNull(
+                capabilityRegistry = capabilityRegistry,
                 llmGateway = llmGateway,
                 config = runtimeConfig,
             )
@@ -436,6 +520,7 @@ internal object BertBotRuntimeFactory {
                 stateEventStore = stateEventStore,
                 stateReplayService = stateReplayService,
                 koogMemory = koogMemory,
+                toolCapabilityRegistry = capabilityRegistry,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,
                 runtimeCapabilitySnapshotProvider = runtimeCapabilitySnapshotProvider,
                 telemetry = telemetry,
@@ -473,36 +558,93 @@ internal val TOOL_BACKED_SUB_AGENT_REQUIREMENTS: List<ToolBackedSubAgentRequirem
     )
 
 private fun buildToolCallingSkillOrNull(
-    googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
-    polymarketToolRouter: PolymarketToolRouter?,
-    macrofactorToolRouter: MacrofactorToolRouter?,
+    capabilityRegistry: CapabilityRegistry,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
     config: BertBotAgentConfig,
 ): ToolCallingSkill? {
-    val integrations =
-        buildRuntimeToolIntegrations(
-            googleWorkspaceRouter = googleWorkspaceRouter,
-            polymarketToolRouter = polymarketToolRouter,
-            macrofactorToolRouter = macrofactorToolRouter,
-        )
-    validateToolBackedSubAgentCoverage(config, integrations)
-    if (integrations.isEmpty()) return null
+    validateToolBackedSubAgentCoverage(config, capabilityRegistry)
+    if (capabilityRegistry.capabilityIds().isEmpty()) return null
 
     return ToolCallingSkill(
         llmGateway = llmGateway,
-        toolDefinitionsProvider = {
-            integrations.flatMap { integration -> integration.toolDefinitionsProvider.invoke() }
-        },
+        toolDefinitionsProvider = capabilityRegistry::toolDefinitions,
         toolExecutor = { name, args ->
             val params = JsonObject()
             params.add("arguments", args)
 
-            integrations
-                .firstNotNullOfOrNull { integration ->
-                    integration.toolExecutor(name, params)?.second
-                } ?: "Tool '$name' not found"
+            capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
         },
     )
+}
+
+internal fun buildCapabilityRegistry(
+    googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
+    polymarketToolRouter: PolymarketToolRouter?,
+    macrofactorToolRouter: MacrofactorToolRouter? = null,
+    shoppingToolRouter: ShoppingToolRouter? = null,
+): CapabilityRegistry {
+    val capabilities = mutableListOf<CapabilityDefinition>()
+
+    if (macrofactorToolRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "macrofactor",
+                router =
+                    FunctionToolRouter(
+                        id = "macrofactor",
+                        definitionsProvider = macrofactorToolRouter::toolDefinitions,
+                        executor = { toolName, params -> macrofactorToolRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
+    if (googleWorkspaceRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "google_workspace",
+                router =
+                    FunctionToolRouter(
+                        id = "google_workspace",
+                        definitionsProvider = googleWorkspaceRouter::toolDefinitions,
+                        executor = { toolName, params -> googleWorkspaceRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
+    if (polymarketToolRouter != null) {
+        val definitions = polymarketToolDefinitions(polymarketToolRouter)
+        capabilities +=
+            CapabilityDefinition(
+                id = "polymarket",
+                router =
+                    FunctionToolRouter(
+                        id = "polymarket",
+                        definitionsProvider = { definitions },
+                        executor = { toolName, params ->
+                            if (!isPolymarketToolName(toolName)) {
+                                null
+                            } else {
+                                polymarketToolRouter.handle(toolName.orEmpty(), params)
+                            }
+                        },
+                    ),
+            )
+    }
+
+    if (shoppingToolRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "shopping",
+                router =
+                    FunctionToolRouter(
+                        id = "shopping",
+                        definitionsProvider = shoppingToolRouter::toolDefinitions,
+                        executor = { toolName, params -> shoppingToolRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
+    return CapabilityRegistry(capabilities)
 }
 
 internal fun buildRuntimeToolIntegrations(
@@ -554,6 +696,11 @@ internal fun createPolymarketToolRouterOrNull(config: BertBotAgentConfig): Polym
     return PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
 }
 
+internal fun createShoppingToolRouterOrNull(configuration: ShoppingRuntimeConfiguration): ShoppingToolRouter? {
+    if (!configuration.hasEnabledStore) return null
+    return ShoppingToolRouter(configuration)
+}
+
 internal fun validateToolBackedSubAgentCoverage(
     config: BertBotAgentConfig,
     integrations: List<RuntimeToolIntegration>,
@@ -575,6 +722,47 @@ internal fun validateToolBackedSubAgentCoverage(
             }
         check(false) {
             "Missing required runtime tool integrations for enabled sub-agents: $details"
+        }
+    }
+}
+
+internal fun validateToolBackedSubAgentCoverage(
+    config: BertBotAgentConfig,
+    capabilityRegistry: CapabilityRegistry,
+) {
+    val enabledSubAgentIds = config.enabledSubAgents().map { definition -> definition.id }.toSet()
+    val availableIntegrationIds = capabilityRegistry.capabilityIds()
+
+    val missingRequired =
+        TOOL_BACKED_SUB_AGENT_REQUIREMENTS.filter { requirement ->
+            requirement.required &&
+                requirement.subAgentId in enabledSubAgentIds &&
+                requirement.integrationId !in availableIntegrationIds
+        }
+
+    if (missingRequired.isNotEmpty()) {
+        val details =
+            missingRequired.joinToString(separator = ", ") { requirement ->
+                "${requirement.subAgentId}->${requirement.integrationId}"
+            }
+        check(false) {
+            "Missing required runtime tool integrations for enabled sub-agents: $details"
+        }
+    }
+
+    val availableCapabilityIds = capabilityRegistry.capabilityIds()
+    val missingFromProfiles =
+        config.executionProfiles
+            .filter { profile -> profile.subAgentId in enabledSubAgentIds }
+            .flatMap { profile ->
+                profile.requiredCapabilities
+                    .filter { capabilityId -> capabilityId !in availableCapabilityIds }
+                    .map { capabilityId -> "${profile.subAgentId}->$capabilityId" }
+            }
+
+    if (missingFromProfiles.isNotEmpty()) {
+        check(false) {
+            "Missing required capabilities from execution profiles: ${missingFromProfiles.joinToString()}"
         }
     }
 }
@@ -640,6 +828,11 @@ internal fun polymarketToolDefinitions(polymarketToolRouter: PolymarketToolRoute
         ),
     )
 }
+
+internal fun isPolymarketToolName(toolName: String?): Boolean =
+    toolName == McpConstants.POLYMARKET_GAMMA_TOOL_NAME ||
+        toolName == McpConstants.POLYMARKET_CLOB_TOOL_NAME ||
+        toolName == McpConstants.POLYMARKET_DATA_TOOL_NAME
 
 private fun polymarketToolDefinition(
     name: String,

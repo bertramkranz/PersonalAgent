@@ -16,6 +16,8 @@
 %% 2026-07-14: ShoppingRuntimeConfiguration added with indexed store slots (BERTBOT_SHOPPING_STORE_N_*); personal_shopper sub-agent registered (disabled by default); validateShoppingConfiguration enforces startup guard when personal_shopper is enabled without a configured store.
 %% 2026-07-14: Shopping runtime configuration declarations consolidated in BertBotSupport so global shopping flags and indexed store-slot settings are resolved together.
 %% 2026-08-03: Env variable consolidation: toBooleanEnv extracted to BertBotEnvironmentSettings as a shared internal function; resolveWorkspaceRoot now honours .env fallback; BERTBOT_SLACK_ENABLED and BERTBOT_WHATSAPP_ENABLED default to false to match .env.example.
+%% 2026-08-04: Runtime now uses a single CapabilityRegistry + UnifiedToolBus pipeline; execution profiles can scope tool visibility/execution by selected sub-agent.
+%% 2026-08-04: Shopping router is now service-backed through PersonalShopperService and seeded AmazonStoreProvider catalog data rather than placeholder-only responses.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -28,6 +30,8 @@ flowchart TD
     subgraph RuntimeComposition
         RuntimeFactory[BertBotRuntimeFactory]
         RuntimeCore[BertBotRuntime]
+        CapabilityRegistry[CapabilityRegistry]
+        UnifiedToolBus[UnifiedToolBus]
         ExternalChatHandler[BertBotExternalChatHandler]
         GraphFactory[BertBotGraphFactory]
         ConnectorFactory[BertBotConnectorRuntimeFactory]
@@ -60,6 +64,7 @@ flowchart TD
 
     subgraph PlanningAndLLM
         Config[BertBotAgentConfig]
+        ExecutionProfiles[SubAgentExecutionProfileDefinition]
         RuntimeFlags[Runtime Capability Snapshot\\nBertBotSupport]
         PromptBuilder[buildSystemPrompt]
         CapabilityResponder[buildCapabilityStatusResponse\\nkeyword-based capability detection]
@@ -125,10 +130,10 @@ flowchart TD
     end
 
     subgraph ShoppingBridge
-        ShoppingToolRouter[ShoppingToolRouter\\npolicy-only: no external API]
+        ShoppingToolRouter[ShoppingToolRouter\\nservice-backed shopping operations]
         ShoppingGuardrails[Guardrails:\n- confirmation_token required for cart/checkout\n- budget limit check\n- seller trust score filter\n- hard-block place_order]
         StoreProviderRegistry[StoreProviderRegistry\\npriority-based provider selection]
-        AmazonStoreProvider[AmazonStoreProvider\\nAPI skeleton]
+        AmazonStoreProvider[AmazonStoreProvider\\nseeded catalog + provider mapping]
         PersonalShopperService[PersonalShopperService\\nprovider-agnostic orchestration\nand safety invariants]
     end
 
@@ -168,12 +173,16 @@ flowchart TD
     ExternalChatHandler --> RuntimeCore
 
     RuntimeFactory --> RuntimeCore
+    RuntimeFactory --> CapabilityRegistry
+    RuntimeFactory --> UnifiedToolBus
     RuntimeFactory --> GraphFactory
     RuntimeFactory --> Skill
     RuntimeFactory --> LLM
     RuntimeFactory --> RuntimeFlags
     RuntimeFactory --> Control
     RuntimeFactory --> Config
+    Config --> ExecutionProfiles
+    ExecutionProfiles --> RuntimeCore
     RuntimeFactory --> StatusProvider
     RuntimeCore --> KoogIntegration
     KoogIntegration --> Episodic

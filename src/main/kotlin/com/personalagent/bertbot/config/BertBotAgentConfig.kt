@@ -20,6 +20,19 @@ data class SubAgentConfigDefinition(
     val enabled: Boolean = true,
 )
 
+enum class ExecutionProfileFallbackBehavior {
+    ALLOW_ALL,
+    WARN_ONLY,
+    DENY_OUTSIDE_PROFILE,
+}
+
+data class SubAgentExecutionProfileDefinition(
+    val subAgentId: String,
+    val requiredCapabilities: Set<String> = emptySet(),
+    val optionalCapabilities: Set<String> = emptySet(),
+    val fallbackBehavior: ExecutionProfileFallbackBehavior = ExecutionProfileFallbackBehavior.ALLOW_ALL,
+)
+
 data class ConnectorConfig(
     val enabled: Boolean = false,
     val approvalScope: String = "chat",
@@ -329,6 +342,7 @@ data class BertBotAgentConfig(
                 enabled = false,
             ),
         ),
+    val executionProfiles: List<SubAgentExecutionProfileDefinition> = defaultSubAgentExecutionProfiles(),
 ) {
     init {
         require(maxSemanticContextEntries > 0) {
@@ -380,6 +394,9 @@ data class BertBotAgentConfig(
         requireConnectorScope("slack", ingestion.slack.connector.approvalScope, setOf("channel", "chat", "conversation"))
         requireConnectorScope("whatsapp", ingestion.whatsapp.connector.approvalScope, setOf("conversation", "chat"))
         requireConnectorScope("discord", ingestion.discord.connector.approvalScope, setOf("channel", "chat", "conversation"))
+        require(executionProfiles.map { profile -> profile.subAgentId }.distinct().size == executionProfiles.size) {
+            "executionProfiles must not contain duplicate subAgentId values"
+        }
     }
 
     fun enabledTools(): List<ToolDefinition> = tools.filter { it.enabled }
@@ -388,6 +405,11 @@ data class BertBotAgentConfig(
 
     fun enabledSubAgents(): List<SubAgentConfigDefinition> = subAgents.filter { it.enabled }
 
+    fun executionProfileFor(subAgentId: String?): SubAgentExecutionProfileDefinition? {
+        if (subAgentId.isNullOrBlank()) return null
+        return executionProfiles.firstOrNull { profile -> profile.subAgentId == subAgentId }
+    }
+
     companion object {
         const val MAX_SEMANTIC_CONTEXT_ENTRIES: Int = 100
         const val MAX_EPISODIC_CONTEXT_ENTRIES: Int = 500
@@ -395,6 +417,30 @@ data class BertBotAgentConfig(
         const val MAX_MEMORY_SUMMARIZATION_BATCH_SIZE: Int = 500
     }
 }
+
+private fun defaultSubAgentExecutionProfiles(): List<SubAgentExecutionProfileDefinition> =
+    listOf(
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "polymarket_analyst",
+            requiredCapabilities = setOf("polymarket"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.DENY_OUTSIDE_PROFILE,
+        ),
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "personal_shopper",
+            requiredCapabilities = setOf("shopping"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.DENY_OUTSIDE_PROFILE,
+        ),
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "google_workspace_operator",
+            optionalCapabilities = setOf("google_workspace"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
+        ),
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "repo_improvement_researcher",
+            optionalCapabilities = setOf("continuous_research"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
+        ),
+    )
 
 private fun requireConnectorScope(
     connectorName: String,
