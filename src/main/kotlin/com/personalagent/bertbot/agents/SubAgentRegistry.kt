@@ -38,6 +38,15 @@ class SubAgentRegistry(
             }
     }
 
+    fun describeMatchesDetailed(task: String): List<SubAgentDefinition> {
+        val normalizedTask = task.lowercase()
+        return enabledAgents().filter { agent ->
+            agent.skills.any { skill ->
+                normalizedTask.contains(skill.lowercase())
+            }
+        }
+    }
+
     fun describeMatches(task: String): List<String> =
         enabledAgents().filter { agent ->
             agent.skills.any { skill -> task.lowercase().contains(skill.lowercase()) }

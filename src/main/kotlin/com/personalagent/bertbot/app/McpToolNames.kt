@@ -28,6 +28,21 @@ internal data class McpToolNames(
     val learningReviewListPending: String,
     val learningReviewApprove: String,
     val learningReviewReject: String,
+    val proceduralSkillList: String,
+    val proceduralSkillCreate: String,
+    val proceduralSkillPatch: String,
+    val proceduralSkillSupersede: String,
+    val proceduralSkillArchive: String,
+    val proceduralSkillApprove: String,
+    val proceduralSkillReject: String,
+    val scheduledJobList: String,
+    val scheduledJobCreate: String,
+    val scheduledJobUpdate: String,
+    val scheduledJobPause: String,
+    val scheduledJobResume: String,
+    val scheduledJobRun: String,
+    val scheduledJobRemove: String,
+    val scheduledJobHistory: String,
 )
 
 internal fun buildInitializeResultPayload(
@@ -60,6 +75,8 @@ internal data class OptionalToolDefinitions(
     val shoppingToolDefinitions: List<JsonObject> = emptyList(),
     val sessionHistoryToolDefinitions: List<JsonObject> = emptyList(),
     val learningReviewToolDefinitions: List<JsonObject> = emptyList(),
+    val proceduralSkillToolDefinitions: List<JsonObject> = emptyList(),
+    val scheduledJobToolDefinitions: List<JsonObject> = emptyList(),
 )
 
 internal fun buildToolsListResultPayload(
@@ -81,6 +98,8 @@ internal fun buildToolsListResultPayload(
     optionalToolDefinitions.shoppingToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.sessionHistoryToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.learningReviewToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.proceduralSkillToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.scheduledJobToolDefinitions.forEach { tool -> tools.add(tool) }
 
     result.add("tools", tools)
     return result

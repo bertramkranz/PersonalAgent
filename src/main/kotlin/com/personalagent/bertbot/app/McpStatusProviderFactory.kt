@@ -12,30 +12,19 @@ internal object McpStatusProviderFactory {
             val googleWorkspaceStatus =
                 summarizeGoogleWorkspaceAvailability(input.googleWorkspaceRuntimeConfiguration, input.googleWorkspaceToolRouter)
             val macrofactorToolNames =
-                input.macrofactorToolRouter
-                    ?.toolDefinitions()
-                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                    ?: emptyList()
+                extractToolNames(input.macrofactorToolRouter)
             val researchToolNames =
-                input.continuousResearchToolRouter
-                    ?.toolDefinitions()
-                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                    ?: emptyList()
+                extractToolNames(input.continuousResearchToolRouter)
             val sessionHistoryToolNames =
-                input.sessionHistoryToolRouter
-                    ?.toolDefinitions()
-                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                    ?: emptyList()
+                extractToolNames(input.sessionHistoryToolRouter)
             val learningReviewToolNames =
-                input.learningReviewToolRouter
-                    ?.toolDefinitions()
-                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                    ?: emptyList()
+                extractToolNames(input.learningReviewToolRouter)
+            val proceduralSkillToolNames =
+                extractToolNames(input.proceduralSkillToolRouter)
+            val scheduledJobToolNames =
+                extractToolNames(input.scheduledJobToolRouter)
             val googleWorkspaceToolNames =
-                input.googleWorkspaceToolRouter
-                    ?.toolDefinitions()
-                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
-                    ?: emptyList()
+                extractToolNames(input.googleWorkspaceToolRouter)
 
             val baseTools =
                 mutableListOf(
@@ -66,6 +55,8 @@ internal object McpStatusProviderFactory {
             researchToolNames.forEach { name -> baseTools += name }
             sessionHistoryToolNames.forEach { name -> baseTools += name }
             learningReviewToolNames.forEach { name -> baseTools += name }
+            proceduralSkillToolNames.forEach { name -> baseTools += name }
+            scheduledJobToolNames.forEach { name -> baseTools += name }
             googleWorkspaceToolNames.forEach { name -> baseTools += name }
 
             """
@@ -95,6 +86,12 @@ internal object McpStatusProviderFactory {
     }
 }
 
+private fun extractToolNames(router: ToolRouter?): List<String> =
+    router
+        ?.toolDefinitions()
+        ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+        ?: emptyList()
+
 internal data class McpStatusProviderInput(
     val startup: McpStartupState,
     val workspaceRoot: File,
@@ -106,6 +103,8 @@ internal data class McpStatusProviderInput(
     val continuousResearchToolRouter: ContinuousResearchToolRouter?,
     val sessionHistoryToolRouter: SessionHistoryToolRouter?,
     val learningReviewToolRouter: LearningReviewToolRouter?,
+    val proceduralSkillToolRouter: ProceduralSkillToolRouter?,
+    val scheduledJobToolRouter: ScheduledJobToolRouter?,
     val learningReviewConfiguration: LearningReviewRuntimeConfiguration,
     val toolNames: McpToolNames,
     val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration,

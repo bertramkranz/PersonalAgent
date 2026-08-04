@@ -85,6 +85,8 @@ internal class McpRequestDispatcher(
     private val shoppingToolRouter: ShoppingToolRouter? = null,
     private val sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
     private val learningReviewToolRouter: LearningReviewToolRouter? = null,
+    private val proceduralSkillToolRouter: ProceduralSkillToolRouter? = null,
+    private val scheduledJobToolRouter: ScheduledJobToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
@@ -109,6 +111,8 @@ internal class McpRequestDispatcher(
         shoppingToolRouter: ShoppingToolRouter? = null,
         sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
         learningReviewToolRouter: LearningReviewToolRouter? = null,
+        proceduralSkillToolRouter: ProceduralSkillToolRouter? = null,
+        scheduledJobToolRouter: ScheduledJobToolRouter? = null,
         ingestionControlPlane: IngestionControlPlane? = null,
         externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
         listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
@@ -132,6 +136,8 @@ internal class McpRequestDispatcher(
         shoppingToolRouter = shoppingToolRouter,
         sessionHistoryToolRouter = sessionHistoryToolRouter,
         learningReviewToolRouter = learningReviewToolRouter,
+        proceduralSkillToolRouter = proceduralSkillToolRouter,
+        scheduledJobToolRouter = scheduledJobToolRouter,
         ingestionControlPlane = ingestionControlPlane,
         externalChatResponder = externalChatResponder,
         listCheckpoints = listCheckpoints,
@@ -272,6 +278,8 @@ internal class McpRequestDispatcher(
                                 shoppingToolDefinitions = toolBus.toolDefinitionsFor("shopping"),
                                 sessionHistoryToolDefinitions = toolBus.toolDefinitionsFor("session_history"),
                                 learningReviewToolDefinitions = toolBus.toolDefinitionsFor("learning_review"),
+                                proceduralSkillToolDefinitions = toolBus.toolDefinitionsFor("procedural_skill"),
+                                scheduledJobToolDefinitions = toolBus.toolDefinitionsFor("scheduled_jobs"),
                             ),
                     ),
                 )
@@ -332,6 +340,8 @@ internal class McpRequestDispatcher(
         addOptionalCapability(capabilities, "shopping", shoppingToolRouter as? ToolRouter)
         addOptionalCapability(capabilities, "session_history", sessionHistoryToolRouter as? ToolRouter)
         addOptionalCapability(capabilities, "learning_review", learningReviewToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "procedural_skill", proceduralSkillToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "scheduled_jobs", scheduledJobToolRouter as? ToolRouter)
 
         return CapabilityRegistry(capabilities)
     }

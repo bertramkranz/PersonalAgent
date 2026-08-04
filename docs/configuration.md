@@ -100,6 +100,9 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` | `state/bertbot-ingestion-source-state.json` | same | same | |
 | `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` | `state/bertbot-research-recommendations.json` | same | same | |
 | `BERTBOT_SESSION_HISTORY_FILE_PATH` | `state/bertbot-session-history.jsonl` | same | same | |
+| `BERTBOT_SCHEDULED_JOB_FILE_PATH` | `state/bertbot-scheduled-jobs.json` | same | same | |
+| `BERTBOT_SCHEDULED_JOB_EXECUTION_FILE_PATH` | `state/bertbot-scheduled-job-executions.jsonl` | same | same | |
+| `BERTBOT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH` | `state/bertbot-learning-proposal-signals.json` | same | same | |
 | `BERTBOT_TRACE_FILE_PATH` | `logs/bertbot-trace.jsonl` | same | same | |
 | `BERTBOT_INTERACTIONS_FILE_PATH` | `state/bertbot-interactions.mmd` | same | same | |
 | `BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED` | `false` | `false` | `false` | |
@@ -118,9 +121,20 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` | `bertbot_ingestion_consent_snapshot` | same | same | |
 | `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` | `bertbot_ingestion_source_state_snapshot` | same | same | |
 | `BERTBOT_SESSION_HISTORY_JDBC_TABLE` | `bertbot_session_history_event` | same | same | |
+| `BERTBOT_SCHEDULED_JOB_JDBC_TABLE` | `bertbot_scheduled_job_snapshot` | same | same | |
+| `BERTBOT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE` | `bertbot_scheduled_job_execution_event` | same | same | |
+| `BERTBOT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE` | `bertbot_learning_proposal_signal_snapshot` | same | same | |
 | `BERTBOT_SESSION_HISTORY_ENABLED` | `true` | `true` | `true` | Master toggle for durable turn history |
 | `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE` | `2000` | `2000` | `2000` | Max retained history rows per persistence scope |
 | `BERTBOT_LEARNING_REVIEW_ENABLED` | `true` | `true` | `true` | Enables parity scaffolding for learning-review flows |
+| `BERTBOT_SCHEDULED_JOBS_ENABLED` | `false` | `false` | `false` | Master toggle for scheduled job polling loop |
+| `BERTBOT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS` | `60` | `60` | `60` | Scheduler polling cadence in seconds |
+| `BERTBOT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS` | `10` | `10` | `10` | Startup delay before scheduler begins polling |
+| `BERTBOT_LEARNING_PROPOSAL_ENABLED` | `false` | `false` | `false` | Master toggle for background proposal generation |
+| `BERTBOT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS` | `180` | `180` | `180` | Proposal loop polling cadence in seconds |
+| `BERTBOT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS` | `30` | `30` | `30` | Startup delay before proposal loop starts |
+| `BERTBOT_LEARNING_PROPOSAL_MAX_BATCH_SIZE` | `3` | `3` | `3` | Max proposals generated per loop cycle |
+| `BERTBOT_LEARNING_PROPOSAL_COOLDOWN_MINUTES` | `240` | `240` | `240` | Cooldown window before re-proposing same dedupe key |
 | `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before memory writes in review flows |
 | `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before skill/prompt writes in review flows |
 | `BERTBOT_RUNTIME_ENV` | `dev` | `dev` | `production` | [compose override] |

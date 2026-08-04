@@ -66,23 +66,37 @@ import com.personalagent.bertbot.serialization.KotlinxAgentJsonCodec
 import java.io.File
 
 internal object BertBotGraphFactory {
+    data class GraphCreationOptions(
+        val checkpointStore: BertBotCheckpointStore? = null,
+        val enableAutomaticCheckpointing: Boolean = false,
+        val eventSourcingConfiguration: BertBotGraphRunner.EventSourcingConfiguration = BertBotGraphRunner.EventSourcingConfiguration(),
+        val routingHintContext: RoutingHintContext = RoutingHintContext(),
+    )
+
+    data class RoutingHintContext(
+        val configuration: RoutingHintsRuntimeConfiguration = RoutingHintsRuntimeConfiguration(),
+        val provider: ((scopeKey: String, routeKey: String) -> RoutingHint?)? = null,
+        val scopeKeyProvider: ((BertBotState) -> String)? = null,
+    )
+
     fun create(
         stateStore: BertBotStateStore,
         config: BertBotAgentConfig,
-        checkpointStore: BertBotCheckpointStore? = null,
-        enableAutomaticCheckpointing: Boolean = false,
-        eventSourcingConfiguration: BertBotGraphRunner.EventSourcingConfiguration = BertBotGraphRunner.EventSourcingConfiguration(),
+        options: GraphCreationOptions = GraphCreationOptions(),
     ): BertBotGraphRunner =
         BertBotGraphRunner(
-            definition = createDefinition(config),
+            definition = createDefinition(config, options.routingHintContext),
             stateStore = stateStore,
             handoffValidators = createHandoffValidators(),
-            checkpointStore = checkpointStore,
-            enableAutomaticCheckpointing = enableAutomaticCheckpointing,
-            eventSourcing = eventSourcingConfiguration,
+            checkpointStore = options.checkpointStore,
+            enableAutomaticCheckpointing = options.enableAutomaticCheckpointing,
+            eventSourcing = options.eventSourcingConfiguration,
         )
 
-    private fun createDefinition(config: BertBotAgentConfig): BertBotGraphDefinition {
+    private fun createDefinition(
+        config: BertBotAgentConfig,
+        routingHintContext: RoutingHintContext,
+    ): BertBotGraphDefinition {
         val registry = SubAgentRegistry(config)
         return BertBotGraphDefinition(
             entryNodeId = NodeIds.CAPTURE,
@@ -94,7 +108,18 @@ internal object BertBotGraphFactory {
                     EvidenceJudgeNode(),
                     SafetyGuardianNode(),
                     ModelRouterNode(strategy = config.modelSelection),
-                    DelegationNode(registry),
+                    DelegationNode(
+                        registry = registry,
+                        hintConfiguration =
+                            RoutingHintRuntimeConfiguration(
+                                enabled = routingHintContext.configuration.enabled,
+                                minSamplesPerRoute = routingHintContext.configuration.minSamplesPerRoute,
+                                maxInfluence = routingHintContext.configuration.maxInfluence,
+                                recencyHalfLifeHours = routingHintContext.configuration.recencyHalfLifeHours,
+                            ),
+                        hintProvider = routingHintContext.provider,
+                        scopeKeyProvider = routingHintContext.scopeKeyProvider,
+                    ),
                     ExecutorNode(),
                     IncidentDetectorNode(),
                     IncidentCommanderNode(),
@@ -182,6 +207,27 @@ internal object BertBotRuntimeDependenciesFactory {
     fun createLearningReviewStore(
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): LearningReviewStore = LearningReviewStoreFactory.create(persistenceConfiguration)
+
+    fun createCuratedMemoryStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+        curatedMemoryConfiguration: CuratedMemoryRuntimeConfiguration = resolveCuratedMemoryRuntimeConfiguration(),
+    ): CuratedMemoryStore =
+        CuratedMemoryStoreFactory.create(
+            persistenceConfiguration = persistenceConfiguration,
+            maxEntriesPerScope = curatedMemoryConfiguration.maxEntriesPerScope,
+        )
+
+    fun createProceduralSkillStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): ProceduralSkillStore = ProceduralSkillStoreFactory.create(persistenceConfiguration)
+
+    fun createRoutingTelemetryStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): RoutingTelemetryStore = RoutingTelemetryStoreFactory.create(persistenceConfiguration)
+
+    fun createScheduledJobStores(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): Pair<ScheduledJobStore, ScheduledJobExecutionStore> = ScheduledJobStoreFactory.create(persistenceConfiguration)
 
     fun createCheckpointStore(
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
@@ -291,6 +337,16 @@ private object BertBotMemoryRuntimeFactory {
         val memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory)
         val memorySummarizer = SafeMemorySummarizer(primary = LlmMemorySummarizer(llmGateway))
         val userProfileStore = createUserProfileStore(normalizedBackend, persistenceConfiguration)
+        val curatedMemoryConfiguration = resolveCuratedMemoryRuntimeConfiguration()
+        val curatedMemoryStore =
+            if (curatedMemoryConfiguration.enabled) {
+                CuratedMemoryStoreFactory.create(
+                    persistenceConfiguration = persistenceConfiguration,
+                    maxEntriesPerScope = curatedMemoryConfiguration.maxEntriesPerScope,
+                )
+            } else {
+                null
+            }
         val memoryWorker =
             MemorySummarizationWorker(
                 episodicMemory,
@@ -306,6 +362,7 @@ private object BertBotMemoryRuntimeFactory {
             memoryAssembler = memoryAssembler,
             memoryWorker = memoryWorker,
             userProfileStore = userProfileStore,
+            curatedMemoryStore = curatedMemoryStore,
         )
     }
 

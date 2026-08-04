@@ -41,6 +41,12 @@ internal data class PersistenceRuntimeConfiguration(
     val researchRecommendationsFilePath: String = DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH,
     val sessionHistoryFilePath: String = DEFAULT_SESSION_HISTORY_FILE_PATH,
     val learningReviewFilePath: String = DEFAULT_LEARNING_REVIEW_FILE_PATH,
+    val curatedMemoryFilePath: String = DEFAULT_CURATED_MEMORY_FILE_PATH,
+    val proceduralSkillFilePath: String = DEFAULT_PROCEDURAL_SKILL_FILE_PATH,
+    val routingTelemetryFilePath: String = DEFAULT_ROUTING_TELEMETRY_FILE_PATH,
+    val scheduledJobFilePath: String = DEFAULT_SCHEDULED_JOB_FILE_PATH,
+    val scheduledJobExecutionFilePath: String = DEFAULT_SCHEDULED_JOB_EXECUTION_FILE_PATH,
+    val learningProposalSignalFilePath: String = DEFAULT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH,
     val jdbcUrl: String? = null,
     val jdbcUser: String? = null,
     val jdbcPassword: String? = null,
@@ -55,6 +61,12 @@ internal data class PersistenceRuntimeConfiguration(
     val sessionHistoryJdbcTable: String = DEFAULT_SESSION_HISTORY_JDBC_TABLE,
     val learningReviewJdbcTable: String = DEFAULT_LEARNING_REVIEW_JDBC_TABLE,
     val learningReviewDecisionJdbcTable: String = DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE,
+    val curatedMemoryJdbcTable: String = DEFAULT_CURATED_MEMORY_JDBC_TABLE,
+    val proceduralSkillJdbcTable: String = DEFAULT_PROCEDURAL_SKILL_JDBC_TABLE,
+    val routingTelemetryJdbcTable: String = DEFAULT_ROUTING_TELEMETRY_JDBC_TABLE,
+    val scheduledJobJdbcTable: String = DEFAULT_SCHEDULED_JOB_JDBC_TABLE,
+    val scheduledJobExecutionJdbcTable: String = DEFAULT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE,
+    val learningProposalSignalJdbcTable: String = DEFAULT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE,
 )
 
 internal data class SessionHistoryRuntimeConfiguration(
@@ -72,6 +84,32 @@ internal data class LearningReviewRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_LEARNING_REVIEW_ENABLED,
     val memoryWriteApprovalRequired: Boolean = DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED,
     val skillWriteApprovalRequired: Boolean = DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED,
+)
+
+internal data class CuratedMemoryRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_CURATED_MEMORY_ENABLED,
+    val maxEntriesPerScope: Int = DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE,
+)
+
+internal data class RoutingHintsRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_ROUTING_HINTS_ENABLED,
+    val minSamplesPerRoute: Int = DEFAULT_ROUTING_HINTS_MIN_SAMPLES,
+    val maxInfluence: Double = DEFAULT_ROUTING_HINTS_MAX_INFLUENCE,
+    val recencyHalfLifeHours: Int = DEFAULT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS,
+)
+
+internal data class ScheduledJobsRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_SCHEDULED_JOBS_ENABLED,
+    val pollIntervalSeconds: Long = DEFAULT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS,
+    val initialDelaySeconds: Long = DEFAULT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS,
+)
+
+internal data class LearningProposalRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_LEARNING_PROPOSAL_ENABLED,
+    val pollIntervalSeconds: Long = DEFAULT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS,
+    val initialDelaySeconds: Long = DEFAULT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS,
+    val maxBatchSize: Int = DEFAULT_LEARNING_PROPOSAL_MAX_BATCH_SIZE,
+    val cooldownMinutes: Long = DEFAULT_LEARNING_PROPOSAL_COOLDOWN_MINUTES,
 )
 
 internal data class ShoppingRuntimeConfiguration(
@@ -183,6 +221,12 @@ internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "$DEFAULT_STATE_FI
 internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-research-recommendations.json"
 internal const val DEFAULT_SESSION_HISTORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-session-history.jsonl"
 internal const val DEFAULT_LEARNING_REVIEW_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-learning-review.jsonl"
+internal const val DEFAULT_CURATED_MEMORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-curated-memory.json"
+internal const val DEFAULT_PROCEDURAL_SKILL_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-procedural-skills.json"
+internal const val DEFAULT_ROUTING_TELEMETRY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-routing-telemetry.json"
+internal const val DEFAULT_SCHEDULED_JOB_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-scheduled-jobs.json"
+internal const val DEFAULT_SCHEDULED_JOB_EXECUTION_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-scheduled-job-executions.jsonl"
+internal const val DEFAULT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-learning-proposal-signals.json"
 internal const val DEFAULT_TRACE_FILE_PATH = "$DEFAULT_LOGS_DIRECTORY/bertbot-trace.jsonl"
 internal const val DEFAULT_INTERACTIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-interactions.mmd"
 internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
@@ -196,12 +240,32 @@ internal const val DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE = "bertbot_ingestio
 internal const val DEFAULT_SESSION_HISTORY_JDBC_TABLE = "bertbot_session_history_event"
 internal const val DEFAULT_LEARNING_REVIEW_JDBC_TABLE = "bertbot_learning_review_queue"
 internal const val DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE = "bertbot_learning_review_decision_event"
+internal const val DEFAULT_CURATED_MEMORY_JDBC_TABLE = "bertbot_curated_memory_snapshot"
+internal const val DEFAULT_PROCEDURAL_SKILL_JDBC_TABLE = "bertbot_procedural_skill_snapshot"
+internal const val DEFAULT_ROUTING_TELEMETRY_JDBC_TABLE = "bertbot_routing_telemetry_snapshot"
+internal const val DEFAULT_SCHEDULED_JOB_JDBC_TABLE = "bertbot_scheduled_job_snapshot"
+internal const val DEFAULT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE = "bertbot_scheduled_job_execution_event"
+internal const val DEFAULT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE = "bertbot_learning_proposal_signal_snapshot"
 internal const val DEFAULT_SESSION_HISTORY_ENABLED = true
 internal const val DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE = 2000
 internal const val DEFAULT_SESSION_RECALL_ENABLED = false
 internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPTS = 3
 internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS = 280
 internal const val DEFAULT_LEARNING_REVIEW_ENABLED = true
+internal const val DEFAULT_CURATED_MEMORY_ENABLED = true
+internal const val DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE = 200
+internal const val DEFAULT_ROUTING_HINTS_ENABLED = false
+internal const val DEFAULT_ROUTING_HINTS_MIN_SAMPLES = 5
+internal const val DEFAULT_ROUTING_HINTS_MAX_INFLUENCE = 0.25
+internal const val DEFAULT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS = 72
+internal const val DEFAULT_SCHEDULED_JOBS_ENABLED = false
+internal const val DEFAULT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS: Long = 60
+internal const val DEFAULT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS: Long = 10
+internal const val DEFAULT_LEARNING_PROPOSAL_ENABLED = false
+internal const val DEFAULT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS: Long = 180
+internal const val DEFAULT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS: Long = 30
+internal const val DEFAULT_LEARNING_PROPOSAL_MAX_BATCH_SIZE = 3
+internal const val DEFAULT_LEARNING_PROPOSAL_COOLDOWN_MINUTES: Long = 240
 internal const val DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SHOPPING_ENABLED = false
@@ -406,6 +470,48 @@ internal fun resolvePersistenceRuntimeConfiguration(
             dotEnvValues,
             DEFAULT_LEARNING_REVIEW_FILE_PATH,
         )
+    val curatedMemoryFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_CURATED_MEMORY_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_CURATED_MEMORY_FILE_PATH,
+        )
+    val proceduralSkillFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_PROCEDURAL_SKILL_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_PROCEDURAL_SKILL_FILE_PATH,
+        )
+    val routingTelemetryFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_ROUTING_TELEMETRY_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_ROUTING_TELEMETRY_FILE_PATH,
+        )
+    val scheduledJobFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_SCHEDULED_JOB_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_SCHEDULED_JOB_FILE_PATH,
+        )
+    val scheduledJobExecutionFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_SCHEDULED_JOB_EXECUTION_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_SCHEDULED_JOB_EXECUTION_FILE_PATH,
+        )
+    val learningProposalSignalFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH,
+        )
 
     val tableNames = resolvePersistenceTableNames(environment, dotEnvValues)
 
@@ -425,6 +531,12 @@ internal fun resolvePersistenceRuntimeConfiguration(
         researchRecommendationsFilePath = researchRecommendationsFilePath,
         sessionHistoryFilePath = sessionHistoryFilePath,
         learningReviewFilePath = learningReviewFilePath,
+        curatedMemoryFilePath = curatedMemoryFilePath,
+        proceduralSkillFilePath = proceduralSkillFilePath,
+        routingTelemetryFilePath = routingTelemetryFilePath,
+        scheduledJobFilePath = scheduledJobFilePath,
+        scheduledJobExecutionFilePath = scheduledJobExecutionFilePath,
+        learningProposalSignalFilePath = learningProposalSignalFilePath,
         jdbcUrl = resolveRuntimeSetting("BERTBOT_STATE_JDBC_URL", environment, dotEnvValues),
         jdbcUser = resolveRuntimeSetting("BERTBOT_STATE_JDBC_USER", environment, dotEnvValues),
         jdbcPassword = resolveRuntimeSetting("BERTBOT_STATE_JDBC_PASSWORD", environment, dotEnvValues),
@@ -439,6 +551,12 @@ internal fun resolvePersistenceRuntimeConfiguration(
         sessionHistoryJdbcTable = tableNames.sessionHistoryJdbcTable,
         learningReviewJdbcTable = tableNames.learningReviewJdbcTable,
         learningReviewDecisionJdbcTable = tableNames.learningReviewDecisionJdbcTable,
+        curatedMemoryJdbcTable = tableNames.curatedMemoryJdbcTable,
+        proceduralSkillJdbcTable = tableNames.proceduralSkillJdbcTable,
+        routingTelemetryJdbcTable = tableNames.routingTelemetryJdbcTable,
+        scheduledJobJdbcTable = tableNames.scheduledJobJdbcTable,
+        scheduledJobExecutionJdbcTable = tableNames.scheduledJobExecutionJdbcTable,
+        learningProposalSignalJdbcTable = tableNames.learningProposalSignalJdbcTable,
     )
 }
 
@@ -446,7 +564,63 @@ private fun resolvePersistenceTableNames(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
 ): PersistenceTableNames =
-    PersistenceTableNames(
+    resolvePersistenceTableNamesCore(environment, dotEnvValues)
+
+private fun resolvePersistenceTableNamesCore(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): PersistenceTableNames {
+    val stateTables = resolveStateAndMemoryTableNames(environment, dotEnvValues)
+    val learningTables = resolveLearningTableNames(environment, dotEnvValues)
+    return PersistenceTableNames(
+        jdbcTable = stateTables.jdbcTable,
+        checkpointJdbcTable = stateTables.checkpointJdbcTable,
+        stateEventJdbcTable = stateTables.stateEventJdbcTable,
+        episodicMemoryJdbcTable = stateTables.episodicMemoryJdbcTable,
+        semanticMemoryJdbcTable = stateTables.semanticMemoryJdbcTable,
+        profileJdbcTable = stateTables.profileJdbcTable,
+        ingestionConsentJdbcTable = stateTables.ingestionConsentJdbcTable,
+        ingestionSourceStateJdbcTable = stateTables.ingestionSourceStateJdbcTable,
+        sessionHistoryJdbcTable = stateTables.sessionHistoryJdbcTable,
+        learningReviewJdbcTable = stateTables.learningReviewJdbcTable,
+        learningReviewDecisionJdbcTable = stateTables.learningReviewDecisionJdbcTable,
+        curatedMemoryJdbcTable = learningTables.curatedMemoryJdbcTable,
+        proceduralSkillJdbcTable = learningTables.proceduralSkillJdbcTable,
+        routingTelemetryJdbcTable = learningTables.routingTelemetryJdbcTable,
+        scheduledJobJdbcTable = learningTables.scheduledJobJdbcTable,
+        scheduledJobExecutionJdbcTable = learningTables.scheduledJobExecutionJdbcTable,
+        learningProposalSignalJdbcTable = learningTables.learningProposalSignalJdbcTable,
+    )
+}
+
+private data class StateAndMemoryTableNames(
+    val jdbcTable: String,
+    val checkpointJdbcTable: String,
+    val stateEventJdbcTable: String,
+    val episodicMemoryJdbcTable: String,
+    val semanticMemoryJdbcTable: String,
+    val profileJdbcTable: String,
+    val ingestionConsentJdbcTable: String,
+    val ingestionSourceStateJdbcTable: String,
+    val sessionHistoryJdbcTable: String,
+    val learningReviewJdbcTable: String,
+    val learningReviewDecisionJdbcTable: String,
+)
+
+private data class LearningTableNames(
+    val curatedMemoryJdbcTable: String,
+    val proceduralSkillJdbcTable: String,
+    val routingTelemetryJdbcTable: String,
+    val scheduledJobJdbcTable: String,
+    val scheduledJobExecutionJdbcTable: String,
+    val learningProposalSignalJdbcTable: String,
+)
+
+private fun resolveStateAndMemoryTableNames(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): StateAndMemoryTableNames =
+    StateAndMemoryTableNames(
         jdbcTable =
             resolvePersistencePathSetting("BERTBOT_STATE_JDBC_TABLE", environment, dotEnvValues, DEFAULT_STATE_JDBC_TABLE),
         checkpointJdbcTable =
@@ -516,6 +690,85 @@ private fun resolvePersistenceTableNames(
             ),
     )
 
+private fun resolveLearningTableNames(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): LearningTableNames =
+    LearningTableNames(
+        curatedMemoryJdbcTable = resolveCuratedMemoryJdbcTable(environment, dotEnvValues),
+        proceduralSkillJdbcTable = resolveProceduralSkillJdbcTable(environment, dotEnvValues),
+        routingTelemetryJdbcTable = resolveRoutingTelemetryJdbcTable(environment, dotEnvValues),
+        scheduledJobJdbcTable = resolveScheduledJobJdbcTable(environment, dotEnvValues),
+        scheduledJobExecutionJdbcTable = resolveScheduledJobExecutionJdbcTable(environment, dotEnvValues),
+        learningProposalSignalJdbcTable = resolveLearningProposalSignalJdbcTable(environment, dotEnvValues),
+    )
+
+private fun resolveCuratedMemoryJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_CURATED_MEMORY_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_CURATED_MEMORY_JDBC_TABLE,
+    )
+
+private fun resolveProceduralSkillJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_PROCEDURAL_SKILL_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_PROCEDURAL_SKILL_JDBC_TABLE,
+    )
+
+private fun resolveRoutingTelemetryJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_ROUTING_TELEMETRY_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_ROUTING_TELEMETRY_JDBC_TABLE,
+    )
+
+private fun resolveScheduledJobJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_SCHEDULED_JOB_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_SCHEDULED_JOB_JDBC_TABLE,
+    )
+
+private fun resolveScheduledJobExecutionJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE,
+    )
+
+private fun resolveLearningProposalSignalJdbcTable(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): String =
+    resolvePersistencePathSetting(
+        "BERTBOT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE",
+        environment,
+        dotEnvValues,
+        DEFAULT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE,
+    )
+
 private data class PersistenceTableNames(
     val jdbcTable: String,
     val checkpointJdbcTable: String,
@@ -528,6 +781,12 @@ private data class PersistenceTableNames(
     val sessionHistoryJdbcTable: String,
     val learningReviewJdbcTable: String,
     val learningReviewDecisionJdbcTable: String,
+    val curatedMemoryJdbcTable: String,
+    val proceduralSkillJdbcTable: String,
+    val routingTelemetryJdbcTable: String,
+    val scheduledJobJdbcTable: String,
+    val scheduledJobExecutionJdbcTable: String,
+    val learningProposalSignalJdbcTable: String,
 )
 
 private fun resolvePersistencePathSetting(
@@ -871,6 +1130,142 @@ internal fun resolveLearningReviewRuntimeConfiguration(
         enabled = enabled,
         memoryWriteApprovalRequired = memoryWriteApprovalRequired,
         skillWriteApprovalRequired = skillWriteApprovalRequired,
+    )
+}
+
+internal fun resolveCuratedMemoryRuntimeConfiguration(): CuratedMemoryRuntimeConfiguration =
+    resolveCuratedMemoryRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveCuratedMemoryRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): CuratedMemoryRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_CURATED_MEMORY_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_CURATED_MEMORY_ENABLED)
+    val maxEntriesPerScope =
+        resolveRuntimeSetting("BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 10_000)
+            ?: DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE
+
+    return CuratedMemoryRuntimeConfiguration(
+        enabled = enabled,
+        maxEntriesPerScope = maxEntriesPerScope,
+    )
+}
+
+internal fun resolveRoutingHintsRuntimeConfiguration(): RoutingHintsRuntimeConfiguration =
+    resolveRoutingHintsRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveScheduledJobsRuntimeConfiguration(): ScheduledJobsRuntimeConfiguration =
+    resolveScheduledJobsRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveScheduledJobsRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): ScheduledJobsRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_SCHEDULED_JOBS_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_SCHEDULED_JOBS_ENABLED)
+    val pollIntervalSeconds =
+        resolveRuntimeSetting("BERTBOT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceIn(10, 86_400)
+            ?: DEFAULT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS
+    val initialDelaySeconds =
+        resolveRuntimeSetting("BERTBOT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceIn(0, 86_400)
+            ?: DEFAULT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS
+
+    return ScheduledJobsRuntimeConfiguration(
+        enabled = enabled,
+        pollIntervalSeconds = pollIntervalSeconds,
+        initialDelaySeconds = initialDelaySeconds,
+    )
+}
+
+internal fun resolveLearningProposalRuntimeConfiguration(): LearningProposalRuntimeConfiguration =
+    resolveLearningProposalRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveLearningProposalRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): LearningProposalRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_LEARNING_PROPOSAL_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_LEARNING_PROPOSAL_ENABLED)
+    val pollIntervalSeconds =
+        resolveRuntimeSetting("BERTBOT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceIn(30, 86_400)
+            ?: DEFAULT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS
+    val initialDelaySeconds =
+        resolveRuntimeSetting("BERTBOT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceIn(0, 86_400)
+            ?: DEFAULT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS
+    val maxBatchSize =
+        resolveRuntimeSetting("BERTBOT_LEARNING_PROPOSAL_MAX_BATCH_SIZE", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 100)
+            ?: DEFAULT_LEARNING_PROPOSAL_MAX_BATCH_SIZE
+    val cooldownMinutes =
+        resolveRuntimeSetting("BERTBOT_LEARNING_PROPOSAL_COOLDOWN_MINUTES", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceIn(1, 60L * 24L * 30L)
+            ?: DEFAULT_LEARNING_PROPOSAL_COOLDOWN_MINUTES
+
+    return LearningProposalRuntimeConfiguration(
+        enabled = enabled,
+        pollIntervalSeconds = pollIntervalSeconds,
+        initialDelaySeconds = initialDelaySeconds,
+        maxBatchSize = maxBatchSize,
+        cooldownMinutes = cooldownMinutes,
+    )
+}
+
+internal fun resolveRoutingHintsRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): RoutingHintsRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_ROUTING_HINTS_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_ROUTING_HINTS_ENABLED)
+    val minSamplesPerRoute =
+        resolveRuntimeSetting("BERTBOT_ROUTING_HINTS_MIN_SAMPLES", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 10_000)
+            ?: DEFAULT_ROUTING_HINTS_MIN_SAMPLES
+    val maxInfluence =
+        resolveRuntimeSetting("BERTBOT_ROUTING_HINTS_MAX_INFLUENCE", environment, dotEnvValues)
+            ?.toDoubleOrNull()
+            ?.coerceIn(0.0, 1.0)
+            ?: DEFAULT_ROUTING_HINTS_MAX_INFLUENCE
+    val recencyHalfLifeHours =
+        resolveRuntimeSetting("BERTBOT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 24 * 365)
+            ?: DEFAULT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS
+
+    return RoutingHintsRuntimeConfiguration(
+        enabled = enabled,
+        minSamplesPerRoute = minSamplesPerRoute,
+        maxInfluence = maxInfluence,
+        recencyHalfLifeHours = recencyHalfLifeHours,
     )
 }
 

@@ -53,3 +53,44 @@ These remain intentionally deferred to keep this refactor behavior-preserving.
 - Full gate: `./gradlew.bat --no-daemon check` (pass).
 - Targeted persistence and follow-up tests were executed during this refactor sequence.
 - Docs and workflows were updated to match implemented runtime behavior.
+
+## #117 Audit Addendum (Learning Parity Completion)
+
+### High-Severity Findings
+
+1. Missing first-class scheduler subsystem with durable execution history.
+	- Resolved by adding scoped file/JDBC scheduled job + execution stores and scheduler control plane.
+	- Evidence: `src/main/kotlin/com/personalagent/bertbot/app/ScheduledJobs.kt`, `src/main/kotlin/com/personalagent/bertbot/app/ScheduledJobToolRouter.kt`, `src/test/kotlin/com/personalagent/bertbot/app/ScheduledJobsTest.kt`.
+
+2. Missing background learning-review proposal generation path.
+	- Resolved by adding bounded, cooldown-protected proposal loop plus scope-isolated signal persistence.
+	- Evidence: `src/main/kotlin/com/personalagent/bertbot/app/LearningProposalLoop.kt`, `src/test/kotlin/com/personalagent/bertbot/app/LearningProposalLoopTest.kt`.
+
+3. Missing outcome-aware routing hint persistence and bounded influence logic.
+	- Resolved by telemetry store + hint computation and delegation trace explainability integration.
+	- Evidence: `src/main/kotlin/com/personalagent/bertbot/app/RoutingTelemetryStore.kt`, `src/main/kotlin/com/personalagent/bertbot/graph/nodes/DelegationNode.kt`, `src/test/kotlin/com/personalagent/bertbot/app/RoutingTelemetryStoreTest.kt`.
+
+### Medium-Severity Findings
+
+1. Config/documentation drift for new parity runtime surfaces.
+	- Resolved by adding new configuration keys and MCP tool surface documentation.
+	- Evidence: `docs/configuration.md`, `docs/run-modes.md`, `docs/learning-parity-status.md`.
+
+2. Status/tool-surface visibility gaps for new optional routers.
+	- Resolved by wiring scheduled jobs into MCP constants, startup tool lists, status provider, and dispatcher capability registry.
+	- Evidence: `src/main/kotlin/com/personalagent/bertbot/app/McpConstants.kt`, `src/main/kotlin/com/personalagent/bertbot/app/McpStatusProviderFactory.kt`, `src/main/kotlin/com/personalagent/bertbot/app/McpServerMain.kt`, `src/main/kotlin/com/personalagent/bertbot/app/McpServerBootstrap.kt`.
+
+### Residual Risks
+
+1. Scheduler currently uses fixed-second cadence instead of cron expressions to keep compatibility risk low.
+2. Background proposal loop starts with conservative heuristic keys and should be expanded incrementally with production feedback.
+3. Multi-scope scheduler polling currently discovers default/global scope first; broader scope discovery can be added when tenant topology requirements are finalized.
+
+### Final Verification Evidence
+
+- Full gate pass: `./gradlew --no-daemon check`.
+- New/updated tests include:
+  - `RoutingTelemetryStoreTest`
+  - `ScheduledJobsTest`
+  - `LearningProposalLoopTest`
+  - runtime/config/status fixture updates (`AiRuntimeConfigurationTest`, `McpStatusProviderFactoryTest`).
