@@ -5,6 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+private const val LEGACY_JDBC_SCOPE_LIMIT = 255
+
 class JdbcUserProfileStoreTest {
     @Test
     fun `jdbc user profile store persists conservative profile fields`() {
@@ -42,6 +44,29 @@ class JdbcUserProfileStoreTest {
 
         assertEquals("Scope A", fromA)
         assertEquals("Scope B", fromB)
+    }
+
+    @Test
+    fun `jdbc user profile store reads legacy truncated scope rows`() {
+        val jdbcUrl = h2JdbcUrl("profile_scope_legacy")
+        val tableName = "bertbot_profile_scope_legacy_snapshot"
+        val store = UserProfileStore(JdbcUserProfileStore(jdbcUrl = jdbcUrl, tableName = tableName))
+
+        val longScope = "scope-" + "u".repeat(300)
+        val legacyScope = longScope.take(LEGACY_JDBC_SCOPE_LIMIT)
+        val payload = "{\"displayName\":\"Legacy Scoped Profile\"}"
+
+        java.sql.DriverManager.getConnection(jdbcUrl).use { connection ->
+            val sql = "INSERT INTO $tableName (scope_key, payload) VALUES (?, ?)"
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, legacyScope)
+                statement.setString(2, payload)
+                statement.executeUpdate()
+            }
+        }
+
+        val profile = store.withScope(longScope) { store.current() }
+        assertEquals("Legacy Scoped Profile", profile.displayName)
     }
 
     @Test

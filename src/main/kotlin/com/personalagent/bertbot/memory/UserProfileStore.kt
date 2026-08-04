@@ -61,7 +61,8 @@ private class FileUserProfileStore(
 ) : UserProfilePersistence {
     private val lock = Any()
     private var cached: UserProfile = UserProfile()
-    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private val currentScope = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
+    private val legacyScopeAlias = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
     private var loadedScopeKey: String? = null
 
     init {
@@ -72,13 +73,19 @@ private class FileUserProfileStore(
         synchronized(lock) {
             loadedScopeKey = currentScope.get()
             val file = scopedStorageFile()
+            val legacyFile = legacyScopedStorageFile()
+            val existingFile = if (file.exists()) file else legacyFile
 
-            if (!file.exists()) {
+            if (!existingFile.exists()) {
                 cached = UserProfile()
                 return cached
             }
 
-            val content = file.readText().trim()
+            if (existingFile == legacyFile && legacyFile != file) {
+                println("Warning: user profile store loaded legacy scoped file '${legacyFile.path}' because normalized scoped file '${file.path}' was not found.")
+            }
+
+            val content = existingFile.readText().trim()
             if (content.isBlank()) {
                 cached = UserProfile()
                 return cached
@@ -88,7 +95,7 @@ private class FileUserProfileStore(
                 cached = gson.fromJson(content, UserProfile::class.java) ?: UserProfile()
                 cached
             } catch (_: JsonSyntaxException) {
-                preserveUnreadableStorageFile(file)
+                preserveUnreadableStorageFile(existingFile)
                 cached = UserProfile()
                 cached
             }
@@ -106,11 +113,14 @@ private class FileUserProfileStore(
         action: () -> T,
     ): T {
         val previous = currentScope.get()
-        currentScope.set(normalizeScope(scopeKey))
+        val previousLegacyAlias = legacyScopeAlias.get()
+        currentScope.set(PersistenceScopeKey.normalizeForFile(scopeKey))
+        legacyScopeAlias.set(PersistenceScopeKey.legacyFileAlias(scopeKey))
         return try {
             action()
         } finally {
             currentScope.set(previous)
+            legacyScopeAlias.set(previousLegacyAlias)
         }
     }
 
@@ -245,7 +255,7 @@ private class FileUserProfileStore(
 
     private fun scopedStorageFile(): File {
         val scope = currentScope.get()
-        if (scope == DEFAULT_SCOPE_KEY) {
+        if (scope == PersistenceScopeKey.defaultScopeKey()) {
             return storageFile
         }
         val parent = storageFile.parentFile ?: File(".")
@@ -254,12 +264,18 @@ private class FileUserProfileStore(
         return File(parent, "$stem-$scope.$ext")
     }
 
-    private companion object {
-        private const val DEFAULT_SCOPE_KEY = "global"
-
-        private fun normalizeScope(scopeKey: String): String =
-            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
+    private fun legacyScopedStorageFile(): File {
+        val scope = legacyScopeAlias.get()
+        if (scope == PersistenceScopeKey.defaultScopeKey()) {
+            return storageFile
+        }
+        val parent = storageFile.parentFile ?: File(".")
+        val stem = storageFile.nameWithoutExtension
+        val ext = storageFile.extension.takeIf { it.isNotBlank() } ?: "json"
+        return File(parent, "$stem-$scope.$ext")
     }
+
+    private companion object
 }
 
 internal fun normalizeDisplayName(raw: String): String =

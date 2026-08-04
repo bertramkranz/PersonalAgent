@@ -72,6 +72,14 @@ Every persistence surface (state, checkpoints, episodic memory, semantic memory,
 - `file` — local file-backed JSON storage, suitable for development and single-node deployments.
 - `jdbc` / `postgres` / `postgresql` — relational backend for multi-instance or cloud deployments.
 
+### Scope Key Compatibility
+
+Scoped persistence keys are normalized differently for file and JDBC backends to keep path and column values bounded while preserving compatibility with older data.
+
+- File-backed scope keys use a bounded normalized value for new writes and also read legacy truncated aliases (200-char truncate semantics).
+- JDBC-backed scope keys use a bounded normalized value for new writes and also read legacy truncated aliases (255-char truncate semantics).
+- The same compatibility rule applies across state, episodic memory, semantic memory, and profile persistence stores.
+
 See [configuration.md](configuration.md) for variable names and [deployment.md](deployment.md) for container and Cloud Run wiring.
 
 ## Sub-Agents

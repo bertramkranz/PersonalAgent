@@ -21,7 +21,7 @@ class KoogMemoryJdbcAdaptersTest {
             val memoryRuntime =
                 BertBotRuntimeDependenciesFactory.createMemoryRuntime(
                     config = com.personalagent.bertbot.config.BertBotAgentConfig(),
-                    llmGateway = NoopLlmGateway(),
+                    llmGateway = KoogJdbcTestNoopLlmGateway(),
                     persistenceConfiguration = persistenceConfiguration,
                 )
 
@@ -47,7 +47,7 @@ class KoogMemoryJdbcAdaptersTest {
         }
 }
 
-private class NoopLlmGateway : LlmGateway {
+private class KoogJdbcTestNoopLlmGateway : LlmGateway {
     override fun complete(
         systemPrompt: String,
         userPrompt: String,

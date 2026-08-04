@@ -1,9 +1,9 @@
 package com.personalagent.bertbot.graph.store
 
+import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.runtime.StateEvent
 import com.personalagent.bertbot.graph.runtime.StateEventStore
 import com.personalagent.bertbot.graph.runtime.StateEventType
-import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.sql.Connection
@@ -48,8 +48,12 @@ internal class JdbcStateEventStore(
                     buildList {
                         while (resultSet.next()) {
                             val payload = resultSet.getString("payload") ?: continue
-                            val persisted = codec.decode(payload, JdbcPersistedStateEvent::class.java) ?: continue
-                            add(persisted.toDomain())
+                            try {
+                                val persisted = codec.decode(payload, JdbcPersistedStateEvent::class.java) ?: continue
+                                add(persisted.toDomain())
+                            } catch (_: JsonSyntaxException) {
+                                println("Warning: failed to parse persisted state event row from table '$tableName'.")
+                            }
                         }
                     }
                 }
@@ -114,7 +118,7 @@ private data class JdbcPersistedStateEvent(
             traceId = traceId,
             nodeId = nodeId,
             eventType = eventType,
-            state = state.copyForPersistence(),
+            state = sanitizeStateForPersistence(state),
             metadata = metadata.toMap(),
             createdAtEpochMillis = createdAtEpochMillis,
         )
@@ -127,9 +131,12 @@ private data class JdbcPersistedStateEvent(
                 traceId = event.traceId,
                 nodeId = event.nodeId,
                 eventType = event.eventType,
-                state = event.state.copyForPersistence(),
+                state = sanitizeStateForPersistence(event.state),
                 metadata = event.metadata.toMap(),
                 createdAtEpochMillis = event.createdAtEpochMillis,
             )
     }
 }
+
+private fun sanitizeStateForPersistence(state: com.personalagent.bertbot.graph.model.BertBotState): com.personalagent.bertbot.graph.model.BertBotState =
+    PersistedBertBotStateSnapshot.fromState(state).toState()

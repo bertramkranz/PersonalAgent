@@ -5,6 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+private const val LEGACY_JDBC_SCOPE_LIMIT = 255
+
 class JdbcBertBotMemoryStoreTest {
     @Test
     fun `jdbc memory store persists entries and supports replaceAll`() {
@@ -43,6 +45,30 @@ class JdbcBertBotMemoryStoreTest {
 
         assertEquals("USER: from-a", fromA)
         assertEquals("USER: from-b", fromB)
+    }
+
+    @Test
+    fun `jdbc memory store reads legacy truncated scope rows`() {
+        val jdbcUrl = h2JdbcUrl("memory_legacy_scope")
+        val tableName = "bertbot_memory_scope_legacy"
+        val store = JdbcBertBotMemoryStore(jdbcUrl = jdbcUrl, tableName = tableName)
+
+        val longScope = "scope-" + "x".repeat(300)
+        val legacyScope = longScope.take(LEGACY_JDBC_SCOPE_LIMIT)
+        val payload = "[{\"text\":\"USER: legacy\",\"createdAt\":\"2026-01-01T00:00:00Z\"}]"
+
+        java.sql.DriverManager.getConnection(jdbcUrl).use { connection ->
+            val sql = "INSERT INTO $tableName (scope_key, payload) VALUES (?, ?)"
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, legacyScope)
+                statement.setString(2, payload)
+                statement.executeUpdate()
+            }
+        }
+
+        val entries = store.withScope(longScope) { store.entries() }
+        assertEquals(1, entries.size)
+        assertEquals("USER: legacy", entries.single().text)
     }
 
     private fun h2JdbcUrl(suffix: String): String =

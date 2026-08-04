@@ -186,4 +186,22 @@ class UserProfileStoreTest {
 
         assertEquals(null, store.current().budgetLimitCents)
     }
+
+    @Test
+    fun `profile store reads legacy truncated scoped file for long scope key`() {
+        val baseFile = File.createTempFile("bertbot-profile", ".json")
+        baseFile.delete()
+        baseFile.deleteOnExit()
+
+        val longScope = "scope-" + "z".repeat(320)
+        val legacyScope = longScope.trim().ifBlank { "global" }.take(200)
+        val legacyScopedFile = File(baseFile.parentFile, "${baseFile.nameWithoutExtension}-$legacyScope.${baseFile.extension}")
+        legacyScopedFile.writeText("{\"displayName\":\"Legacy Scoped User\"}")
+        legacyScopedFile.deleteOnExit()
+
+        val store = UserProfileStore(baseFile)
+        val profile = store.withScope(longScope) { store.current() }
+
+        assertEquals("Legacy Scoped User", profile.displayName)
+    }
 }

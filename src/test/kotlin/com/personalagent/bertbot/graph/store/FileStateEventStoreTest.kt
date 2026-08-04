@@ -50,4 +50,14 @@ class FileStateEventStoreTest {
         assertEquals(listOf("first", "second"), scopeA.map { it.state.lastUserMessage })
         assertEquals(listOf("e3"), scopeB.map { it.eventId })
     }
+
+    @Test
+    fun `invalid event payload is treated as empty`() {
+        val file = File.createTempFile("bertbot-events", ".json")
+        file.writeText("{invalid-json")
+        file.deleteOnExit()
+        val store = FileStateEventStore(file)
+
+        assertEquals(emptyList(), store.list("scope-a"))
+    }
 }

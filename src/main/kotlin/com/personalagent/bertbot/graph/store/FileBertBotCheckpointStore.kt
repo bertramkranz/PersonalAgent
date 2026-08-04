@@ -4,7 +4,6 @@ import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
-import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.io.File
@@ -74,6 +73,7 @@ internal class FileBertBotCheckpointStore(
         return try {
             codec.decode(content, PersistedCheckpointEnvelope::class.java)?.checkpoints.orEmpty()
         } catch (_: JsonSyntaxException) {
+            println("Warning: failed to parse checkpoint file '${file.path}'. Returning no checkpoints.")
             emptyList()
         }
     }
@@ -98,7 +98,7 @@ private data class PersistedCheckpoint(
             scopeKey = scopeKey,
             traceId = traceId,
             nodeId = nodeId,
-            state = state.copyForPersistence(),
+            state = sanitizeStateForPersistence(state),
             createdAtEpochMillis = createdAtEpochMillis,
         )
 
@@ -109,11 +109,14 @@ private data class PersistedCheckpoint(
                 scopeKey = checkpoint.scopeKey,
                 traceId = checkpoint.traceId,
                 nodeId = checkpoint.nodeId,
-                state = checkpoint.state.copyForPersistence(),
+                state = sanitizeStateForPersistence(checkpoint.state),
                 createdAtEpochMillis = checkpoint.createdAtEpochMillis,
             )
     }
 }
+
+private fun sanitizeStateForPersistence(state: BertBotState): BertBotState =
+    PersistedBertBotStateSnapshot.fromState(state).toState()
 
 private fun writeTextAtomically(
     target: File,

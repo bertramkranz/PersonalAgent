@@ -4,10 +4,13 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 fun interface ExternalChatAsyncRunner {
     fun submit(task: () -> Unit)
+
+    fun close() = Unit
 }
 
 object DaemonThreadExternalChatAsyncRunner : ExternalChatAsyncRunner {
@@ -20,6 +23,23 @@ object DaemonThreadExternalChatAsyncRunner : ExternalChatAsyncRunner {
         scope.launch {
             task()
         }
+    }
+}
+
+class ManagedExternalChatAsyncRunner : ExternalChatAsyncRunner {
+    private val scope =
+        CoroutineScope(
+            SupervisorJob() + Dispatchers.IO + CoroutineName("bertbot-external-chat-followup-managed"),
+        )
+
+    override fun submit(task: () -> Unit) {
+        scope.launch {
+            task()
+        }
+    }
+
+    override fun close() {
+        scope.cancel()
     }
 }
 

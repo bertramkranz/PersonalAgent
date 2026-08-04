@@ -3,10 +3,10 @@ package com.personalagent.bertbot.graph.store
 import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.memory.PersistenceScopeKey
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.SQLException
 
 class JdbcBertBotStateStore(
@@ -16,8 +16,10 @@ class JdbcBertBotStateStore(
     private val tableName: String = DEFAULT_TABLE_NAME,
     private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) : BertBotStateStore {
+    private val connectionProvider: JdbcConnectionProvider = DriverManagerJdbcConnectionProvider(jdbcUrl, username, password)
     private val lock = Any()
-    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private val currentScope = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
+    private val legacyScopeAlias = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
 
     init {
         require(jdbcUrl.isNotBlank()) { "jdbcUrl must not be blank" }
@@ -30,10 +32,20 @@ class JdbcBertBotStateStore(
     override fun load(): BertBotState =
         synchronized(lock) {
             val scopeKey = currentScope.get()
+            val legacyScopeKey = legacyScopeAlias.get()
             withConnection { connection ->
                 val payload =
                     try {
-                        loadScopedPayload(connection, scopeKey)
+                        val scopedPayload = loadScopedPayload(connection, scopeKey)
+                        if (scopedPayload != null) {
+                            scopedPayload
+                        } else {
+                            val legacyPayload = loadScopedPayload(connection, legacyScopeKey)
+                            if (legacyPayload != null && legacyScopeKey != scopeKey) {
+                                println("Warning: JDBC state store loaded legacy scoped row for scope_key='$legacyScopeKey' because normalized scope_key='$scopeKey' was not found.")
+                            }
+                            legacyPayload
+                        }
                     } catch (_: SQLException) {
                         loadLegacyPayload(connection)
                     }
@@ -88,11 +100,14 @@ class JdbcBertBotStateStore(
         action: () -> T,
     ): T {
         val previous = currentScope.get()
-        currentScope.set(normalizeScope(scopeKey))
+        val previousLegacyAlias = legacyScopeAlias.get()
+        currentScope.set(PersistenceScopeKey.normalizeForJdbc(scopeKey))
+        legacyScopeAlias.set(PersistenceScopeKey.legacyJdbcAlias(scopeKey))
         return try {
             action()
         } finally {
             currentScope.set(previous)
+            legacyScopeAlias.set(previousLegacyAlias)
         }
     }
 
@@ -211,24 +226,15 @@ class JdbcBertBotStateStore(
     }
 
     private fun <T> withConnection(action: (Connection) -> T): T {
-        val connection =
-            if (username != null) {
-                DriverManager.getConnection(jdbcUrl, username, password)
-            } else {
-                DriverManager.getConnection(jdbcUrl)
-            }
+        val connection = connectionProvider.open()
         connection.use { return action(it) }
     }
 
     private companion object {
-        private const val DEFAULT_SCOPE_KEY = "global"
         private const val LEGACY_SNAPSHOT_ID: Int = 1
         private const val DEFAULT_TABLE_NAME: String = "bertbot_state_snapshot"
         private val TABLE_NAME_REGEX = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
         private const val CURRENT_SCHEMA_VERSION: Int = 2
         private const val LEGACY_SCHEMA_VERSION: Int = 1
-
-        private fun normalizeScope(scopeKey: String): String =
-            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(255)
     }
 }

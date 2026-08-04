@@ -85,7 +85,7 @@ class AiRuntimeConfigurationTest {
 
     @Test
     fun `runtime gateway resolution returns selected openai model when available`() {
-        val fallbackGateway = NoOpLlmGateway()
+        val fallbackGateway = TestFallbackLlmGateway()
         val configuration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key")
 
         val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
@@ -98,7 +98,7 @@ class AiRuntimeConfigurationTest {
 
     @Test
     fun `runtime gateway resolution falls back for unsupported provider`() {
-        val fallbackGateway = NoOpLlmGateway()
+        val fallbackGateway = TestFallbackLlmGateway()
         val configuration = AiRuntimeConfiguration(provider = "custom", model = "gpt-4o-mini", apiKey = "test-key")
 
         val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
@@ -636,7 +636,7 @@ class AiRuntimeConfigurationTest {
     }
 }
 
-private class NoOpLlmGateway : LlmGateway {
+private class TestFallbackLlmGateway : LlmGateway {
     override fun complete(
         systemPrompt: String,
         userPrompt: String,

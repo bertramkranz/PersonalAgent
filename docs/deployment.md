@@ -91,7 +91,7 @@ Optional GitHub repository variables:
 - `AI_API_KEY_SECRET_NAME` (default `bertbot-ai-api-key`)
 - `DB_PASSWORD_SECRET_NAME` (default `bertbot-db-password`)
 - `TELEGRAM_SECRET_TOKEN_SECRET_NAME` (default `bertbot-telegram-secret-token`)
-- `TELEGRAM_BOT_TOKEN_SECRET_NAME` is fixed to `bertbot-telegram-bot-token` in the workflow default path.
+- `TELEGRAM_BOT_TOKEN_SECRET_NAME` (default empty; set only when Telegram async follow-up sending is enabled)
 - `SLACK_SIGNING_SECRET_NAME` (default empty; set only when Slack integration is enabled)
 - `WHATSAPP_APP_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
@@ -101,6 +101,8 @@ Optional GitHub repository variables:
 - `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME` (default empty, recommended single-secret bootstrap for Cloud Run)
 - `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
 - `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME` (default empty, must be paired with token secret)
+
+For optional secret-name variables, use an empty value (or `disabled`) to skip injecting that secret in the deploy workflow.
 
 The workflow fails fast if an optional secret variable points to a missing secret, or if `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` points to a missing service account.
 
@@ -134,6 +136,8 @@ for secret in bertbot-ai-api-key bertbot-db-password bertbot-telegram-secret-tok
     --role="roles/secretmanager.secretAccessor"
 done
 ```
+
+If Telegram async follow-up sending is enabled, grant the same accessor role on the Telegram bot-token secret as well.
 
 Set the GitHub repository variable used by the deploy workflow:
 
@@ -184,9 +188,25 @@ If you have an OAuth credential bootstrap JSON file from the workspace extension
 - Manual script: pass `-GoogleWorkspaceTokenB64Secret` and `-GoogleWorkspaceMasterKeyB64Secret` to [../scripts/deploy-cloud-run.ps1](../scripts/deploy-cloud-run.ps1) or [../scripts/bootstrap-cloud-run.ps1](../scripts/bootstrap-cloud-run.ps1).
 - GitHub Actions: set either `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME`, or both `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` and `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME`.
 
+For optional secret-name parameters in PowerShell deploy scripts, pass an empty value or `disabled` to skip that secret mapping.
+
 At container startup, [../docker/entrypoint.sh](../docker/entrypoint.sh) decodes these secrets to the expected workspace extension file paths and forces file-based token storage for headless operation.
 
 The deployer identity (configured in `GCP_DEPLOYER_SERVICE_ACCOUNT`) needs IAM permissions for Artifact Registry push, Cloud Run deploy/update, and service usage needed by the deployment command. The Cloud Run runtime service account needs Secret Manager accessor and Cloud SQL client permissions for runtime access.
+
+### Persistence Migration Warning Checks
+
+After deploys or persistence migrations, verify whether runtime is still reading legacy scoped aliases by filtering Cloud Run logs:
+
+```bash
+gcloud logging read \
+  "resource.type=cloud_run_revision AND resource.labels.service_name=YOUR_SERVICE_NAME AND textPayload:('loaded legacy scoped file' OR 'loaded legacy scoped row')" \
+  --project=YOUR_PROJECT_ID \
+  --limit=50 \
+  --format='value(timestamp,textPayload)'
+```
+
+If warnings continue after migration windows, inspect scoped persistence data to identify stale legacy-key rows or files that were not rewritten under normalized scope keys.
 
 ### Cloud SQL Setup
 

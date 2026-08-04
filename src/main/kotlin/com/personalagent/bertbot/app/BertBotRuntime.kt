@@ -28,6 +28,7 @@ import com.personalagent.bertbot.ingestion.NormalizedIngestionMessage
 import com.personalagent.bertbot.ingestion.connectors.BertBotExternalConnectors
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatFollowupSender
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatPayloadDispatcher
+import com.personalagent.bertbot.ingestion.connectors.ManagedExternalChatAsyncRunner
 import com.personalagent.bertbot.ingestion.connectors.NoopExternalChatFollowupSender
 import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
@@ -59,6 +60,7 @@ internal class BertBotRuntime(
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
     private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
+    private var externalChatAsyncRunner: ManagedExternalChatAsyncRunner? = null
     private val externalChatHandler =
         BertBotExternalChatHandler(
             controlPlane = ingestionRuntime?.controlPlane,
@@ -267,6 +269,7 @@ internal class BertBotRuntime(
                     discord = connectorRuntime.discord,
                 ),
             followupSender = followupSender,
+            asyncRunner = ensureExternalChatAsyncRunner(),
         )
 
     override fun close() {
@@ -274,7 +277,18 @@ internal class BertBotRuntime(
         ingestionRuntime?.scheduler?.close()
         researchRuntime?.scheduler?.close()
         researchRuntime?.service?.close()
+        externalChatAsyncRunner?.close()
         telemetry.close()
+    }
+
+    private fun ensureExternalChatAsyncRunner(): ManagedExternalChatAsyncRunner {
+        val existing = externalChatAsyncRunner
+        if (existing != null) {
+            return existing
+        }
+        return ManagedExternalChatAsyncRunner().also { runner ->
+            externalChatAsyncRunner = runner
+        }
     }
 
     private fun <T> withPersistenceScope(

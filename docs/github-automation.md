@@ -7,6 +7,7 @@ This repository includes GitHub workflow automation for merge guardrails, secret
 - `.github/workflows/bootstrap-repo-guardrails.yml`: reapplies branch-protection required checks and review policy for `main`.
 - `.github/workflows/dod-enforcement.yml`: enforces Definition-of-Done style CI policy checks on pushes and pull requests, including path-coupled test expectations.
 - `.github/workflows/autofix-on-push.yml`: applies safe formatting auto-fixes (`ktlintFormat`) on non-main branch pushes and commits them back automatically.
+- `.github/workflows/enforce-pinned-actions.yml`: enforces immutable SHA-pinned GitHub Action references in workflow files.
 - `.github/workflows/merge-generated-prs-on-green.yml`: approves and enables GitHub native auto-merge for eligible pull requests when required checks pass.
 - `.github/workflows/deploy-cloud-run-main.yml`: builds and deploys the webhook service to Cloud Run after CI succeeds on `main` (also supports manual dispatch).
 - `.github/workflows/auto-version-tag.yml`: increments semantic patch tags on `main` and pushes the next `v*` tag.
@@ -108,7 +109,7 @@ Using GitHub CLI:
 gh workflow run bootstrap-repo-guardrails.yml --repo bertramkranz/PersonalAgent --field branch=main
 ```
 
-Then verify branch protection required contexts include `dod-enforcement`:
+Then verify branch protection required contexts include `dod-enforcement`, `lint-workflows`, and `enforce-pinned-actions`:
 
 ```bash
 gh api repos/bertramkranz/PersonalAgent/branches/main/protection

@@ -51,6 +51,22 @@ Core tools include:
 - `polymarket_clob_query`
 - `polymarket_data_query`
 
+Ingestion tools (enabled when ingestion control is configured):
+
+- `ingestion_set_approval`
+- `ingestion_list_approved_sources`
+- `ingestion_ingest_manual`
+- `ingestion_chat_manual`
+
+Checkpoint and rollback tools:
+
+- `checkpoint_list`
+- `checkpoint_latest`
+- `checkpoint_get`
+- `checkpoint_rollback`
+- `checkpoint_rollback_latest`
+- `checkpoint_policy`
+
 `workspace_list_dir`, `workspace_read_file`, and `workspace_search` now accept an optional `root` argument. Supported roots are `workspace` (default), `state`, and `logs`.
 
 Example MCP calls:
@@ -130,6 +146,23 @@ BertBot emits structured tracing for graph execution and delegation lifecycles.
 - A Mermaid interaction view is written to `state/bertbot-interactions.mmd` by default.
 
 Use these artifacts to inspect node transitions, delegation, and runtime flow after a request completes.
+
+### Persistence Migration Warnings
+
+When scoped persistence loads legacy truncated aliases instead of normalized scoped keys, runtime emits warning lines to process logs. These warnings help detect partial migrations where old scoped records still exist.
+
+Look for messages containing:
+
+- `loaded legacy scoped file`
+- `loaded legacy scoped row`
+
+Local check (PowerShell):
+
+```powershell
+Select-String -Path logs\bertbot-trace.jsonl, logs\*.log -Pattern "loaded legacy scoped" -ErrorAction SilentlyContinue
+```
+
+If you are running directly with Gradle and not writing a log file, inspect terminal output for the same warning text.
 
 ## Store Backend And Mode Flags
 

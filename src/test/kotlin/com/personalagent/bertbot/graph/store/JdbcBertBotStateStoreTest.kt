@@ -7,6 +7,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+private const val LEGACY_JDBC_SCOPE_LIMIT = 255
+
 class JdbcBertBotStateStoreTest {
     @Test
     fun `jdbc store persists and reloads schema versioned snapshot`() {
@@ -62,6 +64,47 @@ class JdbcBertBotStateStoreTest {
 
         assertEquals("from-a", loadedA.lastUserMessage)
         assertEquals("from-b", loadedB.lastUserMessage)
+    }
+
+    @Test
+    fun `jdbc store reads legacy long scope alias row`() {
+        val jdbcUrl = h2JdbcUrl()
+        val store = JdbcBertBotStateStore(jdbcUrl = jdbcUrl)
+        val longScope = "scope-" + "j".repeat(320)
+        val legacyScope = longScope.trim().ifBlank { "global" }.take(255)
+
+        DriverManager.getConnection(jdbcUrl).use { connection ->
+            connection.prepareStatement("INSERT INTO bertbot_state_snapshot (scope_key, payload) VALUES (?, ?)").use { insert ->
+                insert.setString(1, legacyScope)
+                insert.setString(2, "{\"lastUserMessage\":\"legacy-jdbc-scope\"}")
+                insert.executeUpdate()
+            }
+        }
+
+        val loaded = store.withScope(longScope) { store.load() }
+        assertEquals("legacy-jdbc-scope", loaded.lastUserMessage)
+    }
+
+    @Test
+    fun `jdbc store reads legacy truncated scope rows`() {
+        val jdbcUrl = h2JdbcUrl()
+        val store = JdbcBertBotStateStore(jdbcUrl = jdbcUrl)
+
+        val longScope = "scope-" + "y".repeat(300)
+        val legacyScope = longScope.take(LEGACY_JDBC_SCOPE_LIMIT)
+        val payload = "{\"schemaVersion\":2,\"lastUserMessage\":\"legacy scoped\",\"pendingTasks\":[] }"
+
+        DriverManager.getConnection(jdbcUrl).use { connection ->
+            val sql = "INSERT INTO bertbot_state_snapshot (scope_key, payload) VALUES (?, ?)"
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, legacyScope)
+                statement.setString(2, payload)
+                statement.executeUpdate()
+            }
+        }
+
+        val loaded = store.withScope(longScope) { store.load() }
+        assertEquals("legacy scoped", loaded.lastUserMessage)
     }
 
     private fun writePayload(

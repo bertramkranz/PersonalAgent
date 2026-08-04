@@ -1,8 +1,8 @@
 package com.personalagent.bertbot.graph.store
 
+import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpoint
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
-import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.sql.Connection
@@ -94,8 +94,13 @@ internal class JdbcBertBotCheckpointStore(
 
     private fun decodeCheckpoint(payload: String?): BertBotCheckpoint? {
         if (payload.isNullOrBlank()) return null
-        val persisted = codec.decode(payload, JdbcPersistedCheckpoint::class.java) ?: return null
-        return persisted.toDomain()
+        return try {
+            val persisted = codec.decode(payload, JdbcPersistedCheckpoint::class.java) ?: return null
+            persisted.toDomain()
+        } catch (_: JsonSyntaxException) {
+            println("Warning: failed to parse persisted checkpoint row from table '$tableName'.")
+            null
+        }
     }
 
     private fun initializeSchema() {
@@ -183,7 +188,7 @@ private data class JdbcPersistedCheckpoint(
             scopeKey = scopeKey,
             traceId = traceId,
             nodeId = nodeId,
-            state = state.copyForPersistence(),
+            state = sanitizeStateForPersistence(state),
             createdAtEpochMillis = createdAtEpochMillis,
         )
 
@@ -194,8 +199,11 @@ private data class JdbcPersistedCheckpoint(
                 scopeKey = checkpoint.scopeKey,
                 traceId = checkpoint.traceId,
                 nodeId = checkpoint.nodeId,
-                state = checkpoint.state.copyForPersistence(),
+                state = sanitizeStateForPersistence(checkpoint.state),
                 createdAtEpochMillis = checkpoint.createdAtEpochMillis,
             )
     }
 }
+
+private fun sanitizeStateForPersistence(state: com.personalagent.bertbot.graph.model.BertBotState): com.personalagent.bertbot.graph.model.BertBotState =
+    PersistedBertBotStateSnapshot.fromState(state).toState()
