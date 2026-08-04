@@ -22,10 +22,15 @@ This split keeps graph contracts separate from runtime wiring and keeps persiste
 At a high level, BertBot:
 
 1. Captures an inbound message.
-2. Plans work and priorities.
-3. Selects a sub-agent when delegation is appropriate.
-4. Executes the delegated or direct workflow.
-5. Persists the latest execution snapshot and supporting artifacts.
+2. Builds an investigation plan when research signals are present.
+3. Plans work and priorities.
+4. Validates evidence from user input, memory, profile context, and plan context.
+5. Runs a safety gate that can require explicit user approval for high-risk operations.
+6. Selects an execution model using deterministic complexity and cost routing.
+7. Selects a sub-agent when delegation is appropriate.
+8. Executes the delegated or direct workflow.
+9. Detects incidents and applies bounded recovery strategies.
+10. Persists the latest execution snapshot and supporting artifacts.
 
 That design makes the path through the system easy to inspect in traces and interaction diagrams.
 

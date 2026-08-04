@@ -18,6 +18,8 @@
 %% 2026-08-03: Env variable consolidation: toBooleanEnv extracted to BertBotEnvironmentSettings as a shared internal function; resolveWorkspaceRoot now honours .env fallback; BERTBOT_SLACK_ENABLED and BERTBOT_WHATSAPP_ENABLED default to false to match .env.example.
 %% 2026-08-04: Runtime now uses a single CapabilityRegistry + UnifiedToolBus pipeline; execution profiles can scope tool visibility/execution by selected sub-agent.
 %% 2026-08-04: Shopping router is now service-backed through PersonalShopperService and seeded AmazonStoreProvider catalog data rather than placeholder-only responses.
+%% 2026-08-04: Phase 1 graph stages now include ResearchPlannerNode, EvidenceJudgeNode, and SafetyGuardianNode before delegation/execution.
+%% 2026-08-04: Phase 2/3 graph stages now include ModelRouterNode, IncidentDetectorNode, and IncidentCommanderNode.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -44,9 +46,15 @@ flowchart TD
     subgraph GraphExecution
         Runner[BertBotGraphRunner]
         Capture[Capture Node]
+        ResearchPlanner[Research Planner Node]
         Planner[Planner Node]
+        EvidenceJudge[Evidence Judge Node]
+        SafetyGuardian[Safety Guardian Node]
+        ModelRouter[Model Router Node]
         Delegate[Delegation Node]
         Execute[Executor Node]
+        IncidentDetector[Incident Detector Node]
+        IncidentCommander[Incident Commander Node]
         State[(State Snapshot)]
         StateFile[(state/bertbot-state.json)]
         JdbcState[(JDBC State Store)]
@@ -192,7 +200,15 @@ flowchart TD
 
     RuntimeCore --> Runner
     GraphFactory --> Runner
-    Runner --> Capture --> Planner --> Delegate --> Execute
+    Runner --> Capture --> ResearchPlanner --> Planner
+    Planner -->|pending tasks| EvidenceJudge --> SafetyGuardian
+    Planner -->|no tasks| Execute
+    SafetyGuardian -->|approval required| Execute
+    SafetyGuardian -->|safe to continue| ModelRouter
+    ModelRouter -->|delegate path| Delegate --> Execute
+    ModelRouter -->|direct execute path| Execute
+    Execute --> IncidentDetector
+    IncidentDetector -->|incident detected| IncidentCommander
     Execute --> State
     Runner --> StateFile
     Runner --> JdbcState
