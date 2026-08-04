@@ -2,6 +2,7 @@
 
 package com.personalagent.bertbot.app
 
+import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
@@ -52,6 +53,9 @@ internal class BertBotRuntime(
     private val rollbackService: BertBotRollbackService? = null,
     private val stateEventStore: StateEventStore? = null,
     private val stateReplayService: StateReplayService? = null,
+    private val sessionHistoryStore: SessionHistoryStore? = null,
+    private val learningReviewStore: LearningReviewStore? = null,
+    private val learningReviewConfiguration: LearningReviewRuntimeConfiguration = LearningReviewRuntimeConfiguration(),
     private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
     private val toolCapabilityRegistry: CapabilityRegistry? = null,
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
@@ -140,6 +144,13 @@ internal class BertBotRuntime(
                         }
                     }
                 val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
+                sessionHistoryStore?.append(
+                    buildSessionHistoryEntry(
+                        role = SessionHistoryRole.USER,
+                        text = userMessage,
+                        traceId = tracingContext.traceId,
+                    ),
+                )
                 val response =
                     generateAssistantResponse(
                         userMessage = userMessage,
@@ -159,18 +170,52 @@ internal class BertBotRuntime(
                     TraceLogger.warn(tracingContext, "diagram-write-failed", "InteractionGraphWriter failed: ${e.message}")
                 }
 
-                memoryRuntime.episodicMemory.append("ASSISTANT: $response")
-                runCatching {
-                    koogMemory.recordTurn(
+                if (!shouldGateMemoryWrites()) {
+                    memoryRuntime.episodicMemory.append("ASSISTANT: $response")
+                } else {
+                    enqueueLearningReviewRequest(
                         scopeKey = persistenceScopeKey,
-                        userMessage = userMessage,
-                        assistantResponse = response,
+                        writeType = LearningReviewWriteType.MEMORY,
+                        payload =
+                            learningReviewJson.toJson(
+                                MemoryWriteApprovalPayload(
+                                    userMessage = userMessage,
+                                    assistantResponse = response,
+                                    traceId = tracingContext.traceId,
+                                ),
+                            ),
                         traceId = tracingContext.traceId,
                     )
                 }
-                memoryRuntime.memoryWorker.scheduleIfNeeded()
-                runCatching {
-                    researchRuntime?.service?.submitEventAsync(reason = "respond_to")
+                sessionHistoryStore?.append(
+                    buildSessionHistoryEntry(
+                        role = SessionHistoryRole.ASSISTANT,
+                        text = response,
+                        traceId = tracingContext.traceId,
+                    ),
+                )
+                if (!shouldGateMemoryWrites()) {
+                    runCatching {
+                        koogMemory.recordTurn(
+                            scopeKey = persistenceScopeKey,
+                            userMessage = userMessage,
+                            assistantResponse = response,
+                            traceId = tracingContext.traceId,
+                        )
+                    }
+                    memoryRuntime.memoryWorker.scheduleIfNeeded()
+                }
+                if (!shouldGateSkillWrites()) {
+                    runCatching {
+                        researchRuntime?.service?.submitEventAsync(reason = "respond_to")
+                    }
+                } else {
+                    enqueueLearningReviewRequest(
+                        scopeKey = persistenceScopeKey,
+                        writeType = LearningReviewWriteType.SKILL,
+                        payload = learningReviewJson.toJson(SkillWriteApprovalPayload(reason = "respond_to")),
+                        traceId = tracingContext.traceId,
+                    )
                 }
                 response
             } catch (e: Throwable) {
@@ -198,6 +243,90 @@ internal class BertBotRuntime(
     fun ingestionControlPlane(): IngestionControlPlane? = ingestionRuntime?.controlPlane
 
     fun researchService(): ContinuousImprovementResearchService? = researchRuntime?.service
+
+    fun listSessionHistory(
+        limit: Int = 200,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): List<SessionHistoryEntry> {
+        val store = sessionHistoryStore ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) { store.list(limit) }
+    }
+
+    fun clearSessionHistory(persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY): Boolean {
+        val store = sessionHistoryStore ?: return false
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) {
+            store.clear()
+            true
+        }
+    }
+
+    fun searchSessionHistory(
+        query: String,
+        limit: Int = 50,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): List<SessionHistoryEntry> {
+        val store = sessionHistoryStore ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) {
+            store.search(query = query, limit = limit)
+        }
+    }
+
+    fun listPendingLearningReviewRequests(
+        limit: Int = 200,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): List<LearningReviewRequest> {
+        val store = learningReviewStore ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) {
+            store
+                .list(status = LearningReviewStatus.PENDING, limit = limit)
+                .sortedByDescending { it.lastApplyFailedAt ?: "" }
+        }
+    }
+
+    fun approveLearningReviewRequest(
+        requestId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+        note: String? = null,
+    ): LearningReviewDecisionResult {
+        val store = learningReviewStore ?: return LearningReviewDecisionResult(message = "Learning review store unavailable.")
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) {
+            val pendingRequest =
+                store
+                    .list(status = LearningReviewStatus.PENDING, limit = 10_000)
+                    .firstOrNull { it.requestId == requestId }
+                    ?: return@withScope LearningReviewDecisionResult(message = "Learning review request not found.")
+            val applyResult = applyLearningReviewRequest(pendingRequest)
+            if (!applyResult.success) {
+                val failureReason = applyResult.message ?: "apply failed"
+                store.recordApplyFailure(requestId = requestId, reason = failureReason)
+                return@withScope LearningReviewDecisionResult(message = failureReason)
+            }
+            val decided = store.decide(requestId = requestId, status = LearningReviewStatus.APPROVED, note = note)
+            LearningReviewDecisionResult(request = decided)
+        }
+    }
+
+    fun rejectLearningReviewRequest(
+        requestId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+        note: String? = null,
+    ): LearningReviewDecisionResult {
+        val store = learningReviewStore ?: return LearningReviewDecisionResult(message = "Learning review store unavailable.")
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return store.withScope(normalizedScopeKey) {
+            val decided = store.decide(requestId = requestId, status = LearningReviewStatus.REJECTED, note = note)
+            if (decided == null) {
+                LearningReviewDecisionResult(message = "Learning review request not found.")
+            } else {
+                LearningReviewDecisionResult(request = decided)
+            }
+        }
+    }
 
     fun rollbackToCheckpoint(
         checkpointId: String,
@@ -299,8 +428,92 @@ internal class BertBotRuntime(
         return stateStore.withScope(normalizedScopeKey) {
             memoryRuntime.episodicMemory.withScope(normalizedScopeKey) {
                 memoryRuntime.semanticMemory.withScope(normalizedScopeKey) {
-                    memoryRuntime.userProfileStore.withScope(normalizedScopeKey, action)
+                    memoryRuntime.userProfileStore.withScope(normalizedScopeKey) {
+                        val runInsideSessionScope: (() -> T) -> T = { innerAction ->
+                            sessionHistoryStore?.withScope(normalizedScopeKey, innerAction) ?: innerAction()
+                        }
+                        val runInsideLearningReviewScope: (() -> T) -> T = { innerAction ->
+                            learningReviewStore?.withScope(normalizedScopeKey, innerAction) ?: innerAction()
+                        }
+                        runInsideSessionScope {
+                            runInsideLearningReviewScope {
+                                action()
+                            }
+                        }
+                    }
                 }
+            }
+        }
+    }
+
+    private fun enqueueLearningReviewRequest(
+        scopeKey: String,
+        writeType: LearningReviewWriteType,
+        payload: String,
+        traceId: String?,
+    ) {
+        val store = learningReviewStore ?: return
+        val normalizedScopeKey = normalizeScopeKey(scopeKey)
+        store.withScope(normalizedScopeKey) {
+            store.enqueue(
+                buildLearningReviewRequest(
+                    scopeKey = normalizedScopeKey,
+                    writeType = writeType,
+                    payload = payload,
+                    traceId = traceId,
+                ),
+            )
+        }
+    }
+
+    private fun applyLearningReviewRequest(request: LearningReviewRequest): LearningReviewApplyResult {
+        when (request.writeType) {
+            LearningReviewWriteType.MEMORY -> {
+                val payload =
+                    runCatching {
+                        learningReviewJson.fromJson(request.payload, MemoryWriteApprovalPayload::class.java)
+                    }.getOrNull()
+                        ?: return LearningReviewApplyResult(
+                            success = false,
+                            message = "memory payload parsing failed",
+                        )
+                memoryRuntime.episodicMemory.append("ASSISTANT: ${payload.assistantResponse}")
+                runCatching {
+                    koogMemory.recordTurn(
+                        scopeKey = request.scopeKey,
+                        userMessage = payload.userMessage,
+                        assistantResponse = payload.assistantResponse,
+                        traceId = payload.traceId ?: request.traceId ?: "learning-review",
+                    )
+                }
+                memoryRuntime.memoryWorker.scheduleIfNeeded()
+                return LearningReviewApplyResult(success = true)
+            }
+            LearningReviewWriteType.SKILL -> {
+                val payload =
+                    runCatching {
+                        learningReviewJson.fromJson(request.payload, SkillWriteApprovalPayload::class.java)
+                    }.getOrNull()
+                        ?: return LearningReviewApplyResult(
+                            success = false,
+                            message = "skill payload parsing failed",
+                        )
+                val service =
+                    researchRuntime?.service
+                        ?: return LearningReviewApplyResult(
+                            success = false,
+                            message = "research service unavailable",
+                        )
+                return runCatching {
+                    service.submitEventAsync(reason = payload.reason)
+                    LearningReviewApplyResult(success = true)
+                }
+                    .getOrElse { error ->
+                        LearningReviewApplyResult(
+                            success = false,
+                            message = "skill apply failed: ${error.message ?: "unknown error"}",
+                        )
+                    }
             }
         }
     }
@@ -395,10 +608,37 @@ internal class BertBotRuntime(
         return registry.execute(name, params, allowedCapabilityIds)?.second ?: "Tool '$name' not found"
     }
 
+    private fun shouldGateMemoryWrites(): Boolean =
+        learningReviewConfiguration.enabled && learningReviewConfiguration.memoryWriteApprovalRequired
+
+    private fun shouldGateSkillWrites(): Boolean =
+        learningReviewConfiguration.enabled && learningReviewConfiguration.skillWriteApprovalRequired
+
     private companion object {
         private const val DEFAULT_PERSISTENCE_SCOPE_KEY = "global"
+        private val learningReviewJson = Gson()
     }
 }
+
+private data class MemoryWriteApprovalPayload(
+    val userMessage: String,
+    val assistantResponse: String,
+    val traceId: String? = null,
+)
+
+private data class SkillWriteApprovalPayload(
+    val reason: String,
+)
+
+internal data class LearningReviewApplyResult(
+    val success: Boolean,
+    val message: String? = null,
+)
+
+internal data class LearningReviewDecisionResult(
+    val request: LearningReviewRequest? = null,
+    val message: String? = null,
+)
 
 internal data class BertBotMemoryRuntime(
     val episodicMemory: EpisodicMemory,
@@ -436,9 +676,21 @@ internal object BertBotRuntimeFactory {
         val normalizedProvider = aiRuntimeConfiguration.provider.lowercase()
 
         val persistenceConfiguration = resolvePersistenceRuntimeConfiguration()
+        val sessionHistoryConfiguration = resolveSessionHistoryRuntimeConfiguration()
+        val learningReviewConfiguration = resolveLearningReviewRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
         val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
         val stateEventStore = BertBotRuntimeDependenciesFactory.createStateEventStore(persistenceConfiguration)
+        val sessionHistoryStore =
+            if (sessionHistoryConfiguration.enabled) {
+                BertBotRuntimeDependenciesFactory.createSessionHistoryStore(
+                    persistenceConfiguration = persistenceConfiguration,
+                    sessionHistoryConfiguration = sessionHistoryConfiguration,
+                )
+            } else {
+                null
+            }
+        val learningReviewStore = BertBotRuntimeDependenciesFactory.createLearningReviewStore(persistenceConfiguration)
         val rollbackService = BertBotRuntimeDependenciesFactory.createRollbackService(stateStore, checkpointStore, stateEventStore)
         val stateReplayService = BertBotRuntimeDependenciesFactory.createStateReplayService(checkpointStore, stateEventStore)
         val graph =
@@ -493,12 +745,27 @@ internal object BertBotRuntimeFactory {
         val macrofactorToolRouter = createMacrofactorToolRouterOrNull(resolveMacrofactorRuntimeConfiguration())
         val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
         val shoppingToolRouter = createShoppingToolRouterOrNull(shoppingRuntimeConfiguration)
+        val sessionHistoryToolRouter =
+            sessionHistoryStore?.let { store ->
+                SessionHistoryToolRouter(
+                    listEntries = { limit, scopeKey ->
+                        runtimeScopedSessionHistoryList(store, scopeKey, limit)
+                    },
+                    searchEntries = { query, limit, scopeKey ->
+                        runtimeScopedSessionHistorySearch(store, scopeKey, query, limit)
+                    },
+                    clearEntries = { scopeKey ->
+                        runtimeScopedSessionHistoryClear(store, scopeKey)
+                    },
+                )
+            }
         val capabilityRegistry =
             buildCapabilityRegistry(
                 googleWorkspaceRouter = googleWorkspaceRouter,
                 polymarketToolRouter = polymarketToolRouter,
                 macrofactorToolRouter = macrofactorToolRouter,
                 shoppingToolRouter = shoppingToolRouter,
+                sessionHistoryToolRouter = sessionHistoryToolRouter,
             )
         val googleWorkspaceToolDefinitions = googleWorkspaceRouter?.toolDefinitions().orEmpty()
         val toolCallingSkill =
@@ -542,6 +809,9 @@ internal object BertBotRuntimeFactory {
                 rollbackService = rollbackService,
                 stateEventStore = stateEventStore,
                 stateReplayService = stateReplayService,
+                sessionHistoryStore = sessionHistoryStore,
+                learningReviewStore = learningReviewStore,
+                learningReviewConfiguration = learningReviewConfiguration,
                 koogMemory = koogMemory,
                 toolCapabilityRegistry = capabilityRegistry,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,
@@ -676,11 +946,14 @@ internal fun resolveRuntimeGatewayForModel(
     }
 }
 
+@Suppress("LongParameterList", "LongMethod")
 internal fun buildCapabilityRegistry(
     googleWorkspaceRouter: GoogleWorkspaceToolRouter?,
     polymarketToolRouter: PolymarketToolRouter?,
     macrofactorToolRouter: MacrofactorToolRouter? = null,
     shoppingToolRouter: ShoppingToolRouter? = null,
+    sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
+    learningReviewToolRouter: LearningReviewToolRouter? = null,
 ): CapabilityRegistry {
     val capabilities = mutableListOf<CapabilityDefinition>()
 
@@ -743,6 +1016,32 @@ internal fun buildCapabilityRegistry(
             )
     }
 
+    if (sessionHistoryToolRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "session_history",
+                router =
+                    FunctionToolRouter(
+                        id = "session_history",
+                        definitionsProvider = sessionHistoryToolRouter::toolDefinitions,
+                        executor = { toolName, params -> sessionHistoryToolRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
+    if (learningReviewToolRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "learning_review",
+                router =
+                    FunctionToolRouter(
+                        id = "learning_review",
+                        definitionsProvider = learningReviewToolRouter::toolDefinitions,
+                        executor = { toolName, params -> learningReviewToolRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
     return CapabilityRegistry(capabilities)
 }
 
@@ -798,6 +1097,46 @@ internal fun createPolymarketToolRouterOrNull(config: BertBotAgentConfig): Polym
 internal fun createShoppingToolRouterOrNull(configuration: ShoppingRuntimeConfiguration): ShoppingToolRouter? {
     if (!configuration.hasEnabledStore) return null
     return ShoppingToolRouter(configuration)
+}
+
+private fun runtimeScopedSessionHistoryList(
+    store: SessionHistoryStore,
+    scopeKey: String?,
+    limit: Int,
+): List<SessionHistoryEntry> {
+    if (scopeKey.isNullOrBlank()) {
+        return store.list(limit)
+    }
+    val normalizedScopeKey = scopeKey.trim().ifBlank { "global" }.replace("|", "_")
+    return store.withScope(normalizedScopeKey) { store.list(limit) }
+}
+
+private fun runtimeScopedSessionHistorySearch(
+    store: SessionHistoryStore,
+    scopeKey: String?,
+    query: String,
+    limit: Int,
+): List<SessionHistoryEntry> {
+    if (scopeKey.isNullOrBlank()) {
+        return store.search(query, limit)
+    }
+    val normalizedScopeKey = scopeKey.trim().ifBlank { "global" }.replace("|", "_")
+    return store.withScope(normalizedScopeKey) { store.search(query, limit) }
+}
+
+private fun runtimeScopedSessionHistoryClear(
+    store: SessionHistoryStore,
+    scopeKey: String?,
+): Boolean {
+    if (scopeKey.isNullOrBlank()) {
+        store.clear()
+        return true
+    }
+    val normalizedScopeKey = scopeKey.trim().ifBlank { "global" }.replace("|", "_")
+    return store.withScope(normalizedScopeKey) {
+        store.clear()
+        true
+    }
 }
 
 internal fun validateToolBackedSubAgentCoverage(

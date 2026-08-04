@@ -4,6 +4,7 @@ import java.io.File
 import java.time.Instant
 
 internal object McpStatusProviderFactory {
+    @Suppress("LongMethod")
     fun create(input: McpStatusProviderInput): () -> String {
         return {
             val macrofactorStatus =
@@ -17,6 +18,16 @@ internal object McpStatusProviderFactory {
                     ?: emptyList()
             val researchToolNames =
                 input.continuousResearchToolRouter
+                    ?.toolDefinitions()
+                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                    ?: emptyList()
+            val sessionHistoryToolNames =
+                input.sessionHistoryToolRouter
+                    ?.toolDefinitions()
+                    ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
+                    ?: emptyList()
+            val learningReviewToolNames =
+                input.learningReviewToolRouter
                     ?.toolDefinitions()
                     ?.mapNotNull { it.get("name")?.asString?.takeIf { name -> name.isNotBlank() } }
                     ?: emptyList()
@@ -53,6 +64,8 @@ internal object McpStatusProviderFactory {
 
             macrofactorToolNames.forEach { name -> baseTools += name }
             researchToolNames.forEach { name -> baseTools += name }
+            sessionHistoryToolNames.forEach { name -> baseTools += name }
+            learningReviewToolNames.forEach { name -> baseTools += name }
             googleWorkspaceToolNames.forEach { name -> baseTools += name }
 
             """
@@ -65,6 +78,11 @@ internal object McpStatusProviderFactory {
             Runtime error: ${input.startup.errorMessage ?: "none"}
             MacroFactor MCP: $macrofactorStatus
             Google Workspace MCP: $googleWorkspaceStatus
+                        Learning review policy:
+                            enabled=${input.learningReviewConfiguration.enabled}
+                            memoryWriteApprovalRequired=${input.learningReviewConfiguration.memoryWriteApprovalRequired}
+                            skillWriteApprovalRequired=${input.learningReviewConfiguration.skillWriteApprovalRequired}
+                            approvalQueueEnabled=${input.learningReviewToolRouter != null}
                         Checkpoint rollback policy:
                             environment=${input.checkpointRollbackPolicy.environment}
                             protectedEnvironment=${input.checkpointRollbackPolicy.isProtectedEnvironment}
@@ -86,6 +104,9 @@ internal data class McpStatusProviderInput(
     val macrofactorToolRouter: MacrofactorToolRouter?,
     val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter?,
     val continuousResearchToolRouter: ContinuousResearchToolRouter?,
+    val sessionHistoryToolRouter: SessionHistoryToolRouter?,
+    val learningReviewToolRouter: LearningReviewToolRouter?,
+    val learningReviewConfiguration: LearningReviewRuntimeConfiguration,
     val toolNames: McpToolNames,
     val checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration,
 )

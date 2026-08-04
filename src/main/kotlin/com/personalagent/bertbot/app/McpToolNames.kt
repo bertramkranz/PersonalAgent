@@ -22,6 +22,12 @@ internal data class McpToolNames(
     val checkpointRollback: String,
     val checkpointRollbackLatest: String,
     val checkpointPolicy: String,
+    val sessionHistoryList: String,
+    val sessionHistorySearch: String,
+    val sessionHistoryClear: String,
+    val learningReviewListPending: String,
+    val learningReviewApprove: String,
+    val learningReviewReject: String,
 )
 
 internal fun buildInitializeResultPayload(
@@ -52,6 +58,8 @@ internal data class OptionalToolDefinitions(
     val desktopAutomationToolDefinitions: List<JsonObject> = emptyList(),
     val continuousResearchToolDefinitions: List<JsonObject> = emptyList(),
     val shoppingToolDefinitions: List<JsonObject> = emptyList(),
+    val sessionHistoryToolDefinitions: List<JsonObject> = emptyList(),
+    val learningReviewToolDefinitions: List<JsonObject> = emptyList(),
 )
 
 internal fun buildToolsListResultPayload(
@@ -71,6 +79,8 @@ internal fun buildToolsListResultPayload(
     optionalToolDefinitions.desktopAutomationToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.continuousResearchToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.shoppingToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.sessionHistoryToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.learningReviewToolDefinitions.forEach { tool -> tools.add(tool) }
 
     result.add("tools", tools)
     return result
@@ -192,6 +202,30 @@ private fun baseToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
             toolNames.checkpointPolicy,
             "Show active checkpoint rollback policy and environment guardrails.",
         ),
+        buildToolDefinition(
+            toolNames.sessionHistoryList,
+            "List persisted session history turns for a scope.",
+        ) {
+            property("scopeKey", "string", "Optional persistence scope key. Uses current scope when omitted.")
+            property("limit", "number", "Maximum number of turns to return (default 50, max 1000).")
+        },
+        buildToolDefinition(
+            toolNames.sessionHistorySearch,
+            "Search persisted session history turns for a scope.",
+        ) {
+            property("query", "string", "Case-insensitive text query.")
+            property("scopeKey", "string", "Optional persistence scope key. Uses current scope when omitted.")
+            property("limit", "number", "Maximum number of matching turns to return (default 50, max 1000).")
+            required("query")
+        },
+        buildToolDefinition(
+            toolNames.sessionHistoryClear,
+            "Clear persisted session history turns for a scope.",
+        ) {
+            property("scopeKey", "string", "Optional persistence scope key. Uses current scope when omitted.")
+            property("confirm", "boolean", "Must be true to execute clear.")
+            required("confirm")
+        },
     )
 
 private fun ingestionToolDefinitions(toolNames: McpToolNames): List<JsonObject> =

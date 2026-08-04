@@ -10,6 +10,42 @@ import kotlin.test.assertTrue
 
 class AiRuntimeConfigurationTest {
     @Test
+    fun `learning review configuration defaults are applied`() {
+        val configuration =
+            resolveLearningReviewRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_LEARNING_REVIEW_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED, configuration.memoryWriteApprovalRequired)
+        assertEquals(DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED, configuration.skillWriteApprovalRequired)
+    }
+
+    @Test
+    fun `learning review configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveLearningReviewRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_LEARNING_REVIEW_ENABLED" to "true",
+                        "BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED" to "true",
+                        "BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED" to "false",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_LEARNING_REVIEW_ENABLED" to "false",
+                        "BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED" to "false",
+                        "BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED" to "true",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(true, configuration.memoryWriteApprovalRequired)
+        assertEquals(false, configuration.skillWriteApprovalRequired)
+    }
+
+    @Test
     fun `resolve configuration uses explicit environment values before dotenv`() {
         val configuration =
             resolveAiRuntimeConfiguration(

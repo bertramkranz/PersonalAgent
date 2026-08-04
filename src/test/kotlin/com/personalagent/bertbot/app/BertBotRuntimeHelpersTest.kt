@@ -1,5 +1,6 @@
 package com.personalagent.bertbot.app
 
+import com.google.gson.Gson
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphRunner
@@ -241,6 +242,139 @@ class BertBotRuntimeHelpersTest {
         assertTrue(resolution.gateway === fallbackGateway)
         assertEquals("gpt-4o-mini", resolution.effectiveModelId)
         assertEquals("unsupported_provider:custom", resolution.fallbackReason)
+    }
+
+    @Test
+    fun `learning review approval gate blocks memory write side effects`() {
+        val gateway = CountingGateway()
+        val episodicFile = File.createTempFile("bertbot-episodic", ".json")
+        val semanticFile = File.createTempFile("bertbot-semantic", ".json")
+        val profileFile = File.createTempFile("bertbot-profile", ".json")
+        episodicFile.delete()
+        semanticFile.delete()
+        profileFile.delete()
+        episodicFile.deleteOnExit()
+        semanticFile.deleteOnExit()
+        profileFile.deleteOnExit()
+        val episodicMemory = EpisodicMemory(BertBotMemory(episodicFile))
+        val semanticMemory = SemanticMemory(BertBotMemory(semanticFile))
+        val memoryRuntime =
+            BertBotMemoryRuntime(
+                episodicMemory = episodicMemory,
+                memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory),
+                memoryWorker = MemorySummarizationWorker(episodicMemory, semanticMemory, threshold = 10, summarizeCount = 5),
+                userProfileStore = UserProfileStore(profileFile),
+            )
+        val runtime =
+            BertBotRuntime(
+                config = BertBotAgentConfig(),
+                aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+                stateStore = TestNoopStateStore(),
+                graph = BertBotGraphRunner(definition = BertBotGraphDefinition(entryNodeId = "none", nodes = emptyList(), edges = emptyList()), stateStore = TestNoopStateStore()),
+                assistantResponseSkill = createAssistantResponseSkill(gateway),
+                memoryRuntime = memoryRuntime,
+                ingestionRuntime = null,
+                learningReviewConfiguration =
+                    LearningReviewRuntimeConfiguration(
+                        enabled = true,
+                        memoryWriteApprovalRequired = true,
+                        skillWriteApprovalRequired = true,
+                    ),
+            )
+
+        try {
+            val response = runtime.respondTo("hello")
+
+            assertEquals("ok", response)
+            assertEquals(1, gateway.callCount)
+            val entries = episodicMemory.entries()
+            assertEquals(1, entries.size)
+            assertTrue(entries.single().text.startsWith("USER:"))
+        } finally {
+            runtime.close()
+        }
+    }
+
+    @Test
+    fun `learning review approve records failure then succeeds after payload correction`() {
+        val gateway = CountingGateway()
+        val episodicFile = File.createTempFile("bertbot-episodic", ".json")
+        val semanticFile = File.createTempFile("bertbot-semantic", ".json")
+        val profileFile = File.createTempFile("bertbot-profile", ".json")
+        val learningReviewFile = File.createTempFile("bertbot-learning-review", ".jsonl")
+        val recommendationFile = File.createTempFile("bertbot-recommendations", ".json")
+        episodicFile.delete()
+        semanticFile.delete()
+        profileFile.delete()
+        learningReviewFile.delete()
+        recommendationFile.delete()
+        episodicFile.deleteOnExit()
+        semanticFile.deleteOnExit()
+        profileFile.deleteOnExit()
+        learningReviewFile.deleteOnExit()
+        recommendationFile.deleteOnExit()
+
+        val episodicMemory = EpisodicMemory(BertBotMemory(episodicFile))
+        val semanticMemory = SemanticMemory(BertBotMemory(semanticFile))
+        val memoryRuntime =
+            BertBotMemoryRuntime(
+                episodicMemory = episodicMemory,
+                memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory),
+                memoryWorker = MemorySummarizationWorker(episodicMemory, semanticMemory, threshold = 10, summarizeCount = 5),
+                userProfileStore = UserProfileStore(profileFile),
+            )
+        val learningReviewStore = FileLearningReviewStore(learningReviewFile)
+        val researchService =
+            ContinuousImprovementResearchService(
+                config = BertBotAgentConfig(),
+                workspaceRoot = File("."),
+                store = FileImprovementRecommendationStore(recommendationFile),
+            )
+        val runtime =
+            BertBotRuntime(
+                config = BertBotAgentConfig(),
+                aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+                stateStore = TestNoopStateStore(),
+                graph = BertBotGraphRunner(definition = BertBotGraphDefinition(entryNodeId = "none", nodes = emptyList(), edges = emptyList()), stateStore = TestNoopStateStore()),
+                assistantResponseSkill = createAssistantResponseSkill(gateway),
+                memoryRuntime = memoryRuntime,
+                ingestionRuntime = null,
+                researchRuntime = BertBotResearchRuntime(service = researchService),
+                learningReviewStore = learningReviewStore,
+            )
+
+        try {
+            val request =
+                buildLearningReviewRequest(
+                    scopeKey = "global",
+                    writeType = LearningReviewWriteType.SKILL,
+                    payload = "{}",
+                    traceId = "trace-retry",
+                )
+            learningReviewStore.enqueue(request)
+
+            val firstApprove = runtime.approveLearningReviewRequest(request.requestId)
+            assertEquals(null, firstApprove.request)
+            assertTrue(firstApprove.message?.contains("skill apply failed") == true)
+
+            val pendingAfterFailure = runtime.listPendingLearningReviewRequests(limit = 10)
+            assertEquals(1, pendingAfterFailure.size)
+            assertEquals(request.requestId, pendingAfterFailure.single().requestId)
+            assertTrue(!pendingAfterFailure.single().lastApplyFailureReason.isNullOrBlank())
+            assertTrue(!pendingAfterFailure.single().lastApplyFailedAt.isNullOrBlank())
+
+            val updatedRequest = pendingAfterFailure.single().copy(payload = "{\"reason\":\"retry_after_failure\"}")
+            learningReviewFile.writeText(Gson().toJson(updatedRequest))
+
+            val secondApprove = runtime.approveLearningReviewRequest(request.requestId)
+            assertTrue(secondApprove.request != null)
+            assertEquals(LearningReviewStatus.APPROVED, secondApprove.request.status)
+
+            val finalPending = runtime.listPendingLearningReviewRequests(limit = 10)
+            assertTrue(finalPending.isEmpty())
+        } finally {
+            runtime.close()
+        }
     }
 }
 

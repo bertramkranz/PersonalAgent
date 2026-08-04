@@ -23,6 +23,12 @@ internal object McpConstants {
     const val CHECKPOINT_ROLLBACK_TOOL_NAME = "checkpoint_rollback"
     const val CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME = "checkpoint_rollback_latest"
     const val CHECKPOINT_POLICY_TOOL_NAME = "checkpoint_policy"
+    const val SESSION_HISTORY_LIST_TOOL_NAME = "session_history_list"
+    const val SESSION_HISTORY_SEARCH_TOOL_NAME = "session_history_search"
+    const val SESSION_HISTORY_CLEAR_TOOL_NAME = "session_history_clear"
+    const val LEARNING_REVIEW_LIST_TOOL_NAME = "learning_review_list_pending"
+    const val LEARNING_REVIEW_APPROVE_TOOL_NAME = "learning_review_approve"
+    const val LEARNING_REVIEW_REJECT_TOOL_NAME = "learning_review_reject"
 
     const val WORKSPACE_ROOT_ENV_VAR = "BERTBOT_WORKSPACE_ROOT"
 
@@ -46,6 +52,12 @@ internal object McpConstants {
             checkpointRollback = CHECKPOINT_ROLLBACK_TOOL_NAME,
             checkpointRollbackLatest = CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME,
             checkpointPolicy = CHECKPOINT_POLICY_TOOL_NAME,
+            sessionHistoryList = SESSION_HISTORY_LIST_TOOL_NAME,
+            sessionHistorySearch = SESSION_HISTORY_SEARCH_TOOL_NAME,
+            sessionHistoryClear = SESSION_HISTORY_CLEAR_TOOL_NAME,
+            learningReviewListPending = LEARNING_REVIEW_LIST_TOOL_NAME,
+            learningReviewApprove = LEARNING_REVIEW_APPROVE_TOOL_NAME,
+            learningReviewReject = LEARNING_REVIEW_REJECT_TOOL_NAME,
         )
 
     val startupTools =
@@ -64,6 +76,12 @@ internal object McpConstants {
             CHECKPOINT_ROLLBACK_TOOL_NAME,
             CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME,
             CHECKPOINT_POLICY_TOOL_NAME,
+            SESSION_HISTORY_LIST_TOOL_NAME,
+            SESSION_HISTORY_SEARCH_TOOL_NAME,
+            SESSION_HISTORY_CLEAR_TOOL_NAME,
+            LEARNING_REVIEW_LIST_TOOL_NAME,
+            LEARNING_REVIEW_APPROVE_TOOL_NAME,
+            LEARNING_REVIEW_REJECT_TOOL_NAME,
         )
 
     val defaultStatusToolSurface =
@@ -82,5 +100,11 @@ internal object McpConstants {
             CHECKPOINT_ROLLBACK_TOOL_NAME,
             CHECKPOINT_ROLLBACK_LATEST_TOOL_NAME,
             CHECKPOINT_POLICY_TOOL_NAME,
+            SESSION_HISTORY_LIST_TOOL_NAME,
+            SESSION_HISTORY_SEARCH_TOOL_NAME,
+            SESSION_HISTORY_CLEAR_TOOL_NAME,
+            LEARNING_REVIEW_LIST_TOOL_NAME,
+            LEARNING_REVIEW_APPROVE_TOOL_NAME,
+            LEARNING_REVIEW_REJECT_TOOL_NAME,
         )
 }

@@ -39,6 +39,8 @@ internal data class PersistenceRuntimeConfiguration(
     val ingestionConsentFilePath: String = DEFAULT_INGESTION_CONSENT_FILE_PATH,
     val ingestionSourceStateFilePath: String = DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH,
     val researchRecommendationsFilePath: String = DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH,
+    val sessionHistoryFilePath: String = DEFAULT_SESSION_HISTORY_FILE_PATH,
+    val learningReviewFilePath: String = DEFAULT_LEARNING_REVIEW_FILE_PATH,
     val jdbcUrl: String? = null,
     val jdbcUser: String? = null,
     val jdbcPassword: String? = null,
@@ -50,6 +52,20 @@ internal data class PersistenceRuntimeConfiguration(
     val profileJdbcTable: String = DEFAULT_PROFILE_JDBC_TABLE,
     val ingestionConsentJdbcTable: String = DEFAULT_INGESTION_CONSENT_JDBC_TABLE,
     val ingestionSourceStateJdbcTable: String = DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
+    val sessionHistoryJdbcTable: String = DEFAULT_SESSION_HISTORY_JDBC_TABLE,
+    val learningReviewJdbcTable: String = DEFAULT_LEARNING_REVIEW_JDBC_TABLE,
+    val learningReviewDecisionJdbcTable: String = DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE,
+)
+
+internal data class SessionHistoryRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_SESSION_HISTORY_ENABLED,
+    val maxEntriesPerScope: Int = DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE,
+)
+
+internal data class LearningReviewRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_LEARNING_REVIEW_ENABLED,
+    val memoryWriteApprovalRequired: Boolean = DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED,
+    val skillWriteApprovalRequired: Boolean = DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED,
 )
 
 internal data class ShoppingRuntimeConfiguration(
@@ -159,6 +175,8 @@ internal const val DEFAULT_PROFILE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/b
 internal const val DEFAULT_INGESTION_CONSENT_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-ingestion-consent.json"
 internal const val DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-ingestion-source-state.json"
 internal const val DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-research-recommendations.json"
+internal const val DEFAULT_SESSION_HISTORY_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-session-history.jsonl"
+internal const val DEFAULT_LEARNING_REVIEW_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-learning-review.jsonl"
 internal const val DEFAULT_TRACE_FILE_PATH = "$DEFAULT_LOGS_DIRECTORY/bertbot-trace.jsonl"
 internal const val DEFAULT_INTERACTIONS_FILE_PATH = "$DEFAULT_STATE_FILES_DIRECTORY/bertbot-interactions.mmd"
 internal const val DEFAULT_STATE_JDBC_TABLE = "bertbot_state_snapshot"
@@ -169,6 +187,14 @@ internal const val DEFAULT_SEMANTIC_MEMORY_JDBC_TABLE = "bertbot_memory_semantic
 internal const val DEFAULT_PROFILE_JDBC_TABLE = "bertbot_profile_snapshot"
 internal const val DEFAULT_INGESTION_CONSENT_JDBC_TABLE = "bertbot_ingestion_consent_snapshot"
 internal const val DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE = "bertbot_ingestion_source_state_snapshot"
+internal const val DEFAULT_SESSION_HISTORY_JDBC_TABLE = "bertbot_session_history_event"
+internal const val DEFAULT_LEARNING_REVIEW_JDBC_TABLE = "bertbot_learning_review_queue"
+internal const val DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE = "bertbot_learning_review_decision_event"
+internal const val DEFAULT_SESSION_HISTORY_ENABLED = true
+internal const val DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE = 2000
+internal const val DEFAULT_LEARNING_REVIEW_ENABLED = true
+internal const val DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED = false
+internal const val DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SHOPPING_ENABLED = false
 internal const val DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS: Long = 10_000L
 internal const val DEFAULT_SHOPPING_MIN_SELLER_TRUST_SCORE: Double = 0.7
@@ -357,6 +383,20 @@ internal fun resolvePersistenceRuntimeConfiguration(
             dotEnvValues,
             DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH,
         )
+    val sessionHistoryFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_SESSION_HISTORY_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_SESSION_HISTORY_FILE_PATH,
+        )
+    val learningReviewFilePath =
+        resolvePersistencePathSetting(
+            "BERTBOT_LEARNING_REVIEW_FILE_PATH",
+            environment,
+            dotEnvValues,
+            DEFAULT_LEARNING_REVIEW_FILE_PATH,
+        )
 
     val tableNames = resolvePersistenceTableNames(environment, dotEnvValues)
 
@@ -374,6 +414,8 @@ internal fun resolvePersistenceRuntimeConfiguration(
         ingestionConsentFilePath = ingestionConsentFilePath,
         ingestionSourceStateFilePath = ingestionSourceStateFilePath,
         researchRecommendationsFilePath = researchRecommendationsFilePath,
+        sessionHistoryFilePath = sessionHistoryFilePath,
+        learningReviewFilePath = learningReviewFilePath,
         jdbcUrl = resolveRuntimeSetting("BERTBOT_STATE_JDBC_URL", environment, dotEnvValues),
         jdbcUser = resolveRuntimeSetting("BERTBOT_STATE_JDBC_USER", environment, dotEnvValues),
         jdbcPassword = resolveRuntimeSetting("BERTBOT_STATE_JDBC_PASSWORD", environment, dotEnvValues),
@@ -385,6 +427,9 @@ internal fun resolvePersistenceRuntimeConfiguration(
         profileJdbcTable = tableNames.profileJdbcTable,
         ingestionConsentJdbcTable = tableNames.ingestionConsentJdbcTable,
         ingestionSourceStateJdbcTable = tableNames.ingestionSourceStateJdbcTable,
+        sessionHistoryJdbcTable = tableNames.sessionHistoryJdbcTable,
+        learningReviewJdbcTable = tableNames.learningReviewJdbcTable,
+        learningReviewDecisionJdbcTable = tableNames.learningReviewDecisionJdbcTable,
     )
 }
 
@@ -439,6 +484,27 @@ private fun resolvePersistenceTableNames(
                 dotEnvValues,
                 DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE,
             ),
+        sessionHistoryJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_SESSION_HISTORY_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_SESSION_HISTORY_JDBC_TABLE,
+            ),
+        learningReviewJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_LEARNING_REVIEW_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_LEARNING_REVIEW_JDBC_TABLE,
+            ),
+        learningReviewDecisionJdbcTable =
+            resolvePersistencePathSetting(
+                "BERTBOT_LEARNING_REVIEW_DECISION_JDBC_TABLE",
+                environment,
+                dotEnvValues,
+                DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE,
+            ),
     )
 
 private data class PersistenceTableNames(
@@ -450,6 +516,9 @@ private data class PersistenceTableNames(
     val profileJdbcTable: String,
     val ingestionConsentJdbcTable: String,
     val ingestionSourceStateJdbcTable: String,
+    val sessionHistoryJdbcTable: String,
+    val learningReviewJdbcTable: String,
+    val learningReviewDecisionJdbcTable: String,
 )
 
 private fun resolvePersistencePathSetting(
@@ -741,6 +810,58 @@ internal fun resolveCheckpointRollbackPolicyConfiguration(
         rollbackEnabled = rollbackEnabled,
         requireConfirm = requireConfirm,
         allowInProtectedEnvironment = allowInProtectedEnvironment,
+    )
+}
+
+internal fun resolveSessionHistoryRuntimeConfiguration(): SessionHistoryRuntimeConfiguration =
+    resolveSessionHistoryRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveSessionHistoryRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): SessionHistoryRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_SESSION_HISTORY_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_SESSION_HISTORY_ENABLED)
+    val maxEntriesPerScope =
+        resolveRuntimeSetting("BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(100, 100_000)
+            ?: DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE
+
+    return SessionHistoryRuntimeConfiguration(
+        enabled = enabled,
+        maxEntriesPerScope = maxEntriesPerScope,
+    )
+}
+
+internal fun resolveLearningReviewRuntimeConfiguration(): LearningReviewRuntimeConfiguration =
+    resolveLearningReviewRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveLearningReviewRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): LearningReviewRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_LEARNING_REVIEW_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_LEARNING_REVIEW_ENABLED)
+    val memoryWriteApprovalRequired =
+        resolveRuntimeSetting("BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED)
+    val skillWriteApprovalRequired =
+        resolveRuntimeSetting("BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED)
+
+    return LearningReviewRuntimeConfiguration(
+        enabled = enabled,
+        memoryWriteApprovalRequired = memoryWriteApprovalRequired,
+        skillWriteApprovalRequired = skillWriteApprovalRequired,
     )
 }
 

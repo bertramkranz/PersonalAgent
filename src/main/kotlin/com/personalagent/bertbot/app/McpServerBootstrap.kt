@@ -25,6 +25,7 @@ internal object McpServerBootstrap {
     fun createDispatcherContext(input: DispatcherContextInput): DispatcherContext {
         val startup = createStartupState(input.aiRuntimeConfiguration, input.workspaceRoot)
         val checkpointRollbackPolicy = input.checkpointRollbackPolicy ?: resolveCheckpointRollbackPolicyConfiguration()
+        val learningReviewConfiguration = resolveLearningReviewRuntimeConfiguration()
         val macrofactorToolRouter =
             if (input.macrofactorRuntimeConfiguration.enabled) {
                 MacrofactorToolRouter(input.macrofactorRuntimeConfiguration)
@@ -44,6 +45,56 @@ internal object McpServerBootstrap {
                 null
             }
         val shoppingToolRouter = createShoppingToolRouterOrNull(input.shoppingRuntimeConfiguration)
+        val sessionHistoryToolRouter =
+            startup.runtime?.let { runtime ->
+                SessionHistoryToolRouter(
+                    listEntries = { limit, scopeKey ->
+                        runtime.listSessionHistory(
+                            limit = limit,
+                            persistenceScopeKey = scopeKey ?: "global",
+                        )
+                    },
+                    searchEntries = { query, limit, scopeKey ->
+                        runtime.searchSessionHistory(
+                            query = query,
+                            limit = limit,
+                            persistenceScopeKey = scopeKey ?: "global",
+                        )
+                    },
+                    clearEntries = { scopeKey ->
+                        runtime.clearSessionHistory(scopeKey ?: "global")
+                    },
+                )
+            }
+        val learningReviewToolRouter =
+            startup.runtime?.let { runtime ->
+                LearningReviewToolRouter(
+                    listPending = { limit, scopeKey ->
+                        runtime.listPendingLearningReviewRequests(
+                            limit = limit,
+                            persistenceScopeKey = scopeKey ?: "global",
+                        )
+                    },
+                    approve = { requestId, scopeKey, note ->
+                        val approved =
+                            runtime.approveLearningReviewRequest(
+                                requestId = requestId,
+                                persistenceScopeKey = scopeKey ?: "global",
+                                note = note,
+                            )
+                        LearningReviewDecisionOutcome(request = approved.request, message = approved.message)
+                    },
+                    reject = { requestId, scopeKey, note ->
+                        val rejected =
+                            runtime.rejectLearningReviewRequest(
+                                requestId = requestId,
+                                persistenceScopeKey = scopeKey ?: "global",
+                                note = note,
+                            )
+                        LearningReviewDecisionOutcome(request = rejected.request, message = rejected.message)
+                    },
+                )
+            }
         val polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
         val continuousResearchToolRouter =
             startup.runtime
@@ -123,6 +174,28 @@ internal object McpServerBootstrap {
                                     ),
                             )
                         },
+                        sessionHistoryToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "session_history",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "session_history",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        learningReviewToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "learning_review",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "learning_review",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
                     ),
             )
 
@@ -137,6 +210,9 @@ internal object McpServerBootstrap {
                     macrofactorToolRouter = macrofactorToolRouter,
                     googleWorkspaceToolRouter = googleWorkspaceToolRouter,
                     continuousResearchToolRouter = continuousResearchToolRouter,
+                    sessionHistoryToolRouter = sessionHistoryToolRouter,
+                    learningReviewToolRouter = learningReviewToolRouter,
+                    learningReviewConfiguration = learningReviewConfiguration,
                     toolNames = input.toolNames,
                     checkpointRollbackPolicy = checkpointRollbackPolicy,
                 ),
@@ -162,6 +238,8 @@ internal object McpServerBootstrap {
                 polymarketToolRouter = polymarketToolRouter,
                 continuousResearchToolRouter = continuousResearchToolRouter,
                 shoppingToolRouter = shoppingToolRouter,
+                sessionHistoryToolRouter = sessionHistoryToolRouter,
+                learningReviewToolRouter = learningReviewToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
                 externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
                 listCheckpoints = startup.runtime?.let { runtime -> { scopeKey -> runtime.listCheckpoints(scopeKey ?: "global") } },
