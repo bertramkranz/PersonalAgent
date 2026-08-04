@@ -17,6 +17,7 @@ Use this skill when task success depends on real browser interaction rather than
 - Form filling, navigation chains, and UI state verification.
 - Data capture from web pages with source evidence.
 - Repeatable browser procedures that can be rerun safely.
+- Web-only automation where the target is a browser session rather than a desktop application.
 
 ## Working Rules
 

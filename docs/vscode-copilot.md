@@ -24,7 +24,7 @@ Use `@Test Orchestration` for verification-first workflows, targeted checks, and
 
 Use `@Repo Ops` for repeatable maintenance tasks like dependency hygiene, workflow upkeep, and repository health checks.
 
-Use `@Browser Automation` for checkpointed browser workflows and computer-use style web task execution.
+Use `@Browser Automation` for checkpointed web-browser workflows such as navigation, form completion, content extraction, and UI verification.
 
 ## Agent Selection Matrix
 
@@ -34,7 +34,7 @@ Use `@Browser Automation` for checkpointed browser workflows and computer-use st
 | Multi-step implementation and execution | `@Repo Automation` | Focused on evidence-backed edits and workflow execution. |
 | Verification, focused checks, and failure triage | `@Test Orchestration` | Optimized for confidence-building validation and actionable test outcomes. |
 | Recurring maintenance and operational hygiene | `@Repo Ops` | Tailored for dependency, workflow, and repository-health upkeep. |
-| Browser-driven workflows and web task execution | `@Browser Automation` | Specialized for Playwright-backed interaction flows with explicit checkpoints. |
+| Browser-driven web workflows and web task execution | `@Browser Automation` | Specialized for Playwright-backed interaction flows with explicit checkpoints and web-only safety constraints. |
 
 When unsure, start with `@BertBot` and then switch to a specialized agent once the task shape is clear.
 

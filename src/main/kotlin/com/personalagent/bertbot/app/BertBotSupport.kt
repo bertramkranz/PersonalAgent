@@ -887,8 +887,8 @@ internal fun buildCapabilityStatusResponse(
         appendLine("Capability status snapshot:")
         appendLine("- workspace.read_file (allowed file roots): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
         appendLine("- Google Workspace MCP: ${summarizeGoogleWorkspaceCapability(runtimeCapabilities)}")
-        appendLine("- Playwright capability: ${if (playwrightEnabled) "enabled" else "disabled"}")
-        appendLine("- Playwright fallback: ${summarizePlaywrightFallback(runtimeCapabilities, playwrightEnabled)}")
+        appendLine("- Browser automation (web-only): ${if (playwrightEnabled) "enabled" else "disabled"}")
+        appendLine("- Browser automation fallback: ${summarizePlaywrightFallback(runtimeCapabilities, playwrightEnabled)}")
         appendLine("- Persistence store: ${runtimeCapabilities.persistenceBackend}")
         appendLine()
         appendLine("Sub-agents:")
@@ -922,7 +922,7 @@ private fun summarizePlaywrightFallback(
 ): String =
     when {
         runtimeCapabilities.playwrightFallbackAvailable -> "available"
-        playwrightEnabled -> "agent-advertised (no direct fallback configured)"
+        playwrightEnabled -> "agent-advertised (web browser fallback not configured)"
         else -> "disabled"
     }
 
