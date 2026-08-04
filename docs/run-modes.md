@@ -50,6 +50,12 @@ Core tools include:
 - `polymarket_gamma_query`
 - `polymarket_clob_query`
 - `polymarket_data_query`
+- `session_history_list`
+- `session_history_search`
+- `session_history_clear`
+- `learning_review_list_pending`
+- `learning_review_approve`
+- `learning_review_reject`
 
 Ingestion tools (enabled when ingestion control is configured):
 

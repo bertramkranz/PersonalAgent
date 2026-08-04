@@ -83,6 +83,8 @@ internal class McpRequestDispatcher(
     private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
     private val shoppingToolRouter: ShoppingToolRouter? = null,
+    private val sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
+    private val learningReviewToolRouter: LearningReviewToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
@@ -222,6 +224,8 @@ internal class McpRequestDispatcher(
                                 desktopAutomationToolDefinitions = toolBus.toolDefinitionsFor("desktop_automation"),
                                 continuousResearchToolDefinitions = toolBus.toolDefinitionsFor("continuous_research"),
                                 shoppingToolDefinitions = toolBus.toolDefinitionsFor("shopping"),
+                                sessionHistoryToolDefinitions = toolBus.toolDefinitionsFor("session_history"),
+                                learningReviewToolDefinitions = toolBus.toolDefinitionsFor("learning_review"),
                             ),
                     ),
                 )
@@ -280,6 +284,8 @@ internal class McpRequestDispatcher(
 
         addOptionalCapability(capabilities, "continuous_research", continuousResearchToolRouter as? ToolRouter)
         addOptionalCapability(capabilities, "shopping", shoppingToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "session_history", sessionHistoryToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "learning_review", learningReviewToolRouter as? ToolRouter)
 
         return CapabilityRegistry(capabilities)
     }

@@ -174,6 +174,15 @@ internal object BertBotRuntimeDependenciesFactory {
             llmGateway = llmGateway,
         )
 
+    fun createSessionHistoryStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+        sessionHistoryConfiguration: SessionHistoryRuntimeConfiguration = resolveSessionHistoryRuntimeConfiguration(),
+    ): SessionHistoryStore = SessionHistoryStoreFactory.create(persistenceConfiguration, sessionHistoryConfiguration)
+
+    fun createLearningReviewStore(
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+    ): LearningReviewStore = LearningReviewStoreFactory.create(persistenceConfiguration)
+
     fun createCheckpointStore(
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): BertBotCheckpointStore {

@@ -120,6 +120,92 @@ class BertBotRuntimeCheckpointTest {
         }
     }
 
+    @Test
+    @Suppress("LongMethod")
+    fun `runtime appends lists and clears session history per normalized scope`() {
+        val episodicFile = File.createTempFile("bertbot-episodic", ".json")
+        val semanticFile = File.createTempFile("bertbot-semantic", ".json")
+        val profileFile = File.createTempFile("bertbot-profile", ".json")
+        val historyFile = File.createTempFile("bertbot-session-history", ".jsonl")
+        episodicFile.delete()
+        semanticFile.delete()
+        profileFile.delete()
+        historyFile.delete()
+        episodicFile.deleteOnExit()
+        semanticFile.deleteOnExit()
+        profileFile.deleteOnExit()
+        historyFile.deleteOnExit()
+
+        val stateStore = ScopedInMemoryBertBotStateStore()
+        val checkpointStore = InMemoryCheckpointStore()
+        val stateEventStore = InMemoryStateEventStore()
+        val graph =
+            BertBotGraphRunner(
+                definition =
+                    BertBotGraphDefinition(
+                        entryNodeId = NodeIds.CAPTURE,
+                        nodes = listOf(MessageCaptureNode()),
+                        edges = emptyList(),
+                    ),
+                stateStore = stateStore,
+                checkpointStore = checkpointStore,
+                enableAutomaticCheckpointing = true,
+                eventSourcing = BertBotGraphRunner.EventSourcingConfiguration(enabled = true, store = stateEventStore),
+            )
+
+        val episodicMemory = EpisodicMemory(BertBotMemory(episodicFile))
+        val semanticMemory = SemanticMemory(BertBotMemory(semanticFile))
+        val memoryRuntime =
+            BertBotMemoryRuntime(
+                episodicMemory = episodicMemory,
+                memoryAssembler = DualMemoryContextAssembler(episodicMemory, semanticMemory),
+                memoryWorker = MemorySummarizationWorker(episodicMemory, semanticMemory, threshold = 10, summarizeCount = 5),
+                userProfileStore = UserProfileStore(profileFile),
+            )
+        val runtime =
+            BertBotRuntime(
+                config = BertBotAgentConfig(),
+                aiRuntimeConfiguration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key"),
+                stateStore = stateStore,
+                graph = graph,
+                assistantResponseSkill = createAssistantResponseSkill(StaticGateway()),
+                memoryRuntime = memoryRuntime,
+                checkpointStore = checkpointStore,
+                rollbackService = StateOnlyRollbackService(stateStore, checkpointStore),
+                stateEventStore = stateEventStore,
+                stateReplayService = StateReplayService(checkpointStore, stateEventStore),
+                sessionHistoryStore = FileSessionHistoryStore(file = historyFile, maxEntriesPerScope = 50),
+            )
+
+        try {
+            val scopeA = "external|telegram|chat|a|root"
+            val scopeB = "external|telegram|chat|b|root"
+
+            runtime.respondTo("hello-a", persistenceScopeKey = scopeA)
+            runtime.respondTo("hello-b", persistenceScopeKey = scopeB)
+
+            val entriesA = runtime.listSessionHistory(limit = 20, persistenceScopeKey = scopeA)
+            val entriesB = runtime.listSessionHistory(limit = 20, persistenceScopeKey = scopeB)
+            val searchA = runtime.searchSessionHistory(query = "hello", limit = 20, persistenceScopeKey = scopeA)
+
+            assertTrue(entriesA.any { it.role == SessionHistoryRole.USER && it.text == "hello-a" })
+            assertTrue(entriesA.any { it.role == SessionHistoryRole.ASSISTANT && it.text == "ok" })
+            assertTrue(entriesB.any { it.role == SessionHistoryRole.USER && it.text == "hello-b" })
+            assertTrue(entriesB.any { it.role == SessionHistoryRole.ASSISTANT && it.text == "ok" })
+            assertTrue(searchA.any { it.text == "hello-a" })
+
+            assertEquals(true, runtime.clearSessionHistory(scopeA))
+
+            val clearedA = runtime.listSessionHistory(limit = 20, persistenceScopeKey = scopeA)
+            val remainingB = runtime.listSessionHistory(limit = 20, persistenceScopeKey = scopeB)
+
+            assertTrue(clearedA.isEmpty())
+            assertTrue(remainingB.isNotEmpty())
+        } finally {
+            runtime.close()
+        }
+    }
+
     private fun normalize(scope: String): String = scope.replace("|", "_")
 }
 

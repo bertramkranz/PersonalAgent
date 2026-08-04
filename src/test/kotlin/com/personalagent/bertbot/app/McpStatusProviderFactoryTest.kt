@@ -5,6 +5,19 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class McpStatusProviderFactoryTest {
+    private val sessionHistoryToolRouter =
+        SessionHistoryToolRouter(
+            listEntries = { _, _ -> emptyList() },
+            searchEntries = { _, _, _ -> emptyList() },
+            clearEntries = { true },
+        )
+    private val learningReviewToolRouter =
+        LearningReviewToolRouter(
+            listPending = { _, _ -> emptyList() },
+            approve = { _, _, _ -> LearningReviewDecisionOutcome() },
+            reject = { _, _, _ -> LearningReviewDecisionOutcome() },
+        )
+
     @Test
     fun `status includes checkpoint tool surface and rollback policy details`() {
         val statusProvider =
@@ -18,6 +31,14 @@ class McpStatusProviderFactoryTest {
                     macrofactorToolRouter = null,
                     googleWorkspaceToolRouter = null,
                     continuousResearchToolRouter = null,
+                    sessionHistoryToolRouter = sessionHistoryToolRouter,
+                    learningReviewToolRouter = learningReviewToolRouter,
+                    learningReviewConfiguration =
+                        LearningReviewRuntimeConfiguration(
+                            enabled = true,
+                            memoryWriteApprovalRequired = true,
+                            skillWriteApprovalRequired = false,
+                        ),
                     toolNames = McpConstants.toolNames,
                     checkpointRollbackPolicy =
                         CheckpointRollbackPolicyConfiguration(
@@ -37,6 +58,13 @@ class McpStatusProviderFactoryTest {
         assertTrue(status.contains("checkpoint_rollback"))
         assertTrue(status.contains("checkpoint_rollback_latest"))
         assertTrue(status.contains("checkpoint_policy"))
+        assertTrue(status.contains("session_history_list"))
+        assertTrue(status.contains("session_history_clear"))
+        assertTrue(status.contains("Learning review policy:"))
+        assertTrue(status.contains("enabled=true"))
+        assertTrue(status.contains("memoryWriteApprovalRequired=true"))
+        assertTrue(status.contains("skillWriteApprovalRequired=false"))
+        assertTrue(status.contains("approvalQueueEnabled=true"))
         assertTrue(status.contains("Checkpoint rollback policy:"))
         assertTrue(status.contains("environment=production"))
         assertTrue(status.contains("protectedEnvironment=true"))
@@ -78,6 +106,9 @@ class McpStatusProviderFactoryTest {
                     macrofactorToolRouter = macrofactorRouter,
                     googleWorkspaceToolRouter = googleWorkspaceRouter,
                     continuousResearchToolRouter = null,
+                    sessionHistoryToolRouter = sessionHistoryToolRouter,
+                    learningReviewToolRouter = null,
+                    learningReviewConfiguration = LearningReviewRuntimeConfiguration(),
                     toolNames = McpConstants.toolNames,
                     checkpointRollbackPolicy = CheckpointRollbackPolicyConfiguration(),
                 ),

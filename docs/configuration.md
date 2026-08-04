@@ -99,6 +99,7 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_INGESTION_CONSENT_FILE_PATH` | `state/bertbot-ingestion-consent.json` | same | same | |
 | `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` | `state/bertbot-ingestion-source-state.json` | same | same | |
 | `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` | `state/bertbot-research-recommendations.json` | same | same | |
+| `BERTBOT_SESSION_HISTORY_FILE_PATH` | `state/bertbot-session-history.jsonl` | same | same | |
 | `BERTBOT_TRACE_FILE_PATH` | `logs/bertbot-trace.jsonl` | same | same | |
 | `BERTBOT_INTERACTIONS_FILE_PATH` | `state/bertbot-interactions.mmd` | same | same | |
 | `BERTBOT_CHECKPOINT_AUTOSAVE_ENABLED` | `false` | `false` | `false` | |
@@ -116,6 +117,12 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_PROFILE_JDBC_TABLE` | `bertbot_profile_snapshot` | same | same | |
 | `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` | `bertbot_ingestion_consent_snapshot` | same | same | |
 | `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` | `bertbot_ingestion_source_state_snapshot` | same | same | |
+| `BERTBOT_SESSION_HISTORY_JDBC_TABLE` | `bertbot_session_history_event` | same | same | |
+| `BERTBOT_SESSION_HISTORY_ENABLED` | `true` | `true` | `true` | Master toggle for durable turn history |
+| `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE` | `2000` | `2000` | `2000` | Max retained history rows per persistence scope |
+| `BERTBOT_LEARNING_REVIEW_ENABLED` | `true` | `true` | `true` | Enables parity scaffolding for learning-review flows |
+| `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before memory writes in review flows |
+| `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before skill/prompt writes in review flows |
 | `BERTBOT_RUNTIME_ENV` | `dev` | `dev` | `production` | [compose override] |
 | `BERTBOT_CHECKPOINT_ROLLBACK_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM` | `true` | `true` | `true` | |
@@ -313,6 +320,7 @@ File-backed paths:
 - `BERTBOT_INGESTION_CONSENT_FILE_PATH`
 - `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH`
 - `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH`
+- `BERTBOT_SESSION_HISTORY_FILE_PATH`
 - `BERTBOT_TRACE_FILE_PATH`
 - `BERTBOT_INTERACTIONS_FILE_PATH`
 - `BERTBOT_STATE_EVENT_FILE_PATH` – event-sourcing log (used when `BERTBOT_EVENT_SOURCING_ENABLED=true`)
@@ -330,6 +338,15 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_PROFILE_JDBC_TABLE`
 - `BERTBOT_INGESTION_CONSENT_JDBC_TABLE`
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE`
+- `BERTBOT_SESSION_HISTORY_JDBC_TABLE`
+
+Session history and learning review controls:
+
+- `BERTBOT_SESSION_HISTORY_ENABLED`
+- `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE`
+- `BERTBOT_LEARNING_REVIEW_ENABLED`
+- `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED`
+- `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED`
 
 Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 

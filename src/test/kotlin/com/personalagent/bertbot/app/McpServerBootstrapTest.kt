@@ -40,6 +40,10 @@ class McpServerBootstrapTest {
         val text = json.getAsJsonObject("result").getAsJsonArray("content")[0].asJsonObject.get("text").asString
 
         assertTrue(text.contains("checkpoint_policy"))
+        assertTrue(text.contains("Learning review policy:"))
+        assertTrue(text.contains("enabled=true"))
+        assertTrue(text.contains("memoryWriteApprovalRequired=false"))
+        assertTrue(text.contains("skillWriteApprovalRequired=false"))
         assertTrue(text.contains("Checkpoint rollback policy:"))
         assertTrue(text.contains("environment=production"))
         assertTrue(text.contains("protectedEnvironment=true"))
