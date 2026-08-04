@@ -7,6 +7,7 @@ import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
 import com.personalagent.bertbot.agents.ToolCallingSkill
+import com.personalagent.bertbot.agents.ToolCallingSkillConfig
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.ExecutionProfileFallbackBehavior
 import com.personalagent.bertbot.graph.model.BertBotState
@@ -574,15 +575,18 @@ private fun buildToolCallingSkillOrNull(
     if (capabilityRegistry.capabilityIds().isEmpty()) return null
 
     return ToolCallingSkill(
-        llmGateway = llmGateway,
-        toolDefinitionsProvider = capabilityRegistry::toolDefinitions,
-        toolExecutor = { name, args ->
-            val params = JsonObject()
-            params.add("arguments", args)
+        config =
+            ToolCallingSkillConfig(
+                llmGateway = llmGateway,
+                toolDefinitionsProvider = capabilityRegistry::toolDefinitions,
+                toolExecutor = { name, args ->
+                    val params = JsonObject()
+                    params.add("arguments", args)
 
-            capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
-        },
-        gatewayResolver = gatewayResolver,
+                    capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
+                },
+                gatewayResolver = gatewayResolver,
+            ),
     )
 }
 

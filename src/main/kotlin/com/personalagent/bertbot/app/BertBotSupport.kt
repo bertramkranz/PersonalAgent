@@ -8,6 +8,7 @@ import com.openai.client.okhttp.OpenAIOkHttpClient
 import com.openai.models.ChatModel
 import com.personalagent.bertbot.agents.KoogStructuredOutputGateway
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
+import com.personalagent.bertbot.agents.SelfCorrectingSkillConfig
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.llm.LlmGateway
@@ -209,12 +210,15 @@ internal fun createAssistantResponseSkill(
     gatewayResolver: ((String) -> LlmGateway)? = null,
 ): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
-        name = "assistant_response_generator",
-        llmGateway = llmGateway,
-        outputFormatInstructions = "Return valid JSON object only: {\"response\": \"<assistant response>\"}",
-        parser = ::parseAssistantResponseEnvelope,
-        structuredOutputGateway = KoogStructuredOutputGateway(),
-        gatewayResolver = gatewayResolver,
+        config =
+            SelfCorrectingSkillConfig(
+                name = "assistant_response_generator",
+                llmGateway = llmGateway,
+                outputFormatInstructions = "Return valid JSON object only: {\"response\": \"<assistant response>\"}",
+                parser = ::parseAssistantResponseEnvelope,
+                structuredOutputGateway = KoogStructuredOutputGateway(),
+                gatewayResolver = gatewayResolver,
+            ),
     )
 }
 
