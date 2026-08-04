@@ -22,27 +22,27 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-      GCP_CLOUDSQL_INSTANCE: ${{ vars.GCP_CLOUDSQL_INSTANCE }}
-      CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'bertbot-webhook' }}
-      BERTBOT_DB_NAME: ${{ vars.BERTBOT_DB_NAME || 'bertbot' }}
-      BERTBOT_DB_USER: ${{ vars.BERTBOT_DB_USER || 'bertbot' }}
-      AI_API_KEY_SECRET_NAME: ${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}
-      DB_PASSWORD_SECRET_NAME: ${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}
-      TELEGRAM_SECRET_TOKEN_SECRET_NAME: ${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}
+      GCP_PROJECT_ID: "${{ vars.GCP_PROJECT_ID }}"
+      GCP_REGION: "${{ vars.GCP_REGION }}"
+      GCP_ARTIFACT_REGISTRY_REPO: "${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}"
+      GCP_CLOUDSQL_INSTANCE: "${{ vars.GCP_CLOUDSQL_INSTANCE }}"
+      CLOUD_RUN_SERVICE: "${{ vars.CLOUD_RUN_SERVICE || 'bertbot-webhook' }}"
+      BERTBOT_DB_NAME: "${{ vars.BERTBOT_DB_NAME || 'bertbot' }}"
+      BERTBOT_DB_USER: "${{ vars.BERTBOT_DB_USER || 'bertbot' }}"
+      AI_API_KEY_SECRET_NAME: "${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}"
+      DB_PASSWORD_SECRET_NAME: "${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}"
+      TELEGRAM_SECRET_TOKEN_SECRET_NAME: "${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}"
       TELEGRAM_BOT_TOKEN_SECRET_NAME: bertbot-telegram-bot-token
-      SLACK_SIGNING_SECRET_NAME: ${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}
-      WHATSAPP_APP_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}
-      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: ${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}
-      GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME'] || '' }}
-      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME'] || '' }}
-      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: ${{ vars['GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME'] || '' }}
-      CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}
+      SLACK_SIGNING_SECRET_NAME: "${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}"
+      WHATSAPP_APP_SECRET_NAME: "${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}"
+      WHATSAPP_VERIFY_TOKEN_SECRET_NAME: "${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}"
+      GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME: "${{ vars['GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME'] || '' }}"
+      GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME: "${{ vars['GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME'] || '' }}"
+      GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME: "${{ vars['GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME'] || '' }}"
+      CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: "${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT || '' }}"
       CLOUD_RUN_ALLOW_UNAUTHENTICATED: 'true'
       CLOUD_RUN_CONTAINER_PORT: '8080'
-      BERTBOT_GOOGLE_WORKSPACE_ENABLED: ${{ vars[format('{0}', 'BERTBOT_GOOGLE_WORKSPACE_ENABLED')] || 'true' }}
+      BERTBOT_GOOGLE_WORKSPACE_ENABLED: "${{ vars[format('{0}', 'BERTBOT_GOOGLE_WORKSPACE_ENABLED')] || 'true' }}"
 
     steps:
       - name: Validate required deployment vars

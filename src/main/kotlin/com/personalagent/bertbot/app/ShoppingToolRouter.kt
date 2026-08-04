@@ -2,6 +2,10 @@ package com.personalagent.bertbot.app
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import com.personalagent.bertbot.shopping.AmazonStoreProvider
+import com.personalagent.bertbot.shopping.PersonalShopperService
+import com.personalagent.bertbot.shopping.ShoppingConfig
+import com.personalagent.bertbot.shopping.StoreProviderRegistry
 
 internal const val SHOPPING_TOOL_NAME = "shopping_query"
 
@@ -15,6 +19,7 @@ private val BLOCKED_PLACE_ORDER_OPERATIONS =
 
 internal class ShoppingToolRouter(
     private val config: ShoppingRuntimeConfiguration,
+    private val shopperService: PersonalShopperService = defaultPersonalShopperService(config),
 ) {
     fun handle(
         toolName: String?,
@@ -89,41 +94,119 @@ internal class ShoppingToolRouter(
         val query =
             arguments.stringValue("query")
                 ?: return true to "Missing required field: query"
+        val maxResults = shoppingLongValue(arguments, "max_results")?.toInt()?.coerceAtLeast(1) ?: 5
+        val result = shopperService.searchProducts(query = query, maxResults = maxResults)
+        if (result.products.isEmpty()) {
+            return false to
+                "operation=search query=\"$query\" provider=${result.providerId} results=0 " +
+                "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore}"
+        }
+
+        val topResults =
+            result.products.take(maxResults).joinToString(separator = " | ") { product ->
+                val lowest = product.lowestPriceOffer()
+                if (lowest == null) {
+                    "${product.productId}:${product.title}"
+                } else {
+                    val trust = lowest.seller.sellerScore ?: 0.0
+                    val cents = toCents(lowest.price)
+                    "${product.productId}:${product.title}:${cents}c:seller_trust=$trust"
+                }
+            }
+
         return false to
-            "operation=search query=\"$query\" " +
-            "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore}"
+            "operation=search query=\"$query\" provider=${result.providerId} results=${result.products.size} " +
+            "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore} items=$topResults"
     }
 
     private fun handleDetails(arguments: JsonObject): Pair<Boolean, String> {
         val itemId =
             arguments.stringValue("item_id")
                 ?: return true to "Missing required field: item_id"
-        return false to "operation=details item_id=\"$itemId\""
+        val product = shopperService.getProduct(itemId)
+        if (product == null) {
+            return false to "operation=details item_id=\"$itemId\" offer=unknown note=provider_item_not_found"
+        }
+        val lowest = product.lowestPriceOffer()
+        val offerText =
+            if (lowest == null) {
+                "offer=none"
+            } else {
+                val sellerScore = lowest.seller.sellerScore ?: 0.0
+                "offer_price=${toCents(lowest.price)}c seller=${lowest.seller.name} seller_trust=$sellerScore availability=${lowest.availability}"
+            }
+        return false to "operation=details item_id=\"$itemId\" title=\"${product.title}\" $offerText"
     }
 
     private fun handleCompare(arguments: JsonObject): Pair<Boolean, String> {
         val itemId =
             arguments.stringValue("item_id")
                 ?: return true to "Missing required field: item_id"
+        val product = shopperService.getProduct(itemId)
+        if (product == null) {
+            return false to
+                "operation=compare item_id=\"$itemId\" " +
+                "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore} offers=unknown"
+        }
+        val offerSummary =
+            product.offers.joinToString(separator = " | ") { offer ->
+                val trust = offer.seller.sellerScore ?: 0.0
+                "${toCents(offer.price)}c:${offer.seller.name}:trust=$trust:${offer.availability}"
+            }
         return false to
             "operation=compare item_id=\"$itemId\" " +
-            "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore}"
+            "budget_limit=${config.budgetLimitCents}c min_seller_trust=${config.minSellerTrustScore} offers=$offerSummary"
     }
 
     private fun handleCartPrepare(arguments: JsonObject): Pair<Boolean, String> {
         val itemId =
             arguments.stringValue("item_id")
                 ?: return true to "Missing required field: item_id"
-        return false to "operation=cart_prepare item_id=\"$itemId\" status=ready_for_user_review note=no_order_placed"
+        val product = shopperService.getProduct(itemId)
+        if (product == null) {
+            return false to "operation=cart_prepare item_id=\"$itemId\" status=ready_for_user_review note=no_order_placed"
+        }
+        val lowest = product.lowestPriceOffer()
+        val price = lowest?.let { offer -> toCents(offer.price) }
+        return false to
+            "operation=cart_prepare item_id=\"$itemId\" status=ready_for_user_review " +
+            "selected_price=${price ?: "unknown"}c note=no_order_placed"
     }
 
     private fun handleCheckoutPrepare(arguments: JsonObject): Pair<Boolean, String> {
         val itemId =
             arguments.stringValue("item_id")
                 ?: return true to "Missing required field: item_id"
-        return false to "operation=checkout_prepare item_id=\"$itemId\" status=checkout_summary_ready note=no_order_placed"
+        val product = shopperService.getProduct(itemId)
+        if (product == null) {
+            return false to "operation=checkout_prepare item_id=\"$itemId\" status=checkout_summary_ready note=no_order_placed"
+        }
+        val lowest = product.lowestPriceOffer()
+        val subtotal = lowest?.let { offer -> toCents(offer.price) }
+        return false to
+            "operation=checkout_prepare item_id=\"$itemId\" status=checkout_summary_ready " +
+            "subtotal=${subtotal ?: "unknown"}c note=no_order_placed"
     }
 }
+
+private fun defaultPersonalShopperService(config: ShoppingRuntimeConfiguration): PersonalShopperService {
+    val providers =
+        config.stores.map { store ->
+            AmazonStoreProvider(priority = store.priority, enabled = store.enabled)
+        }
+    return PersonalShopperService(
+        registry = StoreProviderRegistry(providers),
+        config =
+            ShoppingConfig(
+                enabled = config.enabled,
+                budgetCurrencyCode = config.stores.firstOrNull { it.enabled }?.currency?.uppercase() ?: "USD",
+                budgetLimit = config.budgetLimitCents / 100.0,
+                minSellerScore = config.minSellerTrustScore,
+            ),
+    )
+}
+
+private fun toCents(price: Double): Long = (price * 100.0).toLong()
 
 private fun shoppingLongValue(
     source: JsonObject,

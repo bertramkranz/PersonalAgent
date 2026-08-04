@@ -87,6 +87,20 @@ Disabled by default (require explicit opt-in via `subAgents` config override):
 - **Polymarket Analyst** — prediction market odds, liquidity, and order-book analysis.
 - **Personal Shopper** — product discovery, price comparison, and purchase research.
 
+## Execution Profiles And Capability Registry
+
+Runtime tool capability flow is now centralized:
+
+- `CapabilityRegistry` is the source of truth for optional runtime capabilities (for example polymarket, shopping, Google Workspace, MacroFactor, and continuous research).
+- `UnifiedToolBus` routes execution through one shared dispatch path for capability routers plus built-in MCP handlers.
+- `SubAgentExecutionProfileDefinition` constrains tool visibility and execution by selected sub-agent when a profile declares required/optional capabilities.
+
+Default profile constraints:
+
+- `polymarket_analyst` requires `polymarket` and denies tools outside that profile scope.
+- `personal_shopper` requires `shopping` and denies tools outside that profile scope.
+- `google_workspace_operator` and `repo_improvement_researcher` are warn-only for optional capabilities.
+
 ## Extension Points
 
 To add new behavior safely:
@@ -102,7 +116,5 @@ BertBot mixes stable and beta Koog modules.  The beta module (`agents-features-l
 
 ## Diagrams
 
-- [architecture-diagram.md](architecture-diagram.md) is the Markdown preview page for the main architecture diagram.
 - [architecture.mmd](architecture.mmd) is the Mermaid source of truth for the architecture diagram.
-- [cicd-diagram.md](cicd-diagram.md) is the Markdown preview page for the repository automation diagram.
 - [cicd-diagram.mmd](cicd-diagram.mmd) is the Mermaid source of truth for the repository automation diagram.

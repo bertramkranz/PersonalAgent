@@ -41,8 +41,12 @@ internal class ToolCallingSkill(
         systemPrompt: String,
         userPrompt: String,
         tracingContext: TracingContext,
+        dynamicToolDefinitions: List<JsonObject>? = null,
+        dynamicToolExecutor: ((name: String, args: JsonObject) -> String)? = null,
     ): String {
-        val augmentedSystemPrompt = buildAugmentedSystemPrompt(systemPrompt, toolDefinitionsProvider())
+        val activeToolDefinitions = dynamicToolDefinitions ?: toolDefinitionsProvider()
+        val activeToolExecutor = dynamicToolExecutor ?: toolExecutor
+        val augmentedSystemPrompt = buildAugmentedSystemPrompt(systemPrompt, activeToolDefinitions)
         val toolResults = mutableListOf<Pair<String, String>>()
         var iteration = 1
 
@@ -50,49 +54,28 @@ internal class ToolCallingSkill(
             TraceLogger.skillInvoked(tracingContext, "skill=tool_calling iteration=$iteration")
             val raw =
                 llmGateway.complete(augmentedSystemPrompt, buildUserPrompt(userPrompt, toolResults))
-            val action =
-                parseActionResponse(raw)
-                    ?: recoverActionResponse(
-                        augmentedSystemPrompt = augmentedSystemPrompt,
-                        userPrompt = userPrompt,
-                        toolResults = toolResults,
-                    )
-
-            when {
-                action == null -> {
-                    TraceLogger.warn(tracingContext, "tool_calling_parse_failed", "iteration=$iteration")
-                    return forceFinalResponse(
-                        augmentedSystemPrompt = augmentedSystemPrompt,
-                        userPrompt = userPrompt,
-                        toolResults = toolResults,
-                    )
-                }
-                action.isRespond -> {
-                    TraceLogger.skillCompleted(tracingContext, "skill=tool_calling iterations=$iteration")
-                    val response = action.response ?: raw.trim()
-                    return formatFinalResponse(response, toolResults)
-                }
-                action.isCallTool -> {
-                    val toolName = action.tool ?: break
-                    val args =
-                        normalizeToolArguments(
-                            toolName = toolName,
-                            arguments = action.arguments ?: JsonObject(),
+            val action = resolveAction(raw, augmentedSystemPrompt, userPrompt, toolResults)
+            val handling =
+                handleAction(
+                    context =
+                        ToolActionContext(
                             userPrompt = userPrompt,
-                            toolDefinitions = toolDefinitionsProvider(),
-                        )
-                    TraceLogger.info(tracingContext, "tool_call", "tool=$toolName iteration=$iteration")
-                    val result =
-                        runCatching { toolExecutor(toolName, args) }
-                            .getOrElse { e -> "Tool error: ${e.message ?: "unknown"}" }
-                    TraceLogger.info(
-                        tracingContext,
-                        "tool_result",
-                        "tool=$toolName result_length=${result.length} preview=${sanitizeResultPreview(result)}",
-                    )
-                    toolResults.add(toolName to result)
-                }
-                else -> break
+                            tracingContext = tracingContext,
+                            toolResults = toolResults,
+                            toolDefinitions = activeToolDefinitions,
+                            toolExecutor = activeToolExecutor,
+                            augmentedSystemPrompt = augmentedSystemPrompt,
+                        ),
+                    action = action,
+                    raw = raw,
+                    iteration = iteration,
+                )
+
+            if (handling.response != null) {
+                return handling.response
+            }
+            if (handling.shouldBreak) {
+                break
             }
             iteration++
         }
@@ -101,6 +84,82 @@ internal class ToolCallingSkill(
         val finalResponse = llmGateway.complete(systemPrompt, buildUserPrompt(userPrompt, toolResults))
         return formatFinalResponse(finalResponse, toolResults)
     }
+
+    private fun resolveAction(
+        raw: String,
+        augmentedSystemPrompt: String,
+        userPrompt: String,
+        toolResults: List<Pair<String, String>>,
+    ): ToolAction? =
+        parseActionResponse(raw)
+            ?: recoverActionResponse(
+                augmentedSystemPrompt = augmentedSystemPrompt,
+                userPrompt = userPrompt,
+                toolResults = toolResults,
+            )
+
+    private fun handleAction(
+        context: ToolActionContext,
+        action: ToolAction?,
+        raw: String,
+        iteration: Int,
+    ): ToolActionHandlingResult {
+        if (action == null) {
+            TraceLogger.warn(context.tracingContext, "tool_calling_parse_failed", "iteration=$iteration")
+            return ToolActionHandlingResult(
+                response =
+                    forceFinalResponse(
+                        augmentedSystemPrompt = context.augmentedSystemPrompt,
+                        userPrompt = context.userPrompt,
+                        toolResults = context.toolResults,
+                    ),
+            )
+        }
+
+        if (action.isRespond) {
+            TraceLogger.skillCompleted(context.tracingContext, "skill=tool_calling iterations=$iteration")
+            val response = action.response ?: raw.trim()
+            return ToolActionHandlingResult(response = formatFinalResponse(response, context.toolResults))
+        }
+
+        if (!action.isCallTool) {
+            return ToolActionHandlingResult(shouldBreak = true)
+        }
+
+        val toolName = action.tool ?: return ToolActionHandlingResult(shouldBreak = true)
+        val args =
+            normalizeToolArguments(
+                toolName = toolName,
+                arguments = action.arguments ?: JsonObject(),
+                userPrompt = context.userPrompt,
+                toolDefinitions = context.toolDefinitions,
+            )
+        TraceLogger.info(context.tracingContext, "tool_call", "tool=$toolName iteration=$iteration")
+        val result =
+            runCatching { context.toolExecutor(toolName, args) }
+                .getOrElse { e -> "Tool error: ${e.message ?: "unknown"}" }
+        TraceLogger.info(
+            context.tracingContext,
+            "tool_result",
+            "tool=$toolName result_length=${result.length} preview=${sanitizeResultPreview(result)}",
+        )
+        context.toolResults.add(toolName to result)
+        return ToolActionHandlingResult()
+    }
+
+    private data class ToolActionHandlingResult(
+        val shouldBreak: Boolean = false,
+        val response: String? = null,
+    )
+
+    private data class ToolActionContext(
+        val userPrompt: String,
+        val tracingContext: TracingContext,
+        val toolResults: MutableList<Pair<String, String>>,
+        val toolDefinitions: List<JsonObject>,
+        val toolExecutor: (name: String, args: JsonObject) -> String,
+        val augmentedSystemPrompt: String,
+    )
 
     private fun recoverActionResponse(
         augmentedSystemPrompt: String,
