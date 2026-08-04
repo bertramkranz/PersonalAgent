@@ -1,8 +1,8 @@
-# Hermes Learning Parity Status
+# Learning Parity Status
 
 Last updated: 2026-08-04
 
-This document tracks practical parity progress for Hermes-like learning abilities in PersonalAgent/BertBot.
+This document tracks practical parity progress for advanced learning-loop abilities in PersonalAgent/BertBot.
 
 ## Scope
 
