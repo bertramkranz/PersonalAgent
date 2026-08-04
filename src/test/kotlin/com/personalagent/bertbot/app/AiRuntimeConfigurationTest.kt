@@ -8,7 +8,44 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class AiRuntimeConfigurationTest {
+    @Test
+    fun `session recall configuration defaults are applied`() {
+        val configuration =
+            resolveSessionRecallRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_SESSION_RECALL_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_SESSION_RECALL_MAX_EXCERPTS, configuration.maxExcerpts)
+        assertEquals(DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS, configuration.maxExcerptChars)
+    }
+
+    @Test
+    fun `session recall configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveSessionRecallRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SESSION_RECALL_ENABLED" to "true",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPTS" to "7",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS" to "420",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SESSION_RECALL_ENABLED" to "false",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPTS" to "2",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS" to "120",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(7, configuration.maxExcerpts)
+        assertEquals(420, configuration.maxExcerptChars)
+    }
+
     @Test
     fun `learning review configuration defaults are applied`() {
         val configuration =
@@ -43,6 +80,78 @@ class AiRuntimeConfigurationTest {
         assertEquals(true, configuration.enabled)
         assertEquals(true, configuration.memoryWriteApprovalRequired)
         assertEquals(false, configuration.skillWriteApprovalRequired)
+    }
+
+    @Test
+    fun `curated memory configuration defaults are applied`() {
+        val configuration =
+            resolveCuratedMemoryRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_CURATED_MEMORY_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE, configuration.maxEntriesPerScope)
+    }
+
+    @Test
+    fun `curated memory configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveCuratedMemoryRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_CURATED_MEMORY_ENABLED" to "true",
+                        "BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE" to "333",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_CURATED_MEMORY_ENABLED" to "false",
+                        "BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE" to "111",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(333, configuration.maxEntriesPerScope)
+    }
+
+    @Test
+    fun `routing hints configuration defaults are applied`() {
+        val configuration =
+            resolveRoutingHintsRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_ROUTING_HINTS_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_ROUTING_HINTS_MIN_SAMPLES, configuration.minSamplesPerRoute)
+        assertEquals(DEFAULT_ROUTING_HINTS_MAX_INFLUENCE, configuration.maxInfluence)
+        assertEquals(DEFAULT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS, configuration.recencyHalfLifeHours)
+    }
+
+    @Test
+    fun `routing hints configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveRoutingHintsRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_ROUTING_HINTS_ENABLED" to "true",
+                        "BERTBOT_ROUTING_HINTS_MIN_SAMPLES" to "7",
+                        "BERTBOT_ROUTING_HINTS_MAX_INFLUENCE" to "0.4",
+                        "BERTBOT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS" to "48",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_ROUTING_HINTS_ENABLED" to "false",
+                        "BERTBOT_ROUTING_HINTS_MIN_SAMPLES" to "3",
+                        "BERTBOT_ROUTING_HINTS_MAX_INFLUENCE" to "0.1",
+                        "BERTBOT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS" to "24",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(7, configuration.minSamplesPerRoute)
+        assertEquals(0.4, configuration.maxInfluence)
+        assertEquals(48, configuration.recencyHalfLifeHours)
     }
 
     @Test
@@ -165,6 +274,9 @@ class AiRuntimeConfigurationTest {
         assertEquals(DEFAULT_INGESTION_CONSENT_FILE_PATH, configuration.ingestionConsentFilePath)
         assertEquals(DEFAULT_INGESTION_SOURCE_STATE_FILE_PATH, configuration.ingestionSourceStateFilePath)
         assertEquals(DEFAULT_RESEARCH_RECOMMENDATIONS_FILE_PATH, configuration.researchRecommendationsFilePath)
+        assertEquals(DEFAULT_CURATED_MEMORY_FILE_PATH, configuration.curatedMemoryFilePath)
+        assertEquals(DEFAULT_PROCEDURAL_SKILL_FILE_PATH, configuration.proceduralSkillFilePath)
+        assertEquals(DEFAULT_ROUTING_TELEMETRY_FILE_PATH, configuration.routingTelemetryFilePath)
         assertEquals(DEFAULT_STATE_JDBC_TABLE, configuration.jdbcTable)
         assertEquals(DEFAULT_EPISODIC_MEMORY_JDBC_TABLE, configuration.episodicMemoryJdbcTable)
         assertEquals(DEFAULT_STATE_EVENT_JDBC_TABLE, configuration.stateEventJdbcTable)
@@ -172,6 +284,9 @@ class AiRuntimeConfigurationTest {
         assertEquals(DEFAULT_PROFILE_JDBC_TABLE, configuration.profileJdbcTable)
         assertEquals(DEFAULT_INGESTION_CONSENT_JDBC_TABLE, configuration.ingestionConsentJdbcTable)
         assertEquals(DEFAULT_INGESTION_SOURCE_STATE_JDBC_TABLE, configuration.ingestionSourceStateJdbcTable)
+        assertEquals(DEFAULT_CURATED_MEMORY_JDBC_TABLE, configuration.curatedMemoryJdbcTable)
+        assertEquals(DEFAULT_PROCEDURAL_SKILL_JDBC_TABLE, configuration.proceduralSkillJdbcTable)
+        assertEquals(DEFAULT_ROUTING_TELEMETRY_JDBC_TABLE, configuration.routingTelemetryJdbcTable)
         assertNull(configuration.jdbcUrl)
     }
 
@@ -200,11 +315,17 @@ class AiRuntimeConfigurationTest {
                         "BERTBOT_INGESTION_CONSENT_FILE_PATH" to "consent-from-env.json",
                         "BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH" to "source-state-from-env.json",
                         "BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH" to "research-from-env.json",
+                        "BERTBOT_CURATED_MEMORY_FILE_PATH" to "curated-memory-from-env.json",
+                        "BERTBOT_PROCEDURAL_SKILL_FILE_PATH" to "procedural-skill-from-env.json",
+                        "BERTBOT_ROUTING_TELEMETRY_FILE_PATH" to "routing-telemetry-from-env.json",
                         "BERTBOT_MEMORY_EPISODIC_JDBC_TABLE" to "episodic_table",
                         "BERTBOT_MEMORY_SEMANTIC_JDBC_TABLE" to "semantic_table",
                         "BERTBOT_PROFILE_JDBC_TABLE" to "profile_table",
                         "BERTBOT_INGESTION_CONSENT_JDBC_TABLE" to "consent_table",
                         "BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE" to "source_state_table",
+                        "BERTBOT_CURATED_MEMORY_JDBC_TABLE" to "curated_memory_table",
+                        "BERTBOT_PROCEDURAL_SKILL_JDBC_TABLE" to "procedural_skill_table",
+                        "BERTBOT_ROUTING_TELEMETRY_JDBC_TABLE" to "routing_telemetry_table",
                     ),
                 dotEnvValues =
                     mapOf(
@@ -226,6 +347,9 @@ class AiRuntimeConfigurationTest {
         assertEquals("consent-from-env.json", configuration.ingestionConsentFilePath)
         assertEquals("source-state-from-env.json", configuration.ingestionSourceStateFilePath)
         assertEquals("research-from-env.json", configuration.researchRecommendationsFilePath)
+        assertEquals("curated-memory-from-env.json", configuration.curatedMemoryFilePath)
+        assertEquals("procedural-skill-from-env.json", configuration.proceduralSkillFilePath)
+        assertEquals("routing-telemetry-from-env.json", configuration.routingTelemetryFilePath)
         assertEquals("jdbc:postgresql://localhost:5432/bertbot", configuration.jdbcUrl)
         assertEquals("env-user", configuration.jdbcUser)
         assertEquals("env-pass", configuration.jdbcPassword)
@@ -237,6 +361,9 @@ class AiRuntimeConfigurationTest {
         assertEquals("profile_table", configuration.profileJdbcTable)
         assertEquals("consent_table", configuration.ingestionConsentJdbcTable)
         assertEquals("source_state_table", configuration.ingestionSourceStateJdbcTable)
+        assertEquals("curated_memory_table", configuration.curatedMemoryJdbcTable)
+        assertEquals("procedural_skill_table", configuration.proceduralSkillJdbcTable)
+        assertEquals("routing_telemetry_table", configuration.routingTelemetryJdbcTable)
     }
 
     @Test

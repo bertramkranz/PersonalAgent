@@ -95,6 +95,95 @@ internal object McpServerBootstrap {
                     },
                 )
             }
+        val proceduralSkillToolRouter =
+            startup.runtime?.let {
+                val store = BertBotRuntimeDependenciesFactory.createProceduralSkillStore()
+                ProceduralSkillToolRouter(
+                    handlers =
+                        ProceduralSkillToolHandlers(
+                            listSkills = { status, limit, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.list(status = status, limit = limit)
+                                }
+                            },
+                            createSkill = { request, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.create(request)
+                                }
+                            },
+                            patchSkill = { skillId, request, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.patch(skillId, request)
+                                }
+                            },
+                            supersedeSkill = { skillId, request, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.supersede(skillId, request)
+                                }
+                            },
+                            archiveSkill = { skillId, staged, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.archive(skillId, staged)
+                                }
+                            },
+                            approveSkill = { skillId, note, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.approve(skillId, note)
+                                }
+                            },
+                            rejectSkill = { skillId, note, scopeKey ->
+                                store.withScope(scopeKey ?: "global") {
+                                    store.reject(skillId, note)
+                                }
+                            },
+                        ),
+                )
+            }
+        val scheduledJobToolRouter =
+            startup.runtime?.let { runtime ->
+                ScheduledJobToolRouter(
+                    handlers =
+                        ScheduledJobToolHandlers(
+                            listJobs = { limit, scopeKey ->
+                                runtime.listScheduledJobs(limit = limit, persistenceScopeKey = scopeKey ?: "global")
+                            },
+                            createJob = { scheduleSeconds, payload, scopeKey ->
+                                runtime.createScheduledJob(
+                                    scheduleSeconds = scheduleSeconds,
+                                    payload = payload,
+                                    persistenceScopeKey = scopeKey ?: "global",
+                                )
+                            },
+                            updateJob = { jobId, scheduleSeconds, payload, scopeKey ->
+                                runtime.updateScheduledJob(
+                                    jobId = jobId,
+                                    scheduleSeconds = scheduleSeconds,
+                                    payload = payload,
+                                    persistenceScopeKey = scopeKey ?: "global",
+                                )
+                            },
+                            pauseJob = { jobId, scopeKey ->
+                                runtime.pauseScheduledJob(jobId = jobId, persistenceScopeKey = scopeKey ?: "global")
+                            },
+                            resumeJob = { jobId, scopeKey ->
+                                runtime.resumeScheduledJob(jobId = jobId, persistenceScopeKey = scopeKey ?: "global")
+                            },
+                            runJob = { jobId, scopeKey ->
+                                runtime.runScheduledJob(jobId = jobId, persistenceScopeKey = scopeKey ?: "global")
+                            },
+                            removeJob = { jobId, scopeKey ->
+                                runtime.removeScheduledJob(jobId = jobId, persistenceScopeKey = scopeKey ?: "global")
+                            },
+                            listHistory = { jobId, limit, scopeKey ->
+                                runtime.listScheduledJobHistory(
+                                    jobId = jobId,
+                                    limit = limit,
+                                    persistenceScopeKey = scopeKey ?: "global",
+                                )
+                            },
+                        ),
+                )
+            }
         val polymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment())
         val continuousResearchToolRouter =
             startup.runtime
@@ -196,6 +285,28 @@ internal object McpServerBootstrap {
                                     ),
                             )
                         },
+                        proceduralSkillToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "procedural_skill",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "procedural_skill",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        scheduledJobToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "scheduled_jobs",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "scheduled_jobs",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
                     ),
             )
 
@@ -212,6 +323,8 @@ internal object McpServerBootstrap {
                     continuousResearchToolRouter = continuousResearchToolRouter,
                     sessionHistoryToolRouter = sessionHistoryToolRouter,
                     learningReviewToolRouter = learningReviewToolRouter,
+                    proceduralSkillToolRouter = proceduralSkillToolRouter,
+                    scheduledJobToolRouter = scheduledJobToolRouter,
                     learningReviewConfiguration = learningReviewConfiguration,
                     toolNames = input.toolNames,
                     checkpointRollbackPolicy = checkpointRollbackPolicy,
@@ -220,7 +333,7 @@ internal object McpServerBootstrap {
 
         val dispatcher =
             McpRequestDispatcher(
-                respondToPrompt = { prompt, requestCorrelationId ->
+                respondToPrompt = { prompt, requestCorrelationId, sessionRecallQuery ->
                     val runtime = startup.runtime
                     if (runtime == null) {
                         error(startup.errorMessage ?: "BertBot runtime is unavailable.")
@@ -229,6 +342,7 @@ internal object McpServerBootstrap {
                         userMessage = prompt,
                         emitFallbackMessage = false,
                         traceCorrelationId = requestCorrelationId,
+                        sessionRecallQuery = sessionRecallQuery,
                     )
                 },
                 workspaceRoot = input.workspaceRoot,
@@ -240,6 +354,8 @@ internal object McpServerBootstrap {
                 shoppingToolRouter = shoppingToolRouter,
                 sessionHistoryToolRouter = sessionHistoryToolRouter,
                 learningReviewToolRouter = learningReviewToolRouter,
+                proceduralSkillToolRouter = proceduralSkillToolRouter,
+                scheduledJobToolRouter = scheduledJobToolRouter,
                 ingestionControlPlane = startup.runtime?.ingestionControlPlane(),
                 externalChatResponder = startup.runtime?.let { runtime -> { message, dryRun -> runtime.chatFromExternalMessage(message, dryRun) } },
                 listCheckpoints = startup.runtime?.let { runtime -> { scopeKey -> runtime.listCheckpoints(scopeKey ?: "global") } },

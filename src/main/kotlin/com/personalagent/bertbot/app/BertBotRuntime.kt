@@ -38,7 +38,7 @@ import com.personalagent.bertbot.memory.EpisodicMemory
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
 import com.personalagent.bertbot.memory.UserProfileStore
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LargeClass")
 internal class BertBotRuntime(
     val config: BertBotAgentConfig,
     val aiRuntimeConfiguration: AiRuntimeConfiguration,
@@ -54,8 +54,13 @@ internal class BertBotRuntime(
     private val stateEventStore: StateEventStore? = null,
     private val stateReplayService: StateReplayService? = null,
     private val sessionHistoryStore: SessionHistoryStore? = null,
+    private val sessionRecallConfiguration: SessionRecallRuntimeConfiguration = SessionRecallRuntimeConfiguration(),
     private val learningReviewStore: LearningReviewStore? = null,
     private val learningReviewConfiguration: LearningReviewRuntimeConfiguration = LearningReviewRuntimeConfiguration(),
+    private val routingHintsConfiguration: RoutingHintsRuntimeConfiguration = RoutingHintsRuntimeConfiguration(),
+    private val routingTelemetryStore: RoutingTelemetryStore? = null,
+    private val scheduledJobService: ScheduledJobService? = null,
+    private val learningProposalLoopService: LearningProposalLoopService? = null,
     private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
     private val toolCapabilityRegistry: CapabilityRegistry? = null,
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
@@ -63,7 +68,18 @@ internal class BertBotRuntime(
     private val telemetry: RuntimeTelemetry = NoOpRuntimeTelemetry,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
-    private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
+    private val requestContextBuilder =
+        BertBotRequestContextBuilder(
+            config = config,
+            memoryRuntime = memoryRuntime,
+            buildSessionRecallExcerpts =
+                if (sessionHistoryStore == null) {
+                    null
+                } else {
+                    { query, limit -> sessionHistoryStore.search(query = query, limit = limit) }
+                },
+            sessionRecallConfiguration = sessionRecallConfiguration,
+        )
     private var externalChatAsyncRunner: ManagedExternalChatAsyncRunner? = null
     private val externalChatHandler =
         BertBotExternalChatHandler(
@@ -82,12 +98,13 @@ internal class BertBotRuntime(
         )
     private var connectorRuntime: BertBotConnectorRuntime = BertBotConnectorRuntime()
 
-    @Suppress("LongMethod")
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     fun respondTo(
         userMessage: String,
         emitFallbackMessage: Boolean = true,
         traceCorrelationId: String? = null,
         persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+        sessionRecallQuery: String? = null,
     ): String? {
         return withPersistenceScope(persistenceScopeKey) {
             val requestSpan =
@@ -118,7 +135,12 @@ internal class BertBotRuntime(
                     return@withPersistenceScope unavailableResponse
                 }
 
-                val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
+                val requestContext =
+                    requestContextBuilder.build(
+                        userMessage = userMessage,
+                        traceCorrelationId = traceCorrelationId,
+                        sessionRecallQuery = sessionRecallQuery,
+                    )
 
                 val state =
                     try {
@@ -134,9 +156,17 @@ internal class BertBotRuntime(
                         return@withPersistenceScope null
                     }
 
+                recordDelegationRoutingOutcome(state, persistenceScopeKey)
+                recordLearningSignals(userMessage, persistenceScopeKey, state)
+
                 val koogPromptContext = koogMemory.buildPromptContext(persistenceScopeKey, userMessage)
                 val systemPrompt =
-                    buildSystemPrompt(config, state, effectiveRuntimeCapabilitySnapshot).let { base ->
+                    buildSystemPrompt(
+                        config = config,
+                        state = state,
+                        runtimeCapabilities = effectiveRuntimeCapabilitySnapshot,
+                        sessionRecallExcerpts = requestContext.sessionRecallExcerpts,
+                    ).let { base ->
                         if (koogPromptContext.isBlank()) {
                             base
                         } else {
@@ -144,6 +174,13 @@ internal class BertBotRuntime(
                         }
                     }
                 val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
+                if (requestContext.sessionRecallExcerpts.isNotEmpty()) {
+                    TraceLogger.info(
+                        tracingContext,
+                        "session_recall_injected",
+                        "query=${requestContext.sessionRecallQuery ?: ""} excerpts=${requestContext.sessionRecallExcerpts.size}",
+                    )
+                }
                 sessionHistoryStore?.append(
                     buildSessionHistoryEntry(
                         role = SessionHistoryRole.USER,
@@ -328,6 +365,89 @@ internal class BertBotRuntime(
         }
     }
 
+    fun createScheduledJob(
+        scheduleSeconds: Long,
+        payload: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): ScheduledJob? {
+        val service = scheduledJobService ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.create(
+            scopeKey = normalizedScopeKey,
+            request = ScheduledJobCreateRequest(scheduleSeconds = scheduleSeconds, payload = payload),
+        )
+    }
+
+    fun updateScheduledJob(
+        jobId: String,
+        scheduleSeconds: Long? = null,
+        payload: String? = null,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): ScheduledJob? {
+        val service = scheduledJobService ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.update(
+            scopeKey = normalizedScopeKey,
+            jobId = jobId,
+            request = ScheduledJobUpdateRequest(scheduleSeconds = scheduleSeconds, payload = payload),
+        )
+    }
+
+    fun listScheduledJobs(
+        limit: Int = 200,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): List<ScheduledJob> {
+        val service = scheduledJobService ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.list(scopeKey = normalizedScopeKey, limit = limit)
+    }
+
+    fun pauseScheduledJob(
+        jobId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): ScheduledJob? {
+        val service = scheduledJobService ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.pause(scopeKey = normalizedScopeKey, jobId = jobId)
+    }
+
+    fun resumeScheduledJob(
+        jobId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): ScheduledJob? {
+        val service = scheduledJobService ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.resume(scopeKey = normalizedScopeKey, jobId = jobId)
+    }
+
+    fun removeScheduledJob(
+        jobId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): Boolean {
+        val service = scheduledJobService ?: return false
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.remove(scopeKey = normalizedScopeKey, jobId = jobId)
+    }
+
+    fun runScheduledJob(
+        jobId: String,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): ScheduledJobExecution? {
+        val service = scheduledJobService ?: return null
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.runNow(scopeKey = normalizedScopeKey, jobId = jobId)
+    }
+
+    fun listScheduledJobHistory(
+        jobId: String? = null,
+        limit: Int = 200,
+        persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+    ): List<ScheduledJobExecution> {
+        val service = scheduledJobService ?: return emptyList()
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        return service.listHistory(scopeKey = normalizedScopeKey, jobId = jobId, limit = limit)
+    }
+
     fun rollbackToCheckpoint(
         checkpointId: String,
         persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
@@ -406,6 +526,8 @@ internal class BertBotRuntime(
         ingestionRuntime?.scheduler?.close()
         researchRuntime?.scheduler?.close()
         researchRuntime?.service?.close()
+        scheduledJobService?.close()
+        learningProposalLoopService?.close()
         externalChatAsyncRunner?.close()
         telemetry.close()
     }
@@ -435,9 +557,14 @@ internal class BertBotRuntime(
                         val runInsideLearningReviewScope: (() -> T) -> T = { innerAction ->
                             learningReviewStore?.withScope(normalizedScopeKey, innerAction) ?: innerAction()
                         }
+                        val runInsideCuratedMemoryScope: (() -> T) -> T = { innerAction ->
+                            memoryRuntime.curatedMemoryStore?.withScope(normalizedScopeKey, innerAction) ?: innerAction()
+                        }
                         runInsideSessionScope {
                             runInsideLearningReviewScope {
-                                action()
+                                runInsideCuratedMemoryScope {
+                                    action()
+                                }
                             }
                         }
                     }
@@ -614,6 +741,40 @@ internal class BertBotRuntime(
     private fun shouldGateSkillWrites(): Boolean =
         learningReviewConfiguration.enabled && learningReviewConfiguration.skillWriteApprovalRequired
 
+    private fun recordLearningSignals(
+        userMessage: String,
+        persistenceScopeKey: String,
+        state: BertBotState,
+    ) {
+        val service = learningProposalLoopService ?: return
+        val scope = normalizeScopeKey(persistenceScopeKey)
+        val normalizedMessage = userMessage.lowercase()
+
+        if (normalizedMessage.contains("i prefer") || normalizedMessage.contains("please remember")) {
+            service.recordSignal(scopeKey = scope, dedupeKey = "explicit_preference")
+        }
+        if (normalizedMessage.contains("actually") || normalizedMessage.contains("instead")) {
+            service.recordSignal(scopeKey = scope, dedupeKey = "user_correction")
+        }
+        if (state.activeIncidents.isNotEmpty() || state.recoveryStrategies.isNotEmpty()) {
+            service.recordSignal(scopeKey = scope, dedupeKey = "incident_recovery_pattern")
+        }
+    }
+
+    private fun recordDelegationRoutingOutcome(
+        state: BertBotState,
+        persistenceScopeKey: String,
+    ) {
+        val store = routingTelemetryStore ?: return
+        val selected = state.selectedSubAgent ?: return
+        val normalizedScopeKey = normalizeScopeKey(persistenceScopeKey)
+        val routeKey = "delegation:$normalizedScopeKey:$selected"
+        val success = state.recoveryStrategies.isEmpty() && state.activeIncidents.isEmpty()
+        store.withScope(normalizedScopeKey) {
+            store.recordOutcome(routeKey = routeKey, success = success)
+        }
+    }
+
     private companion object {
         private const val DEFAULT_PERSISTENCE_SCOPE_KEY = "global"
         private val learningReviewJson = Gson()
@@ -646,6 +807,7 @@ internal data class BertBotMemoryRuntime(
     val memoryAssembler: DualMemoryContextAssembler,
     val memoryWorker: MemorySummarizationWorker,
     val userProfileStore: UserProfileStore,
+    val curatedMemoryStore: CuratedMemoryStore? = null,
 )
 
 internal data class BertBotIngestionRuntime(
@@ -677,7 +839,11 @@ internal object BertBotRuntimeFactory {
 
         val persistenceConfiguration = resolvePersistenceRuntimeConfiguration()
         val sessionHistoryConfiguration = resolveSessionHistoryRuntimeConfiguration()
+        val sessionRecallConfiguration = resolveSessionRecallRuntimeConfiguration()
         val learningReviewConfiguration = resolveLearningReviewRuntimeConfiguration()
+        val routingHintsConfiguration = resolveRoutingHintsRuntimeConfiguration()
+        val scheduledJobsConfiguration = resolveScheduledJobsRuntimeConfiguration()
+        val learningProposalConfiguration = resolveLearningProposalRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
         val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
         val stateEventStore = BertBotRuntimeDependenciesFactory.createStateEventStore(persistenceConfiguration)
@@ -691,18 +857,56 @@ internal object BertBotRuntimeFactory {
                 null
             }
         val learningReviewStore = BertBotRuntimeDependenciesFactory.createLearningReviewStore(persistenceConfiguration)
+        val routingTelemetryStore =
+            if (routingHintsConfiguration.enabled) {
+                BertBotRuntimeDependenciesFactory.createRoutingTelemetryStore(persistenceConfiguration)
+            } else {
+                null
+            }
+        val scheduledJobStores = BertBotRuntimeDependenciesFactory.createScheduledJobStores(persistenceConfiguration)
+        val runtimeRef = RuntimeRef()
         val rollbackService = BertBotRuntimeDependenciesFactory.createRollbackService(stateStore, checkpointStore, stateEventStore)
         val stateReplayService = BertBotRuntimeDependenciesFactory.createStateReplayService(checkpointStore, stateEventStore)
         val graph =
             BertBotApplication.createGraph(
                 stateStore = stateStore,
                 config = runtimeConfig,
-                checkpointStore = checkpointStore,
-                enableAutomaticCheckpointing = persistenceConfiguration.checkpointAutoSaveEnabled,
-                eventSourcingConfiguration =
-                    BertBotGraphRunner.EventSourcingConfiguration(
-                        enabled = persistenceConfiguration.eventSourcingEnabled,
-                        store = stateEventStore,
+                options =
+                    BertBotGraphFactory.GraphCreationOptions(
+                        checkpointStore = checkpointStore,
+                        enableAutomaticCheckpointing = persistenceConfiguration.checkpointAutoSaveEnabled,
+                        eventSourcingConfiguration =
+                            BertBotGraphRunner.EventSourcingConfiguration(
+                                enabled = persistenceConfiguration.eventSourcingEnabled,
+                                store = stateEventStore,
+                            ),
+                        routingHintContext =
+                            BertBotGraphFactory.RoutingHintContext(
+                                configuration = routingHintsConfiguration,
+                                provider =
+                                    if (routingTelemetryStore == null) {
+                                        null
+                                    } else {
+                                        { scopeKey, routeKey ->
+                                            routingTelemetryStore.withScope(scopeKey) {
+                                                val summary = routingTelemetryStore.list(limit = 10_000).firstOrNull { it.routeKey == routeKey }
+                                                summary?.let {
+                                                    computeRoutingHint(
+                                                        summary = it,
+                                                        configuration =
+                                                            RoutingHintRuntimeConfiguration(
+                                                                enabled = routingHintsConfiguration.enabled,
+                                                                minSamplesPerRoute = routingHintsConfiguration.minSamplesPerRoute,
+                                                                maxInfluence = routingHintsConfiguration.maxInfluence,
+                                                                recencyHalfLifeHours = routingHintsConfiguration.recencyHalfLifeHours,
+                                                            ),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    },
+                                scopeKeyProvider = { _ -> "global" },
+                            ),
                     ),
             )
         val llmGateway =
@@ -793,6 +997,19 @@ internal object BertBotRuntimeFactory {
         val koogConfiguration = resolveKoogFeatureRuntimeConfiguration()
         val koogMemory = KoogRuntimeIntegrationFactory.createMemory(koogConfiguration, memoryRuntime)
         val telemetry = KoogRuntimeIntegrationFactory.createTelemetry(koogConfiguration)
+        val scheduledJobService =
+            ScheduledJobService(
+                jobStore = scheduledJobStores.first,
+                executionStore = scheduledJobStores.second,
+                runJob = { job -> runScheduledJobPayload(runtime = runtimeRef.require(), scopeKey = job.scopeKey, job = job) },
+                configuration = scheduledJobsConfiguration,
+            )
+        val learningProposalLoopService =
+            LearningProposalLoopService(
+                signalStore = LearningProposalSignalStoreFactory.create(persistenceConfiguration),
+                learningReviewStore = learningReviewStore,
+                configuration = learningProposalConfiguration,
+            )
 
         val runtime =
             BertBotRuntime(
@@ -810,18 +1027,40 @@ internal object BertBotRuntimeFactory {
                 stateEventStore = stateEventStore,
                 stateReplayService = stateReplayService,
                 sessionHistoryStore = sessionHistoryStore,
+                sessionRecallConfiguration = sessionRecallConfiguration,
                 learningReviewStore = learningReviewStore,
                 learningReviewConfiguration = learningReviewConfiguration,
+                routingHintsConfiguration = routingHintsConfiguration,
+                routingTelemetryStore = routingTelemetryStore,
+                scheduledJobService = scheduledJobService,
+                learningProposalLoopService = learningProposalLoopService,
                 koogMemory = koogMemory,
                 toolCapabilityRegistry = capabilityRegistry,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,
                 runtimeCapabilitySnapshotProvider = runtimeCapabilitySnapshotProvider,
                 telemetry = telemetry,
             )
+        runtimeRef.set(runtime)
+        scheduledJobService.start()
+        learningProposalLoopService.start()
         val connectorRuntime = BertBotConnectorRuntimeFactory.create(runtimeConfig, runtime)
         runtime.attachConnectorRuntime(connectorRuntime)
         return runtime
     }
+}
+
+private class RuntimeRef {
+    @Volatile
+    private var runtime: BertBotRuntime? = null
+
+    fun set(value: BertBotRuntime) {
+        runtime = value
+    }
+
+    fun require(): BertBotRuntime =
+        requireNotNull(runtime) {
+            "runtime not initialized"
+        }
 }
 
 internal data class RuntimeToolIntegration(
@@ -954,6 +1193,7 @@ internal fun buildCapabilityRegistry(
     shoppingToolRouter: ShoppingToolRouter? = null,
     sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
     learningReviewToolRouter: LearningReviewToolRouter? = null,
+    proceduralSkillToolRouter: ProceduralSkillToolRouter? = null,
 ): CapabilityRegistry {
     val capabilities = mutableListOf<CapabilityDefinition>()
 
@@ -1038,6 +1278,19 @@ internal fun buildCapabilityRegistry(
                         id = "learning_review",
                         definitionsProvider = learningReviewToolRouter::toolDefinitions,
                         executor = { toolName, params -> learningReviewToolRouter.handle(toolName, params) },
+                    ),
+            )
+    }
+
+    if (proceduralSkillToolRouter != null) {
+        capabilities +=
+            CapabilityDefinition(
+                id = "procedural_skill",
+                router =
+                    FunctionToolRouter(
+                        id = "procedural_skill",
+                        definitionsProvider = proceduralSkillToolRouter::toolDefinitions,
+                        executor = { toolName, params -> proceduralSkillToolRouter.handle(toolName, params) },
                     ),
             )
     }

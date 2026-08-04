@@ -74,7 +74,7 @@ internal fun runMcpSession(
 
 @Suppress("LongParameterList")
 internal class McpRequestDispatcher(
-    private val respondToPrompt: (String, String?) -> String?,
+    private val respondToPrompt: (String, String?, String?) -> String?,
     workspaceRoot: File = File("."),
     persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     private val macrofactorToolRouter: MacrofactorToolRouter? = null,
@@ -85,6 +85,8 @@ internal class McpRequestDispatcher(
     private val shoppingToolRouter: ShoppingToolRouter? = null,
     private val sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
     private val learningReviewToolRouter: LearningReviewToolRouter? = null,
+    private val proceduralSkillToolRouter: ProceduralSkillToolRouter? = null,
+    private val scheduledJobToolRouter: ScheduledJobToolRouter? = null,
     private val ingestionControlPlane: IngestionControlPlane? = null,
     private val externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
     private val listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
@@ -97,6 +99,56 @@ internal class McpRequestDispatcher(
         "Connected to ${McpConstants.SERVER_NAME} MCP server. Active tool surface: ${McpConstants.defaultStatusToolSurface.joinToString()}"
     },
 ) {
+    constructor(
+        respondToPrompt: (String, String?) -> String?,
+        workspaceRoot: File = File("."),
+        persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
+        macrofactorToolRouter: MacrofactorToolRouter? = null,
+        googleWorkspaceToolRouter: GoogleWorkspaceToolRouter? = null,
+        desktopAutomationToolRouter: DesktopAutomationToolRouter? = null,
+        polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
+        continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
+        shoppingToolRouter: ShoppingToolRouter? = null,
+        sessionHistoryToolRouter: SessionHistoryToolRouter? = null,
+        learningReviewToolRouter: LearningReviewToolRouter? = null,
+        proceduralSkillToolRouter: ProceduralSkillToolRouter? = null,
+        scheduledJobToolRouter: ScheduledJobToolRouter? = null,
+        ingestionControlPlane: IngestionControlPlane? = null,
+        externalChatResponder: ((NormalizedIngestionMessage, Boolean) -> ExternalChatOutcome)? = null,
+        listCheckpoints: ((scopeKey: String?) -> List<BertBotCheckpoint>)? = null,
+        latestCheckpoint: ((scopeKey: String?) -> BertBotCheckpoint?)? = null,
+        checkpointById: ((checkpointId: String, scopeKey: String?) -> BertBotCheckpoint?)? = null,
+        rollbackToCheckpoint: ((checkpointId: String, scopeKey: String?) -> BertBotState)? = null,
+        checkpointRollbackPolicy: CheckpointRollbackPolicyConfiguration = CheckpointRollbackPolicyConfiguration(),
+        capabilityRegistry: CapabilityRegistry? = null,
+        statusProvider: () -> String = {
+            "Connected to ${McpConstants.SERVER_NAME} MCP server. Active tool surface: ${McpConstants.defaultStatusToolSurface.joinToString()}"
+        },
+    ) : this(
+        respondToPrompt = { prompt, correlationId, _ -> respondToPrompt(prompt, correlationId) },
+        workspaceRoot = workspaceRoot,
+        persistenceConfiguration = persistenceConfiguration,
+        macrofactorToolRouter = macrofactorToolRouter,
+        googleWorkspaceToolRouter = googleWorkspaceToolRouter,
+        desktopAutomationToolRouter = desktopAutomationToolRouter,
+        polymarketToolRouter = polymarketToolRouter,
+        continuousResearchToolRouter = continuousResearchToolRouter,
+        shoppingToolRouter = shoppingToolRouter,
+        sessionHistoryToolRouter = sessionHistoryToolRouter,
+        learningReviewToolRouter = learningReviewToolRouter,
+        proceduralSkillToolRouter = proceduralSkillToolRouter,
+        scheduledJobToolRouter = scheduledJobToolRouter,
+        ingestionControlPlane = ingestionControlPlane,
+        externalChatResponder = externalChatResponder,
+        listCheckpoints = listCheckpoints,
+        latestCheckpoint = latestCheckpoint,
+        checkpointById = checkpointById,
+        rollbackToCheckpoint = rollbackToCheckpoint,
+        checkpointRollbackPolicy = checkpointRollbackPolicy,
+        capabilityRegistry = capabilityRegistry,
+        statusProvider = statusProvider,
+    )
+
     private val workspaceRootFile = workspaceRoot.canonicalFile
     private val workspaceToolHandler = McpWorkspaceToolHandler(workspaceRootFile, persistenceConfiguration)
     private val ingestionToolHandler = McpIngestionToolHandler(ingestionControlPlane, externalChatResponder)
@@ -226,6 +278,8 @@ internal class McpRequestDispatcher(
                                 shoppingToolDefinitions = toolBus.toolDefinitionsFor("shopping"),
                                 sessionHistoryToolDefinitions = toolBus.toolDefinitionsFor("session_history"),
                                 learningReviewToolDefinitions = toolBus.toolDefinitionsFor("learning_review"),
+                                proceduralSkillToolDefinitions = toolBus.toolDefinitionsFor("procedural_skill"),
+                                scheduledJobToolDefinitions = toolBus.toolDefinitionsFor("scheduled_jobs"),
                             ),
                     ),
                 )
@@ -286,6 +340,8 @@ internal class McpRequestDispatcher(
         addOptionalCapability(capabilities, "shopping", shoppingToolRouter as? ToolRouter)
         addOptionalCapability(capabilities, "session_history", sessionHistoryToolRouter as? ToolRouter)
         addOptionalCapability(capabilities, "learning_review", learningReviewToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "procedural_skill", proceduralSkillToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "scheduled_jobs", scheduledJobToolRouter as? ToolRouter)
 
         return CapabilityRegistry(capabilities)
     }
