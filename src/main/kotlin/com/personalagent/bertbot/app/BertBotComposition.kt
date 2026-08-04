@@ -4,10 +4,16 @@ import com.personalagent.bertbot.agents.SubAgentRegistry
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.nodes.DelegationNode
+import com.personalagent.bertbot.graph.nodes.EvidenceJudgeNode
 import com.personalagent.bertbot.graph.nodes.ExecutorNode
+import com.personalagent.bertbot.graph.nodes.IncidentCommanderNode
+import com.personalagent.bertbot.graph.nodes.IncidentDetectorNode
 import com.personalagent.bertbot.graph.nodes.MessageCaptureNode
+import com.personalagent.bertbot.graph.nodes.ModelRouterNode
 import com.personalagent.bertbot.graph.nodes.NodeIds
 import com.personalagent.bertbot.graph.nodes.PlannerNode
+import com.personalagent.bertbot.graph.nodes.ResearchPlannerNode
+import com.personalagent.bertbot.graph.nodes.SafetyGuardianNode
 import com.personalagent.bertbot.graph.runtime.BertBotCheckpointStore
 import com.personalagent.bertbot.graph.runtime.BertBotGraphDefinition
 import com.personalagent.bertbot.graph.runtime.BertBotGraphEdge
@@ -83,16 +89,36 @@ internal object BertBotGraphFactory {
             nodes =
                 listOf(
                     MessageCaptureNode(),
+                    ResearchPlannerNode(),
                     PlannerNode(config.nonActionableMessages),
+                    EvidenceJudgeNode(),
+                    SafetyGuardianNode(),
+                    ModelRouterNode(strategy = config.modelSelection),
                     DelegationNode(registry),
                     ExecutorNode(),
+                    IncidentDetectorNode(),
+                    IncidentCommanderNode(),
                 ),
             edges =
                 listOf(
-                    BertBotGraphEdge(NodeIds.CAPTURE, NodeIds.PLANNER) { true },
-                    BertBotGraphEdge(NodeIds.PLANNER, NodeIds.DELEGATION) { it.pendingTasks.isNotEmpty() },
+                    BertBotGraphEdge(NodeIds.CAPTURE, NodeIds.RESEARCH_PLANNER) { true },
+                    BertBotGraphEdge(NodeIds.RESEARCH_PLANNER, NodeIds.PLANNER) { true },
+                    BertBotGraphEdge(NodeIds.PLANNER, NodeIds.EVIDENCE_JUDGE) { it.pendingTasks.isNotEmpty() },
                     BertBotGraphEdge(NodeIds.PLANNER, NodeIds.EXECUTOR) { it.pendingTasks.isEmpty() },
+                    BertBotGraphEdge(NodeIds.EVIDENCE_JUDGE, NodeIds.SAFETY_GUARDIAN) { true },
+                    BertBotGraphEdge(NodeIds.SAFETY_GUARDIAN, NodeIds.MODEL_ROUTER) {
+                        it.pendingTasks.isNotEmpty() && !it.requiresUserApproval
+                    },
+                    BertBotGraphEdge(NodeIds.SAFETY_GUARDIAN, NodeIds.EXECUTOR) { it.requiresUserApproval },
+                    BertBotGraphEdge(NodeIds.MODEL_ROUTER, NodeIds.DELEGATION) {
+                        it.pendingTasks.isNotEmpty() && !it.requiresUserApproval
+                    },
+                    BertBotGraphEdge(NodeIds.MODEL_ROUTER, NodeIds.EXECUTOR) {
+                        it.pendingTasks.isEmpty() || it.requiresUserApproval
+                    },
                     BertBotGraphEdge(NodeIds.DELEGATION, NodeIds.EXECUTOR) { true },
+                    BertBotGraphEdge(NodeIds.EXECUTOR, NodeIds.INCIDENT_DETECTOR) { true },
+                    BertBotGraphEdge(NodeIds.INCIDENT_DETECTOR, NodeIds.INCIDENT_COMMANDER) { it.activeIncidents.isNotEmpty() },
                 ),
         )
     }

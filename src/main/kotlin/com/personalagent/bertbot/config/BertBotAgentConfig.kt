@@ -90,6 +90,12 @@ data class ContinuousImprovementResearchConfig(
     val failureCooldownSeconds: Long = 600,
 )
 
+data class ModelSelectionStrategy(
+    val primaryModel: String = "gpt-4o-mini",
+    val reasoningModel: String = "gpt-4o",
+    val costBudgetPerRequestUsd: Double = 0.50,
+)
+
 data class BertBotAgentConfig(
     val name: String = "BertBot",
     val maxSemanticContextEntries: Int = 5,
@@ -97,6 +103,7 @@ data class BertBotAgentConfig(
     val memorySummarizationThreshold: Int = 15,
     val memorySummarizationBatchSize: Int = 10,
     val research: ContinuousImprovementResearchConfig = ContinuousImprovementResearchConfig(),
+    val modelSelection: ModelSelectionStrategy = ModelSelectionStrategy(),
     val ingestion: IngestionConfig = IngestionConfig(),
     val nonActionableMessages: Set<String> =
         setOf(

@@ -199,6 +199,21 @@ BERTBOT_OLLAMA_BASE_URL=http://localhost:11434
 | `BERTBOT_OLLAMA_TIMEOUT_SECONDS` | Ollama request timeout | Default `120` |
 | `BERTBOT_WORKSPACE_ROOT` | Workspace tool root override | Useful for MCP workspace tool routes |
 
+## Model Routing And Incident Recovery
+
+Phase 2 and Phase 3 routing are deterministic graph stages and currently use in-repo config defaults through `BertBotAgentConfig`.
+
+- `modelSelection.primaryModel` (default `gpt-4o-mini`) routes lower-complexity tasks to lower-cost inference.
+- `modelSelection.reasoningModel` (default `gpt-4o`) routes higher-complexity tasks when research, urgency, or evidence density signals are high.
+- `modelSelection.costBudgetPerRequestUsd` (default `0.50`) emits cost budget warnings in traces when estimated request cost exceeds the threshold.
+
+Incident response runs after execution:
+
+- `IncidentDetectorNode` identifies low-evidence, missing-model, delegation, and approval-gated incidents.
+- `IncidentCommanderNode` applies bounded recovery actions (`RETRY`, `FALLBACK`, `ESCALATE`, `ABORT`) and records incident log entries in state snapshots.
+
+These settings are currently code-configured (constructor/config object) rather than environment-variable controlled.
+
 ## Proxy Tool Integrations
 
 Google Workspace MCP proxy:

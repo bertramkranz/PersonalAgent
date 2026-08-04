@@ -4,6 +4,14 @@ import com.google.gson.JsonSyntaxException
 import com.personalagent.bertbot.graph.model.BertBotDelegationDecision
 import com.personalagent.bertbot.graph.model.BertBotIntent
 import com.personalagent.bertbot.graph.model.BertBotState
+import com.personalagent.bertbot.graph.model.EvidenceSource
+import com.personalagent.bertbot.graph.model.Incident
+import com.personalagent.bertbot.graph.model.IncidentLogEntry
+import com.personalagent.bertbot.graph.model.InvestigationPlan
+import com.personalagent.bertbot.graph.model.ModelRoutingDecision
+import com.personalagent.bertbot.graph.model.RecoveryStrategy
+import com.personalagent.bertbot.graph.model.SafetyCheckResult
+import com.personalagent.bertbot.graph.model.TokenMetadata
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
@@ -105,6 +113,20 @@ internal data class PersistedBertBotStateSnapshot(
     val executionSummary: List<String> = emptyList(),
     val currentIntent: BertBotIntent? = null,
     val delegationDecision: BertBotDelegationDecision? = null,
+    val researchPlan: InvestigationPlan? = null,
+    val evidenceSources: List<EvidenceSource> = emptyList(),
+    val evidenceConfidence: Double = 0.0,
+    val safetyCheckResults: List<SafetyCheckResult> = emptyList(),
+    val requiresUserApproval: Boolean = false,
+    val approvalReason: String = "",
+    val selectedModel: String? = null,
+    val modelRoutingDecision: ModelRoutingDecision? = null,
+    val estimatedCostForCurrentTurn: Double = 0.0,
+    val actualCostForCurrentTurn: Double = 0.0,
+    val tokenCountingMetadata: TokenMetadata? = null,
+    val activeIncidents: List<Incident> = emptyList(),
+    val recoveryStrategies: List<RecoveryStrategy> = emptyList(),
+    val incidentLog: List<IncidentLogEntry> = emptyList(),
     val selectedSubAgent: String? = null,
     val intentResolved: Boolean = false,
 ) {
@@ -119,6 +141,20 @@ internal data class PersistedBertBotStateSnapshot(
             executionSummary = executionSummary.toMutableList(),
             currentIntent = currentIntent,
             delegationDecision = delegationDecision,
+            researchPlan = researchPlan,
+            evidenceSources = evidenceSources.toMutableList(),
+            evidenceConfidence = evidenceConfidence,
+            safetyCheckResults = safetyCheckResults.toMutableList(),
+            requiresUserApproval = requiresUserApproval,
+            approvalReason = approvalReason,
+            selectedModel = selectedModel,
+            modelRoutingDecision = modelRoutingDecision,
+            estimatedCostForCurrentTurn = estimatedCostForCurrentTurn,
+            actualCostForCurrentTurn = actualCostForCurrentTurn,
+            tokenCountingMetadata = tokenCountingMetadata,
+            activeIncidents = activeIncidents.toMutableList(),
+            recoveryStrategies = recoveryStrategies.toMutableList(),
+            incidentLog = incidentLog.toMutableList(),
             selectedSubAgent = selectedSubAgent,
             intentResolved = intentResolved,
         )
@@ -135,6 +171,20 @@ internal data class PersistedBertBotStateSnapshot(
                 executionSummary = state.executionSummary.toList(),
                 currentIntent = state.currentIntent,
                 delegationDecision = state.delegationDecision,
+                researchPlan = state.researchPlan,
+                evidenceSources = state.evidenceSources.toList(),
+                evidenceConfidence = state.evidenceConfidence,
+                safetyCheckResults = state.safetyCheckResults.toList(),
+                requiresUserApproval = state.requiresUserApproval,
+                approvalReason = state.approvalReason,
+                selectedModel = state.selectedModel,
+                modelRoutingDecision = state.modelRoutingDecision,
+                estimatedCostForCurrentTurn = state.estimatedCostForCurrentTurn,
+                actualCostForCurrentTurn = state.actualCostForCurrentTurn,
+                tokenCountingMetadata = state.tokenCountingMetadata,
+                activeIncidents = state.activeIncidents.toList(),
+                recoveryStrategies = state.recoveryStrategies.toList(),
+                incidentLog = state.incidentLog.toList(),
                 selectedSubAgent = state.selectedSubAgent,
                 intentResolved = state.intentResolved,
             )
