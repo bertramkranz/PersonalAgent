@@ -73,6 +73,11 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_GOOGLE_WORKSPACE_ARGS` | `…workspace#v0.0.8…` | same | same | |
 | `BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS` | `60` | `60` | `60` | |
 | `BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX` | `google_workspace_` | `google_workspace_` | `google_workspace_` | |
+| `BERTBOT_DESKTOP_AUTOMATION_ENABLED` | `false` | `false` | `false` | Enable the desktop-automation MCP bridge |
+| `BERTBOT_DESKTOP_AUTOMATION_COMMAND` | `npx` | `npx` | `npx` | |
+| `BERTBOT_DESKTOP_AUTOMATION_ARGS` | — | `` | `` | Comma-separated launch args |
+| `BERTBOT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS` | `60` | `60` | `60` | |
+| `BERTBOT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX` | `desktop_automation_` | `desktop_automation_` | `desktop_automation_` | |
 | `BERTBOT_SHOPPING_ENABLED` | `false` | `false` | `false` | |
 | `BERTBOT_SHOPPING_BUDGET_LIMIT_CENTS` | `10000` | `10000` | `10000` | |
 | `BERTBOT_SHOPPING_MIN_SELLER_TRUST_SCORE` | `0.7` | `0.7` | `0.7` | |
@@ -242,6 +247,16 @@ MacroFactor MCP proxy:
 | `BERTBOT_MACROFACTOR_LIVE_ARGS_JSON` | Optional live test tool arguments |
 | `BERTBOT_MACROFACTOR_EXPECTED_TOOL` | Optional `tools/list` assertion target |
 | `BERTBOT_MACROFACTOR_EXPECTED_ARG` | Optional schema assertion key |
+
+Desktop automation MCP bridge:
+
+| Variable | Purpose |
+| --- | --- |
+| `BERTBOT_DESKTOP_AUTOMATION_ENABLED` | Enable the desktop-automation proxy tool registration |
+| `BERTBOT_DESKTOP_AUTOMATION_COMMAND` | Executable used to launch the upstream desktop automation bridge |
+| `BERTBOT_DESKTOP_AUTOMATION_ARGS` | Comma-separated launch args |
+| `BERTBOT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS` | Upstream response timeout |
+| `BERTBOT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX` | Tool-name prefix exposed by BertBot |
 
 Shopping store configuration (supports up to 9 numbered stores; replace `N` with 1–9):
 

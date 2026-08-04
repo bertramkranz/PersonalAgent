@@ -310,6 +310,21 @@ data class BertBotAgentConfig(
                     ),
             ),
             SubAgentConfigDefinition(
+                id = "desktop_automation_operator",
+                name = "Desktop Automation Operator",
+                description = "Handles desktop computer-use and GUI automation workflows through an MCP-based desktop automation bridge",
+                skills =
+                    setOf(
+                        "desktop automation",
+                        "computer use",
+                        "computer-use",
+                        "gui automation",
+                        "desktop gui",
+                        "desktop automation mcp",
+                        "desktop computer-use",
+                    ),
+            ),
+            SubAgentConfigDefinition(
                 id = "repo_improvement_researcher",
                 name = "Repo Improvement Researcher",
                 description = "Continuously researches repository and ecosystem improvements with Kotlin, MCP, AI, security, productivity, and performance focus",

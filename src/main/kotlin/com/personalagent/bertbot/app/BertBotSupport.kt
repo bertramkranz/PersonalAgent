@@ -83,6 +83,14 @@ internal data class GoogleWorkspaceRuntimeConfiguration(
     val toolNamePrefix: String = DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX,
 )
 
+internal data class DesktopAutomationRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_DESKTOP_AUTOMATION_ENABLED,
+    val command: String = DEFAULT_DESKTOP_AUTOMATION_COMMAND,
+    val args: List<String> = DEFAULT_DESKTOP_AUTOMATION_ARGS,
+    val timeoutSeconds: Long = DEFAULT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS,
+    val toolNamePrefix: String = DEFAULT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX,
+)
+
 /**
  * Runtime configuration for the optional Playwright browser store adapter.
  *
@@ -172,6 +180,11 @@ internal const val DEFAULT_GOOGLE_WORKSPACE_COMMAND = "npx"
 internal val DEFAULT_GOOGLE_WORKSPACE_ARGS = listOf("-y", "-p", "github:gemini-cli-extensions/workspace#v0.0.8", "gemini-workspace-server")
 internal const val DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS: Long = 60
 internal const val DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX = "google_workspace_"
+internal const val DEFAULT_DESKTOP_AUTOMATION_ENABLED = false
+internal const val DEFAULT_DESKTOP_AUTOMATION_COMMAND = "npx"
+internal val DEFAULT_DESKTOP_AUTOMATION_ARGS = emptyList<String>()
+internal const val DEFAULT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS: Long = 60
+internal const val DEFAULT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX = "desktop_automation_"
 internal const val DEFAULT_KOOG_CHAT_MEMORY_ENABLED = true
 internal const val DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE = 50
 internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED = true
@@ -522,6 +535,50 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
             ?: DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX
 
     return GoogleWorkspaceRuntimeConfiguration(
+        enabled = enabled,
+        command = command,
+        args = args,
+        timeoutSeconds = timeoutSeconds,
+        toolNamePrefix = toolNamePrefix,
+    )
+}
+
+internal fun resolveDesktopAutomationRuntimeConfiguration(): DesktopAutomationRuntimeConfiguration =
+    resolveDesktopAutomationRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveDesktopAutomationRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): DesktopAutomationRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_DESKTOP_AUTOMATION_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_DESKTOP_AUTOMATION_ENABLED)
+
+    val command =
+        resolveRuntimeSetting("BERTBOT_DESKTOP_AUTOMATION_COMMAND", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_DESKTOP_AUTOMATION_COMMAND
+
+    val args =
+        resolveRuntimeSettingAllowBlank("BERTBOT_DESKTOP_AUTOMATION_ARGS", environment, dotEnvValues)
+            ?.let { parseCommandArgs(it) }
+            ?: DEFAULT_DESKTOP_AUTOMATION_ARGS
+
+    val timeoutSeconds =
+        resolveRuntimeSetting("BERTBOT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS", environment, dotEnvValues)
+            ?.toLongOrNull()
+            ?.coerceAtLeast(1)
+            ?: DEFAULT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS
+
+    val toolNamePrefix =
+        resolveRuntimeSetting("BERTBOT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX", environment, dotEnvValues)
+            ?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX
+
+    return DesktopAutomationRuntimeConfiguration(
         enabled = enabled,
         command = command,
         args = args,

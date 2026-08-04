@@ -79,6 +79,7 @@ internal class McpRequestDispatcher(
     persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     private val macrofactorToolRouter: MacrofactorToolRouter? = null,
     private val googleWorkspaceToolRouter: GoogleWorkspaceToolRouter? = null,
+    private val desktopAutomationToolRouter: DesktopAutomationToolRouter? = null,
     private val polymarketToolRouter: PolymarketToolRouter = PolymarketToolRouter(PolymarketApiClient.fromEnvironment()),
     private val continuousResearchToolRouter: ContinuousResearchToolRouter? = null,
     private val shoppingToolRouter: ShoppingToolRouter? = null,
@@ -218,6 +219,7 @@ internal class McpRequestDispatcher(
                             OptionalToolDefinitions(
                                 macrofactorToolDefinitions = toolBus.toolDefinitionsFor("macrofactor"),
                                 googleWorkspaceToolDefinitions = toolBus.toolDefinitionsFor("google_workspace"),
+                                desktopAutomationToolDefinitions = toolBus.toolDefinitionsFor("desktop_automation"),
                                 continuousResearchToolDefinitions = toolBus.toolDefinitionsFor("continuous_research"),
                                 shoppingToolDefinitions = toolBus.toolDefinitionsFor("shopping"),
                             ),
@@ -277,6 +279,19 @@ internal class McpRequestDispatcher(
                             id = "google_workspace",
                             definitionsProvider = googleWorkspaceToolRouter::toolDefinitions,
                             executor = { toolName, callParams -> googleWorkspaceToolRouter.handle(toolName, callParams) },
+                        ),
+                )
+        }
+
+        if (desktopAutomationToolRouter != null) {
+            capabilities +=
+                CapabilityDefinition(
+                    id = "desktop_automation",
+                    router =
+                        FunctionToolRouter(
+                            id = "desktop_automation",
+                            definitionsProvider = desktopAutomationToolRouter::toolDefinitions,
+                            executor = { toolName, callParams -> desktopAutomationToolRouter.handle(toolName, callParams) },
                         ),
                 )
         }
