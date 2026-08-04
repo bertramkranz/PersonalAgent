@@ -18,6 +18,7 @@ flowchart TD
     %% 2026-08-03: merge-generated-prs-on-green now enables auto-merge for eligible non-draft in-repo PRs without requiring an auto-merge label.
     %% 2026-08-03: deploy-cloud-run-main.yml now sets BERTBOT_WEBHOOK_PORT to CLOUD_RUN_CONTAINER_PORT to override image defaults and avoid startup probe failures.
     %% 2026-08-03: deploy-cloud-run-main.yml now selects postgres only when the configured Cloud SQL instance is reachable, otherwise falls back to file-backed state for startup resilience.
+    %% 2026-08-04: dod-enforcement.yml pins dorny/paths-filter to full SHA (d1c1ffe) to satisfy enforce-pinned-actions policy.
     %% 2026-08-04: deploy-cloud-run-main.yml now quotes repo-var interpolations in env wiring to avoid YAML coercion/empty-value drift across optional integration secrets.
     %% ── Entry points ──────────────────────────────────────────────────────────
     DEV([Developer / Copilot SWE\npushes to a feature branch])
