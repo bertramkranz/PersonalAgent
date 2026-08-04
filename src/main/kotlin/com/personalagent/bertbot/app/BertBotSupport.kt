@@ -62,6 +62,12 @@ internal data class SessionHistoryRuntimeConfiguration(
     val maxEntriesPerScope: Int = DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE,
 )
 
+internal data class SessionRecallRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_SESSION_RECALL_ENABLED,
+    val maxExcerpts: Int = DEFAULT_SESSION_RECALL_MAX_EXCERPTS,
+    val maxExcerptChars: Int = DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS,
+)
+
 internal data class LearningReviewRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_LEARNING_REVIEW_ENABLED,
     val memoryWriteApprovalRequired: Boolean = DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED,
@@ -192,6 +198,9 @@ internal const val DEFAULT_LEARNING_REVIEW_JDBC_TABLE = "bertbot_learning_review
 internal const val DEFAULT_LEARNING_REVIEW_DECISION_JDBC_TABLE = "bertbot_learning_review_decision_event"
 internal const val DEFAULT_SESSION_HISTORY_ENABLED = true
 internal const val DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE = 2000
+internal const val DEFAULT_SESSION_RECALL_ENABLED = false
+internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPTS = 3
+internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS = 280
 internal const val DEFAULT_LEARNING_REVIEW_ENABLED = true
 internal const val DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED = false
@@ -865,6 +874,37 @@ internal fun resolveLearningReviewRuntimeConfiguration(
     )
 }
 
+internal fun resolveSessionRecallRuntimeConfiguration(): SessionRecallRuntimeConfiguration =
+    resolveSessionRecallRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
+internal fun resolveSessionRecallRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): SessionRecallRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_SESSION_RECALL_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_SESSION_RECALL_ENABLED)
+    val maxExcerpts =
+        resolveRuntimeSetting("BERTBOT_SESSION_RECALL_MAX_EXCERPTS", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 20)
+            ?: DEFAULT_SESSION_RECALL_MAX_EXCERPTS
+    val maxExcerptChars =
+        resolveRuntimeSetting("BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(80, 2000)
+            ?: DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS
+
+    return SessionRecallRuntimeConfiguration(
+        enabled = enabled,
+        maxExcerpts = maxExcerpts,
+        maxExcerptChars = maxExcerptChars,
+    )
+}
+
 private fun parseCommandArgs(value: String): List<String> {
     return value
         .split(',')
@@ -998,6 +1038,7 @@ internal fun buildSystemPrompt(
     config: BertBotAgentConfig,
     state: BertBotState,
     runtimeCapabilities: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
+    sessionRecallExcerpts: List<String> = emptyList(),
 ): String =
     """
     ${config.systemPrompt}
@@ -1045,7 +1086,25 @@ internal fun buildSystemPrompt(
     - memory: ${renderStateListForSystemContext(state.memorySummary)}
     - profile: ${renderStateListForSystemContext(state.profileSummary)}
     - selected sub-agent: "${escapeForSystemContext(state.selectedSubAgent ?: "none")}"
+    ${buildSessionRecallPromptSection(sessionRecallExcerpts)}
     """.trimIndent()
+
+private fun buildSessionRecallPromptSection(sessionRecallExcerpts: List<String>): String {
+    if (sessionRecallExcerpts.isEmpty()) {
+        return ""
+    }
+
+    val renderedExcerpts =
+        sessionRecallExcerpts
+            .mapIndexed { index, excerpt -> "${index + 1}. ${escapeForSystemContext(excerpt)}" }
+            .joinToString("\n")
+
+    return buildString {
+        appendLine()
+        appendLine("Relevant prior session excerpts (retrieval opt-in):")
+        append(renderedExcerpts)
+    }
+}
 
 internal fun buildCapabilityStatusResponse(
     config: BertBotAgentConfig,

@@ -8,7 +8,44 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@Suppress("LargeClass")
 class AiRuntimeConfigurationTest {
+    @Test
+    fun `session recall configuration defaults are applied`() {
+        val configuration =
+            resolveSessionRecallRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_SESSION_RECALL_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_SESSION_RECALL_MAX_EXCERPTS, configuration.maxExcerpts)
+        assertEquals(DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS, configuration.maxExcerptChars)
+    }
+
+    @Test
+    fun `session recall configuration prefers environment over dotenv`() {
+        val configuration =
+            resolveSessionRecallRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_SESSION_RECALL_ENABLED" to "true",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPTS" to "7",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS" to "420",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_SESSION_RECALL_ENABLED" to "false",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPTS" to "2",
+                        "BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS" to "120",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(7, configuration.maxExcerpts)
+        assertEquals(420, configuration.maxExcerptChars)
+    }
+
     @Test
     fun `learning review configuration defaults are applied`() {
         val configuration =

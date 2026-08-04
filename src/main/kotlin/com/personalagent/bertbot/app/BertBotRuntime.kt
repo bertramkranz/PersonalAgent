@@ -54,6 +54,7 @@ internal class BertBotRuntime(
     private val stateEventStore: StateEventStore? = null,
     private val stateReplayService: StateReplayService? = null,
     private val sessionHistoryStore: SessionHistoryStore? = null,
+    private val sessionRecallConfiguration: SessionRecallRuntimeConfiguration = SessionRecallRuntimeConfiguration(),
     private val learningReviewStore: LearningReviewStore? = null,
     private val learningReviewConfiguration: LearningReviewRuntimeConfiguration = LearningReviewRuntimeConfiguration(),
     private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
@@ -63,7 +64,18 @@ internal class BertBotRuntime(
     private val telemetry: RuntimeTelemetry = NoOpRuntimeTelemetry,
 ) : AutoCloseable {
     private val interactionGraphWriter: InteractionGraphWriter = InteractionGraphWriter()
-    private val requestContextBuilder = BertBotRequestContextBuilder(config, memoryRuntime)
+    private val requestContextBuilder =
+        BertBotRequestContextBuilder(
+            config = config,
+            memoryRuntime = memoryRuntime,
+            buildSessionRecallExcerpts =
+                if (sessionHistoryStore == null) {
+                    null
+                } else {
+                    { query, limit -> sessionHistoryStore.search(query = query, limit = limit) }
+                },
+            sessionRecallConfiguration = sessionRecallConfiguration,
+        )
     private var externalChatAsyncRunner: ManagedExternalChatAsyncRunner? = null
     private val externalChatHandler =
         BertBotExternalChatHandler(
@@ -82,12 +94,13 @@ internal class BertBotRuntime(
         )
     private var connectorRuntime: BertBotConnectorRuntime = BertBotConnectorRuntime()
 
-    @Suppress("LongMethod")
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
     fun respondTo(
         userMessage: String,
         emitFallbackMessage: Boolean = true,
         traceCorrelationId: String? = null,
         persistenceScopeKey: String = DEFAULT_PERSISTENCE_SCOPE_KEY,
+        sessionRecallQuery: String? = null,
     ): String? {
         return withPersistenceScope(persistenceScopeKey) {
             val requestSpan =
@@ -118,7 +131,12 @@ internal class BertBotRuntime(
                     return@withPersistenceScope unavailableResponse
                 }
 
-                val requestContext = requestContextBuilder.build(userMessage, traceCorrelationId)
+                val requestContext =
+                    requestContextBuilder.build(
+                        userMessage = userMessage,
+                        traceCorrelationId = traceCorrelationId,
+                        sessionRecallQuery = sessionRecallQuery,
+                    )
 
                 val state =
                     try {
@@ -136,7 +154,12 @@ internal class BertBotRuntime(
 
                 val koogPromptContext = koogMemory.buildPromptContext(persistenceScopeKey, userMessage)
                 val systemPrompt =
-                    buildSystemPrompt(config, state, effectiveRuntimeCapabilitySnapshot).let { base ->
+                    buildSystemPrompt(
+                        config = config,
+                        state = state,
+                        runtimeCapabilities = effectiveRuntimeCapabilitySnapshot,
+                        sessionRecallExcerpts = requestContext.sessionRecallExcerpts,
+                    ).let { base ->
                         if (koogPromptContext.isBlank()) {
                             base
                         } else {
@@ -144,6 +167,13 @@ internal class BertBotRuntime(
                         }
                     }
                 val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
+                if (requestContext.sessionRecallExcerpts.isNotEmpty()) {
+                    TraceLogger.info(
+                        tracingContext,
+                        "session_recall_injected",
+                        "query=${requestContext.sessionRecallQuery ?: ""} excerpts=${requestContext.sessionRecallExcerpts.size}",
+                    )
+                }
                 sessionHistoryStore?.append(
                     buildSessionHistoryEntry(
                         role = SessionHistoryRole.USER,
@@ -677,6 +707,7 @@ internal object BertBotRuntimeFactory {
 
         val persistenceConfiguration = resolvePersistenceRuntimeConfiguration()
         val sessionHistoryConfiguration = resolveSessionHistoryRuntimeConfiguration()
+        val sessionRecallConfiguration = resolveSessionRecallRuntimeConfiguration()
         val learningReviewConfiguration = resolveLearningReviewRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
         val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
@@ -810,6 +841,7 @@ internal object BertBotRuntimeFactory {
                 stateEventStore = stateEventStore,
                 stateReplayService = stateReplayService,
                 sessionHistoryStore = sessionHistoryStore,
+                sessionRecallConfiguration = sessionRecallConfiguration,
                 learningReviewStore = learningReviewStore,
                 learningReviewConfiguration = learningReviewConfiguration,
                 koogMemory = koogMemory,

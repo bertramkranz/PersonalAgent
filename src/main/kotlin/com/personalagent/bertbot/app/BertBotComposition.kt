@@ -451,6 +451,8 @@ internal data class BertBotRequestContext(
     val initialState: BertBotState,
     val knownProfile: UserProfile,
     val requestTraceId: String,
+    val sessionRecallQuery: String? = null,
+    val sessionRecallExcerpts: List<String> = emptyList(),
 )
 
 internal data class BertBotConnectorRuntime(
@@ -463,10 +465,13 @@ internal data class BertBotConnectorRuntime(
 internal class BertBotRequestContextBuilder(
     private val config: BertBotAgentConfig,
     private val memoryRuntime: BertBotMemoryRuntime,
+    private val buildSessionRecallExcerpts: ((query: String, limit: Int) -> List<SessionHistoryEntry>)? = null,
+    private val sessionRecallConfiguration: SessionRecallRuntimeConfiguration = SessionRecallRuntimeConfiguration(),
 ) {
     fun build(
         userMessage: String,
         traceCorrelationId: String? = null,
+        sessionRecallQuery: String? = null,
     ): BertBotRequestContext {
         extractDisplayNameFromMessage(userMessage)?.let { extractedName ->
             memoryRuntime.userProfileStore.updateDisplayName(extractedName)
@@ -478,6 +483,21 @@ internal class BertBotRequestContextBuilder(
         val knownProfile = memoryRuntime.userProfileStore.current()
         val profileSummary = buildProfileSummary(knownProfile)
         val requestTraceId = traceCorrelationId?.let { "mcp-$it-${TracingContext().traceId}" } ?: TracingContext().traceId
+        val normalizedSessionRecallQuery = sessionRecallQuery?.trim()?.takeIf { it.isNotBlank() }
+        val sessionRecallExcerpts =
+            if (sessionRecallConfiguration.enabled && !normalizedSessionRecallQuery.isNullOrBlank()) {
+                val entries = buildSessionRecallExcerpts?.invoke(normalizedSessionRecallQuery, sessionRecallConfiguration.maxExcerpts).orEmpty()
+                entries.map { entry ->
+                    val text = entry.text.trim()
+                    if (text.length <= sessionRecallConfiguration.maxExcerptChars) {
+                        text
+                    } else {
+                        text.take(sessionRecallConfiguration.maxExcerptChars).trimEnd() + "..."
+                    }
+                }
+            } else {
+                emptyList()
+            }
         val initialState =
             BertBotState(
                 traceId = requestTraceId,
@@ -495,6 +515,8 @@ internal class BertBotRequestContextBuilder(
             initialState = initialState,
             knownProfile = knownProfile,
             requestTraceId = requestTraceId,
+            sessionRecallQuery = normalizedSessionRecallQuery,
+            sessionRecallExcerpts = sessionRecallExcerpts,
         )
     }
 }

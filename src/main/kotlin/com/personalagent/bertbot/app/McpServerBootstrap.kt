@@ -220,7 +220,7 @@ internal object McpServerBootstrap {
 
         val dispatcher =
             McpRequestDispatcher(
-                respondToPrompt = { prompt, requestCorrelationId ->
+                respondToPrompt = { prompt, requestCorrelationId, sessionRecallQuery ->
                     val runtime = startup.runtime
                     if (runtime == null) {
                         error(startup.errorMessage ?: "BertBot runtime is unavailable.")
@@ -229,6 +229,7 @@ internal object McpServerBootstrap {
                         userMessage = prompt,
                         emitFallbackMessage = false,
                         traceCorrelationId = requestCorrelationId,
+                        sessionRecallQuery = sessionRecallQuery,
                     )
                 },
                 workspaceRoot = input.workspaceRoot,

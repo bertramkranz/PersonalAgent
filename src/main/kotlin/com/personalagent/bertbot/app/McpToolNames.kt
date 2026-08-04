@@ -94,6 +94,7 @@ private fun baseToolDefinitions(toolNames: McpToolNames): List<JsonObject> =
             "Pass a prompt to BertBot and return the orchestration response.",
         ) {
             property("prompt", "string", "Prompt to send to BertBot.")
+            property("sessionRecallQuery", "string", "Optional explicit session-history query for prompt-time recall injection.")
             required("prompt")
         },
         buildToolDefinition(
