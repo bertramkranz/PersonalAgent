@@ -8,8 +8,7 @@ This folder holds focused documentation that was moved out of the root README so
 - Use [configuration.md](configuration.md) when you need environment variables, provider settings, or persistence configuration.
 - Use [run-modes.md](run-modes.md) when you need to choose or operate a runtime mode.
 - Use [deployment.md](deployment.md) when you want Docker Compose or container deployment guidance.
-- Use [vscode-copilot.md](vscode-copilot.md) when you are wiring BertBot into VS Code or Copilot MCP flows, including the Agent Selection Matrix for choosing the right custom agent by task type.
-- Use [vscode-copilot.md](vscode-copilot.md) for the specialized skill catalog, including Cloud Run release ops, persistence compatibility review, MCP capability diagnostics, workflow guardrail maintenance, and prompt/policy regression checks.
+- Use [vscode-copilot.md](vscode-copilot.md) when you are wiring BertBot into VS Code or Copilot MCP flows, including the Agent Selection Matrix and the specialized skill catalog for Cloud Run release ops, persistence compatibility review, MCP capability diagnostics, workflow guardrail maintenance, and prompt/policy regression checks.
 - Use [architecture.md](architecture.md) when you are changing graph, runtime, persistence, or extension behavior.
 - Use [github-automation.md](github-automation.md) when you need CI/CD guardrails, secret scanning, or GitHub Copilot review workflow details.
 - Use [../CONTRIBUTING.md](../CONTRIBUTING.md) when you are setting up a local environment or preparing a pull request.
