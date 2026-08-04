@@ -21,6 +21,7 @@ create_valid_fixture() {
   mkdir -p "$root/.github/skills/test-orchestration"
   mkdir -p "$root/.github/skills/repo-ops"
   mkdir -p "$root/.github/skills/browser-automation"
+  mkdir -p "$root/.github/skills/desktop-automation"
 
   cat > "$root/.github/agents/bertbot.agent.md" <<'EOF'
 ---
@@ -67,6 +68,15 @@ user-invocable: true
 ---
 EOF
 
+  cat > "$root/.github/agents/desktop-automation.agent.md" <<'EOF'
+---
+description: "Desktop automation"
+name: Desktop Automation
+tools: [bertbot-backend/*]
+user-invocable: true
+---
+EOF
+
   cat > "$root/.github/skills/code-review/SKILL.md" <<'EOF'
 ---
 name: code-review
@@ -99,6 +109,13 @@ EOF
 ---
 name: browser-automation
 description: "Browser automation skill"
+---
+EOF
+
+  cat > "$root/.github/skills/desktop-automation/SKILL.md" <<'EOF'
+---
+name: desktop-automation
+description: "Desktop automation skill"
 ---
 EOF
 }

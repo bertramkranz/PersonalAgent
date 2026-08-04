@@ -1,5 +1,5 @@
 ---
-description: "Use when you need focused browser or computer-use style workflow automation with explicit checkpoints and safety constraints."
+description: "Use when you need focused web-browser workflow automation with explicit checkpoints and safety constraints."
 name: Browser Automation
 tools: [bertbot-backend/*, playwright/*]
 argument-hint: "Ask Browser Automation to run repeatable browser workflows and report checkpointed evidence"
