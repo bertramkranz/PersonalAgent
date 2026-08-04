@@ -1,6 +1,6 @@
 # BertBot
 
-BertBot is a graph-based personal assistant orchestration agent built to stay composable, inspectable, and easy to extend across local CLI, MCP, webhook, and Discord runtimes.
+BertBot is a graph-based personal assistant orchestration agent built to stay composable, inspectable, and easy to extend across local CLI, MCP, webhook, and Discord runtimes. Its browser automation support is currently web-only and safety-constrained for repeatable website workflows rather than general desktop computer-use.
 
 ## What BertBot Is
 

@@ -21,12 +21,12 @@ class CapabilityStatusResponseTest {
     }
 
     @Test
-    fun `capability response includes Playwright and document access flags`() {
+    fun `capability response includes browser automation and document access flags`() {
         val response = buildCapabilityStatusResponse(BertBotAgentConfig(), "Do you have access to my documents and can you use Playwright?")
 
         assertNotNull(response)
         assertTrue(response.contains("workspace.read_file (allowed file roots): enabled"))
-        assertTrue(response.contains("Playwright capability: enabled"))
+        assertTrue(response.contains("Browser automation (web-only): enabled"))
     }
 
     @Test
@@ -92,7 +92,7 @@ class CapabilityStatusResponseTest {
     }
 
     @Test
-    fun `capability response includes playwright fallback status when available`() {
+    fun `capability response includes browser automation fallback status when available`() {
         val response =
             buildCapabilityStatusResponse(
                 BertBotAgentConfig(),
@@ -103,11 +103,11 @@ class CapabilityStatusResponseTest {
             )
 
         assertNotNull(response)
-        assertTrue(response.contains("Playwright fallback: available"))
+        assertTrue(response.contains("Browser automation fallback: available"))
     }
 
     @Test
-    fun `capability response indicates playwright fallback disabled when not configured`() {
+    fun `capability response indicates browser automation fallback disabled when not configured`() {
         val response =
             buildCapabilityStatusResponse(
                 BertBotAgentConfig(),
@@ -119,8 +119,8 @@ class CapabilityStatusResponseTest {
 
         assertNotNull(response)
         assertTrue(
-            response.contains("Playwright fallback: agent-advertised") ||
-                response.contains("Playwright fallback: disabled"),
+            response.contains("Browser automation fallback: agent-advertised") ||
+                response.contains("Browser automation fallback: disabled"),
         )
     }
 

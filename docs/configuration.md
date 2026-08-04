@@ -260,7 +260,7 @@ Enabling the `personal_shopper` sub-agent without at least one store slot set to
 
 Playwright browser store adapter:
 
-The Playwright store adapter is **disabled by default**. It adds an optional browser-automation fallback for external stores where the API is missing or unstable.
+The Playwright store adapter is **disabled by default**. It adds an optional web-browser automation fallback for external stores where the API is missing or unstable. It is intentionally web-only and safety-constrained; it does not provide general desktop or OS-level automation.
 
 Three modes are available per store:
 
