@@ -20,6 +20,7 @@ internal class ToolCallingSkill(
     private val maxIterations: Int = 5,
     private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
     private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+    private val gatewayResolver: ((String?) -> LlmGateway)? = null,
 ) {
     constructor(
         llmGateway: LlmGateway,
@@ -28,6 +29,7 @@ internal class ToolCallingSkill(
         maxIterations: Int = 5,
         codec: AgentJsonCodec = GsonAgentJsonCodec(),
         structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+        gatewayResolver: ((String?) -> LlmGateway)? = null,
     ) : this(
         llmGateway = llmGateway,
         toolDefinitionsProvider = { toolDefinitions },
@@ -35,6 +37,7 @@ internal class ToolCallingSkill(
         maxIterations = maxIterations,
         codec = codec,
         structuredOutputGateway = structuredOutputGateway,
+        gatewayResolver = gatewayResolver,
     )
 
     fun invoke(
@@ -43,6 +46,7 @@ internal class ToolCallingSkill(
         tracingContext: TracingContext,
         dynamicToolDefinitions: List<JsonObject>? = null,
         dynamicToolExecutor: ((name: String, args: JsonObject) -> String)? = null,
+        selectedModelId: String? = null,
     ): String {
         val activeToolDefinitions = dynamicToolDefinitions ?: toolDefinitionsProvider()
         val activeToolExecutor = dynamicToolExecutor ?: toolExecutor
@@ -50,11 +54,13 @@ internal class ToolCallingSkill(
         val toolResults = mutableListOf<Pair<String, String>>()
         var iteration = 1
 
+        val activeGateway = resolveGateway(selectedModelId)
+
         while (iteration <= maxIterations) {
             TraceLogger.skillInvoked(tracingContext, "skill=tool_calling iteration=$iteration")
             val raw =
-                llmGateway.complete(augmentedSystemPrompt, buildUserPrompt(userPrompt, toolResults))
-            val action = resolveAction(raw, augmentedSystemPrompt, userPrompt, toolResults)
+                activeGateway.complete(augmentedSystemPrompt, buildUserPrompt(userPrompt, toolResults))
+            val action = resolveAction(raw, augmentedSystemPrompt, userPrompt, toolResults, activeGateway)
             val handling =
                 handleAction(
                     context =
@@ -69,6 +75,7 @@ internal class ToolCallingSkill(
                     action = action,
                     raw = raw,
                     iteration = iteration,
+                    activeGateway = activeGateway,
                 )
 
             if (handling.response != null) {
@@ -81,8 +88,12 @@ internal class ToolCallingSkill(
         }
 
         TraceLogger.warn(tracingContext, "tool_calling_max_iterations", "iterations=$maxIterations")
-        val finalResponse = llmGateway.complete(systemPrompt, buildUserPrompt(userPrompt, toolResults))
+        val finalResponse = activeGateway.complete(systemPrompt, buildUserPrompt(userPrompt, toolResults))
         return formatFinalResponse(finalResponse, toolResults)
+    }
+
+    private fun resolveGateway(selectedModelId: String?): LlmGateway {
+        return gatewayResolver?.invoke(selectedModelId) ?: llmGateway
     }
 
     private fun resolveAction(
@@ -90,12 +101,14 @@ internal class ToolCallingSkill(
         augmentedSystemPrompt: String,
         userPrompt: String,
         toolResults: List<Pair<String, String>>,
+        activeGateway: LlmGateway,
     ): ToolAction? =
         parseActionResponse(raw)
             ?: recoverActionResponse(
                 augmentedSystemPrompt = augmentedSystemPrompt,
                 userPrompt = userPrompt,
                 toolResults = toolResults,
+                activeGateway = activeGateway,
             )
 
     private fun handleAction(
@@ -103,6 +116,7 @@ internal class ToolCallingSkill(
         action: ToolAction?,
         raw: String,
         iteration: Int,
+        activeGateway: LlmGateway,
     ): ToolActionHandlingResult {
         if (action == null) {
             TraceLogger.warn(context.tracingContext, "tool_calling_parse_failed", "iteration=$iteration")
@@ -112,6 +126,7 @@ internal class ToolCallingSkill(
                         augmentedSystemPrompt = context.augmentedSystemPrompt,
                         userPrompt = context.userPrompt,
                         toolResults = context.toolResults,
+                        activeGateway = activeGateway,
                     ),
             )
         }
@@ -165,6 +180,7 @@ internal class ToolCallingSkill(
         augmentedSystemPrompt: String,
         userPrompt: String,
         toolResults: List<Pair<String, String>>,
+        activeGateway: LlmGateway,
     ): ToolAction? {
         val recoveryPrompt =
             buildString {
@@ -177,7 +193,7 @@ internal class ToolCallingSkill(
                 appendLine("Do NOT return delegate/broadcast/internal orchestration actions.")
             }
 
-        val retryRaw = llmGateway.complete(augmentedSystemPrompt, recoveryPrompt)
+        val retryRaw = activeGateway.complete(augmentedSystemPrompt, recoveryPrompt)
         return parseActionResponse(retryRaw)
     }
 
@@ -185,6 +201,7 @@ internal class ToolCallingSkill(
         augmentedSystemPrompt: String,
         userPrompt: String,
         toolResults: List<Pair<String, String>>,
+        activeGateway: LlmGateway,
     ): String {
         val forcedPrompt =
             buildString {
@@ -195,7 +212,7 @@ internal class ToolCallingSkill(
                 appendLine("Do not output JSON.")
                 appendLine("Do not mention internal delegation, sub-agents, or background execution.")
             }
-        return llmGateway.complete(augmentedSystemPrompt, forcedPrompt).trim()
+        return activeGateway.complete(augmentedSystemPrompt, forcedPrompt).trim()
     }
 
     private fun sanitizeResultPreview(result: String): String {

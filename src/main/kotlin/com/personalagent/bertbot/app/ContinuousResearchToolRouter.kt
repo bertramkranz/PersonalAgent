@@ -9,8 +9,10 @@ internal const val RESEARCH_RUN_NOW_TOOL_NAME = "repo_improvement_run_now"
 
 internal class ContinuousResearchToolRouter(
     private val service: ContinuousImprovementResearchService,
-) {
-    fun handle(
+) : ToolRouter {
+    override val id: String = "continuous_research"
+
+    override fun handle(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
@@ -22,7 +24,7 @@ internal class ContinuousResearchToolRouter(
         }
     }
 
-    fun toolDefinitions(): List<JsonObject> =
+    override fun toolDefinitions(): List<JsonObject> =
         listOf(
             buildResearchToolDefinition(
                 RESEARCH_LIST_TOOL_NAME,

@@ -20,10 +20,11 @@ import java.util.logging.Logger
 internal class GoogleWorkspaceToolRouter(
     private val runtimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
     private val transport: GoogleWorkspaceMcpTransport = StdioGoogleWorkspaceMcpTransport(runtimeConfiguration),
-) {
+) : ToolRouter {
+    override val id: String = "google_workspace"
     private var discoveredTools: List<GoogleWorkspaceDiscoveredTool>? = null
 
-    fun toolDefinitions(): List<JsonObject> {
+    override fun toolDefinitions(): List<JsonObject> {
         val tools = discoverTools() ?: return emptyList()
         return tools.map { tool ->
             val proxy = JsonObject()
@@ -35,7 +36,7 @@ internal class GoogleWorkspaceToolRouter(
         }
     }
 
-    fun handle(
+    override fun handle(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
