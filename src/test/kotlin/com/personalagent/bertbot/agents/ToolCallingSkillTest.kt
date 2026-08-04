@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -257,6 +258,39 @@ class ToolCallingSkillTest {
 
         assertEquals("done", response)
         assertEquals("get_trades", capturedOperation)
+    }
+
+    @Test
+    fun `uses resolver-selected gateway when selected model id is provided`() {
+        val defaultGateway = SequenceLlmGateway(listOf("""{"action":"respond","response":"default"}"""))
+        val selectedGateway = SequenceLlmGateway(listOf("""{"action":"respond","response":"reasoning"}"""))
+        val skill =
+            ToolCallingSkill(
+                llmGateway = defaultGateway,
+                toolDefinitions = emptyList(),
+                toolExecutor = { _, _ -> "unused" },
+                gatewayResolver = { modelId ->
+                    if (modelId == "gpt-4o") {
+                        GatewayResolution(
+                            gateway = selectedGateway,
+                            requestedModelId = modelId,
+                            effectiveModelId = "gpt-4o",
+                        )
+                    } else {
+                        GatewayResolution(
+                            gateway = defaultGateway,
+                            requestedModelId = modelId,
+                            effectiveModelId = "gpt-4o-mini",
+                        )
+                    }
+                },
+            )
+
+        val response = skill.invoke("System", "User question", TracingContext(), selectedModelId = "gpt-4o")
+
+        assertEquals("reasoning", response)
+        assertEquals(0, defaultGateway.callCount)
+        assertEquals(1, selectedGateway.callCount)
     }
 
     private fun toolDef(name: String): JsonObject {

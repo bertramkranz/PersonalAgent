@@ -212,6 +212,8 @@ Phase 2 and Phase 3 routing are deterministic graph stages and currently use in-
 - `modelSelection.reasoningModel` (default `gpt-4o`) routes higher-complexity tasks when research, urgency, or evidence density signals are high.
 - `modelSelection.costBudgetPerRequestUsd` (default `0.50`) emits cost budget warnings in traces when estimated request cost exceeds the threshold.
 
+Runtime applies the selected model per turn at invocation time for both direct response generation and tool-calling loops. If the requested model cannot be resolved for the active provider, BertBot falls back to `BERTBOT_AI_MODEL` and emits a trace event with the requested model, effective model, and fallback reason.
+
 Incident response runs after execution:
 
 - `IncidentDetectorNode` identifies low-evidence, missing-model, delegation, and approval-gated incidents.

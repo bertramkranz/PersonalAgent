@@ -217,6 +217,31 @@ class BertBotRuntimeHelpersTest {
 
         assertEquals(listOf("Known user name: Bertram"), summary)
     }
+
+    @Test
+    fun `resolveRuntimeGatewayForModel returns selected openai model when requested model differs`() {
+        val fallbackGateway = CountingGateway()
+        val configuration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key")
+
+        val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
+
+        assertEquals("gpt-4o", resolution.requestedModelId)
+        assertEquals("gpt-4o", resolution.effectiveModelId)
+        assertEquals(null, resolution.fallbackReason)
+        assertTrue(resolution.gateway !== fallbackGateway)
+    }
+
+    @Test
+    fun `resolveRuntimeGatewayForModel falls back for unsupported provider with reason`() {
+        val fallbackGateway = CountingGateway()
+        val configuration = AiRuntimeConfiguration(provider = "custom", model = "gpt-4o-mini", apiKey = "test-key")
+
+        val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
+
+        assertTrue(resolution.gateway === fallbackGateway)
+        assertEquals("gpt-4o-mini", resolution.effectiveModelId)
+        assertEquals("unsupported_provider:custom", resolution.fallbackReason)
+    }
 }
 
 private class CountingGateway : LlmGateway {

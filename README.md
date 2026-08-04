@@ -82,6 +82,12 @@ Start with [docs/index.md](docs/index.md) for the full docs index.
 - `runDiscordBot` for Discord gateway-based two-way messaging.
 - `test` or `check` for validation.
 
+## Model Routing
+
+- The orchestrator selects the turn model via graph routing (`primaryModel` vs `reasoningModel`) based on complexity signals.
+- Runtime LLM invocation now resolves that selected model per turn; both direct response generation and tool-calling loops use the resolved model.
+- If a requested model cannot be resolved for the active provider, runtime falls back to `BERTBOT_AI_MODEL` and records the fallback reason in trace events.
+
 ## Project Structure
 
 The main package boundaries are:

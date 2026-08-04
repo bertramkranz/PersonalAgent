@@ -2,6 +2,7 @@ package com.personalagent.bertbot.app
 
 import com.openai.models.ChatModel
 import com.personalagent.bertbot.config.BertBotAgentConfig
+import com.personalagent.bertbot.llm.LlmGateway
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -80,6 +81,31 @@ class AiRuntimeConfigurationTest {
 
         assertEquals(ChatModel.GPT_4O, model)
         assertEquals("gpt-4o", model.asString())
+    }
+
+    @Test
+    fun `runtime gateway resolution returns selected openai model when available`() {
+        val fallbackGateway = NoOpLlmGateway()
+        val configuration = AiRuntimeConfiguration(provider = "openai", model = "gpt-4o-mini", apiKey = "test-key")
+
+        val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
+
+        assertEquals("gpt-4o", resolution.requestedModelId)
+        assertEquals("gpt-4o", resolution.effectiveModelId)
+        assertNull(resolution.fallbackReason)
+        assertTrue(resolution.gateway !== fallbackGateway)
+    }
+
+    @Test
+    fun `runtime gateway resolution falls back for unsupported provider`() {
+        val fallbackGateway = NoOpLlmGateway()
+        val configuration = AiRuntimeConfiguration(provider = "custom", model = "gpt-4o-mini", apiKey = "test-key")
+
+        val resolution = resolveRuntimeGatewayForModel(configuration, fallbackGateway, "gpt-4o")
+
+        assertTrue(resolution.gateway === fallbackGateway)
+        assertEquals("gpt-4o-mini", resolution.effectiveModelId)
+        assertEquals("unsupported_provider:custom", resolution.fallbackReason)
     }
 
     @Test
@@ -608,4 +634,11 @@ class AiRuntimeConfigurationTest {
         assertEquals(0.0, below.minSellerTrustScore)
         assertEquals(1.0, above.minSellerTrustScore)
     }
+}
+
+private class NoOpLlmGateway : LlmGateway {
+    override fun complete(
+        systemPrompt: String,
+        userPrompt: String,
+    ): String = ""
 }

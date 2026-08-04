@@ -3,6 +3,7 @@ package com.personalagent.bertbot.agents
 import com.google.gson.JsonElement
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 
 data class SelfCorrectingSkillRequest(
@@ -17,7 +18,7 @@ data class SelfCorrectingSkillConfig<O>(
     val parser: (JsonElement) -> O,
     val maxAttempts: Int = 3,
     val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-    val gatewayResolver: ((String) -> LlmGateway)? = null,
+    val gatewayResolver: ((String?) -> GatewayResolution)? = null,
 )
 
 class SelfCorrectingSkill<O>(
@@ -31,7 +32,7 @@ class SelfCorrectingSkill<O>(
         parser: (JsonElement) -> O,
         maxAttempts: Int = 3,
         structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-        gatewayResolver: ((String) -> LlmGateway)? = null,
+        gatewayResolver: ((String?) -> GatewayResolution)? = null,
     ) : this(
         config =
             SelfCorrectingSkillConfig(
@@ -65,11 +66,18 @@ class SelfCorrectingSkill<O>(
         var currentUserPrompt = input.userPrompt
         var lastError: Throwable? = null
         var rawOutput = ""
+        val resolution = resolveGateway(selectedModelId)
+        val activeGateway = resolution.gateway
+
+        TraceLogger.info(
+            tracingContext,
+            "llm_model_resolution",
+            "requested_model=${resolution.requestedModelId ?: "default"} effective_model=${resolution.effectiveModelId} fallback_reason=${resolution.fallbackReason ?: "none"}",
+        )
 
         while (attempt <= config.maxAttempts) {
             TraceLogger.skillInvoked(tracingContext, "skill=${config.name} attempt=$attempt")
 
-            val activeGateway = resolveGateway(selectedModelId)
             rawOutput =
                 activeGateway.complete(
                     systemPrompt = buildSystemPrompt(input.systemPrompt),
@@ -104,8 +112,13 @@ class SelfCorrectingSkill<O>(
         )
     }
 
-    private fun resolveGateway(selectedModelId: String?): LlmGateway =
-        config.gatewayResolver?.invoke(selectedModelId.orEmpty()) ?: config.llmGateway
+    private fun resolveGateway(selectedModelId: String?): GatewayResolution =
+        config.gatewayResolver?.invoke(selectedModelId)
+            ?: GatewayResolution(
+                gateway = config.llmGateway,
+                requestedModelId = selectedModelId,
+                effectiveModelId = selectedModelId?.takeIf { it.isNotBlank() } ?: "default",
+            )
 
     private fun parseStructuredOutput(rawOutput: String): JsonElement {
         return config.structuredOutputGateway.parse(rawOutput)

@@ -29,6 +29,7 @@ import com.personalagent.bertbot.ingestion.connectors.BertBotExternalConnectors
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatFollowupSender
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatPayloadDispatcher
 import com.personalagent.bertbot.ingestion.connectors.NoopExternalChatFollowupSender
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
@@ -455,7 +456,7 @@ internal object BertBotRuntimeFactory {
                         "Unsupported AI provider '${aiRuntimeConfiguration.provider}'. Supported providers: openai, ollama.",
                     )
             }
-        val gatewayResolver: (String?) -> LlmGateway = { selectedModelId ->
+        val gatewayResolver: (String?) -> GatewayResolution = { selectedModelId ->
             resolveRuntimeGatewayForModel(aiRuntimeConfiguration, llmGateway, selectedModelId)
         }
         val memoryRuntime = BertBotRuntimeDependenciesFactory.createMemoryRuntime(runtimeConfig, llmGateway, persistenceConfiguration)
@@ -569,7 +570,7 @@ private fun buildToolCallingSkillOrNull(
     capabilityRegistry: CapabilityRegistry,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
     config: BertBotAgentConfig,
-    gatewayResolver: ((String?) -> com.personalagent.bertbot.llm.LlmGateway)? = null,
+    gatewayResolver: ((String?) -> GatewayResolution)? = null,
 ): ToolCallingSkill? {
     validateToolBackedSubAgentCoverage(config, capabilityRegistry)
     if (capabilityRegistry.capabilityIds().isEmpty()) return null
@@ -589,28 +590,75 @@ private fun buildToolCallingSkillOrNull(
     )
 }
 
-private fun resolveRuntimeGatewayForModel(
+internal fun resolveRuntimeGatewayForModel(
     aiRuntimeConfiguration: AiRuntimeConfiguration,
     fallbackGateway: com.personalagent.bertbot.llm.LlmGateway,
     selectedModelId: String?,
-): com.personalagent.bertbot.llm.LlmGateway {
+): GatewayResolution {
     val requestedModel = selectedModelId?.takeIf { it.isNotBlank() }
     if (requestedModel.isNullOrBlank() || requestedModel == aiRuntimeConfiguration.model) {
-        return fallbackGateway
+        return GatewayResolution(
+            gateway = fallbackGateway,
+            requestedModelId = requestedModel,
+            effectiveModelId = aiRuntimeConfiguration.model,
+        )
     }
 
     return when (aiRuntimeConfiguration.provider.lowercase()) {
         "openai" -> {
-            val apiKey = aiRuntimeConfiguration.apiKey ?: return fallbackGateway
-            createOpenAiLlmGateway(apiKey, requestedModel)
+            val apiKey =
+                aiRuntimeConfiguration.apiKey
+                    ?: return GatewayResolution(
+                        gateway = fallbackGateway,
+                        requestedModelId = requestedModel,
+                        effectiveModelId = aiRuntimeConfiguration.model,
+                        fallbackReason = "openai_api_key_missing",
+                    )
+            runCatching { createOpenAiLlmGateway(apiKey, requestedModel) }
+                .map { gateway ->
+                    GatewayResolution(
+                        gateway = gateway,
+                        requestedModelId = requestedModel,
+                        effectiveModelId = requestedModel,
+                    )
+                }.getOrElse {
+                    GatewayResolution(
+                        gateway = fallbackGateway,
+                        requestedModelId = requestedModel,
+                        effectiveModelId = aiRuntimeConfiguration.model,
+                        fallbackReason = "openai_model_resolution_failed",
+                    )
+                }
         }
-        "ollama" ->
-            createOllamaLlmGateway(
-                baseUrl = aiRuntimeConfiguration.ollamaBaseUrl,
-                modelName = requestedModel,
-                timeoutSeconds = aiRuntimeConfiguration.ollamaTimeoutSeconds,
+        "ollama" -> {
+            runCatching {
+                createOllamaLlmGateway(
+                    baseUrl = aiRuntimeConfiguration.ollamaBaseUrl,
+                    modelName = requestedModel,
+                    timeoutSeconds = aiRuntimeConfiguration.ollamaTimeoutSeconds,
+                )
+            }.map { gateway ->
+                GatewayResolution(
+                    gateway = gateway,
+                    requestedModelId = requestedModel,
+                    effectiveModelId = requestedModel,
+                )
+            }.getOrElse {
+                GatewayResolution(
+                    gateway = fallbackGateway,
+                    requestedModelId = requestedModel,
+                    effectiveModelId = aiRuntimeConfiguration.model,
+                    fallbackReason = "ollama_model_resolution_failed",
+                )
+            }
+        }
+        else ->
+            GatewayResolution(
+                gateway = fallbackGateway,
+                requestedModelId = requestedModel,
+                effectiveModelId = aiRuntimeConfiguration.model,
+                fallbackReason = "unsupported_provider:${aiRuntimeConfiguration.provider}",
             )
-        else -> fallbackGateway
     }
 }
 
