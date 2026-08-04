@@ -50,6 +50,16 @@ For browser-driven workflows with explicit safety and checkpointing, use [../.gi
 
 The existing repo-specific review baseline is [../.github/skills/code-review/SKILL.md](../.github/skills/code-review/SKILL.md).
 
+For hosted release operations and startup recovery on Cloud Run, use [../.github/skills/cloudrun-release-ops/SKILL.md](../.github/skills/cloudrun-release-ops/SKILL.md).
+
+For persistence and rollback compatibility reviews, use [../.github/skills/persistence-compat-review/SKILL.md](../.github/skills/persistence-compat-review/SKILL.md).
+
+For MCP capability and tool-availability diagnosis, use [../.github/skills/mcp-capability-diagnostics/SKILL.md](../.github/skills/mcp-capability-diagnostics/SKILL.md).
+
+For CI policy and required-check guardrail maintenance, use [../.github/skills/workflow-guardrails-maintainer/SKILL.md](../.github/skills/workflow-guardrails-maintainer/SKILL.md).
+
+For prompt/instruction drift prevention and policy regression checks, use [../.github/skills/prompt-policy-regression/SKILL.md](../.github/skills/prompt-policy-regression/SKILL.md).
+
 ## Starting The MCP Backend
 
 You can launch the backend directly with:
