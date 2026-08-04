@@ -24,6 +24,9 @@ This document tracks practical parity progress for advanced learning-loop abilit
    - persistent failure metadata on pending requests,
    - surfaced failure metadata in list output,
    - explicit apply-failure messages in approve responses.
+7. Environment templates (`.env.example`, `.env.compose.example`) and `docs/configuration.md` updated
+   to document all learning-review env keys (`BERTBOT_LEARNING_REVIEW_FILE_PATH`,
+   `BERTBOT_LEARNING_REVIEW_JDBC_TABLE`, `BERTBOT_LEARNING_REVIEW_DECISION_JDBC_TABLE`).
 
 ### In Progress
 
