@@ -98,4 +98,18 @@ class FileBertBotCheckpointStoreTest {
         assertEquals(listOf("c1", "c2"), scopeA.map { it.checkpointId })
         assertEquals(emptyList(), scopeB)
     }
+
+    @Test
+    fun `invalid checkpoint payload is treated as empty`() {
+        val file = File.createTempFile("bertbot-checkpoints", ".json")
+        file.writeText("{invalid-json")
+        file.deleteOnExit()
+        val store = FileBertBotCheckpointStore(file)
+
+        val latest = store.loadLatest("scope-a")
+        val listed = store.list("scope-a")
+
+        assertNull(latest)
+        assertEquals(emptyList(), listed)
+    }
 }

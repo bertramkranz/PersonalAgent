@@ -167,6 +167,25 @@ class MemoryArchitectureTest {
         assertEquals(expected, texts)
         assertTrue(file.readText().trim().startsWith("["))
     }
+
+    @Test
+    fun `memory store reads legacy truncated scoped file for long scope key`() {
+        val baseFile = File.createTempFile("bertbot-memory", ".txt")
+        baseFile.delete()
+        baseFile.deleteOnExit()
+
+        val longScope = "scope-" + "y".repeat(320)
+        val legacyScope = longScope.trim().ifBlank { "global" }.take(200)
+        val legacyScopedFile = File(baseFile.parentFile, "${baseFile.nameWithoutExtension}-$legacyScope.${baseFile.extension}")
+        legacyScopedFile.writeText("legacy entry")
+        legacyScopedFile.deleteOnExit()
+
+        val memory = BertBotMemory(baseFile)
+        val entries = memory.withScope(longScope) { memory.entries() }
+
+        assertEquals(1, entries.size)
+        assertEquals("legacy entry", entries.single().text)
+    }
 }
 
 private class FakeLlmGateway(

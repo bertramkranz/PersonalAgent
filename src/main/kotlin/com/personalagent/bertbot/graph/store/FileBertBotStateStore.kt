@@ -13,6 +13,7 @@ import com.personalagent.bertbot.graph.model.RecoveryStrategy
 import com.personalagent.bertbot.graph.model.SafetyCheckResult
 import com.personalagent.bertbot.graph.model.TokenMetadata
 import com.personalagent.bertbot.graph.runtime.BertBotStateStore
+import com.personalagent.bertbot.memory.PersistenceScopeKey
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.io.File
@@ -25,16 +26,23 @@ class FileBertBotStateStore(
     private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
 ) : BertBotStateStore {
     private val lock = Any()
-    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private val currentScope = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
+    private val legacyScopeAlias = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
 
     override fun load(): BertBotState {
         synchronized(lock) {
             val scopedFile = scopedFile()
-            if (!scopedFile.exists()) {
+            val legacyFile = legacyScopedFile()
+            val existingFile = if (scopedFile.exists()) scopedFile else legacyFile
+            if (!existingFile.exists()) {
                 return BertBotState()
             }
 
-            val content = scopedFile.readText()
+            if (existingFile == legacyFile && legacyFile != scopedFile) {
+                println("Warning: state store loaded legacy scoped file '${legacyFile.path}' because normalized scoped file '${scopedFile.path}' was not found.")
+            }
+
+            val content = existingFile.readText()
             if (content.isBlank()) {
                 return BertBotState()
             }
@@ -42,7 +50,7 @@ class FileBertBotStateStore(
             return try {
                 loadPersistedState(content)
             } catch (_: JsonSyntaxException) {
-                preserveUnreadableFile(scopedFile, "state")
+                preserveUnreadableFile(existingFile, "state")
                 BertBotState()
             }
         }
@@ -61,17 +69,31 @@ class FileBertBotStateStore(
         action: () -> T,
     ): T {
         val previous = currentScope.get()
-        currentScope.set(normalizeScope(scopeKey))
+        val previousLegacyAlias = legacyScopeAlias.get()
+        currentScope.set(PersistenceScopeKey.normalizeForFile(scopeKey))
+        legacyScopeAlias.set(PersistenceScopeKey.legacyFileAlias(scopeKey))
         return try {
             action()
         } finally {
             currentScope.set(previous)
+            legacyScopeAlias.set(previousLegacyAlias)
         }
     }
 
     private fun scopedFile(): File {
         val scope = currentScope.get()
-        if (scope == DEFAULT_SCOPE_KEY) {
+        if (scope == PersistenceScopeKey.defaultScopeKey()) {
+            return file
+        }
+        val parent = file.parentFile ?: File(".")
+        val stem = file.nameWithoutExtension
+        val ext = file.extension.takeIf { it.isNotBlank() } ?: "json"
+        return File(parent, "$stem-$scope.$ext")
+    }
+
+    private fun legacyScopedFile(): File {
+        val scope = legacyScopeAlias.get()
+        if (scope == PersistenceScopeKey.defaultScopeKey()) {
             return file
         }
         val parent = file.parentFile ?: File(".")
@@ -94,12 +116,7 @@ class FileBertBotStateStore(
         return codec.decode(content, BertBotState::class.java) ?: BertBotState()
     }
 
-    private companion object {
-        private const val DEFAULT_SCOPE_KEY = "global"
-
-        private fun normalizeScope(scopeKey: String): String =
-            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(200)
-    }
+    private companion object
 }
 
 internal data class PersistedBertBotStateSnapshot(

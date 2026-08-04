@@ -76,6 +76,23 @@ function Read-RequiredSecret {
     }
 }
 
+function Get-NormalizedOptionalSecretName {
+    param(
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $null
+    }
+
+    $normalized = $Value.Trim()
+    if ($normalized.ToLowerInvariant() -eq "disabled") {
+        return $null
+    }
+
+    return $normalized
+}
+
 function Set-SecretValue {
     param(
         [Parameter(Mandatory = $true)]
@@ -107,6 +124,15 @@ if ([string]::IsNullOrWhiteSpace($ProjectId)) {
 if ([string]::IsNullOrWhiteSpace($Region)) {
     throw "Region is required. Set gcloud compute/region or pass -Region explicitly."
 }
+
+$TelegramSecretTokenSecret = Get-NormalizedOptionalSecretName -Value $TelegramSecretTokenSecret
+$TelegramBotTokenSecret = Get-NormalizedOptionalSecretName -Value $TelegramBotTokenSecret
+$SlackSigningSecret = Get-NormalizedOptionalSecretName -Value $SlackSigningSecret
+$WhatsAppAppSecret = Get-NormalizedOptionalSecretName -Value $WhatsAppAppSecret
+$WhatsAppVerifyTokenSecret = Get-NormalizedOptionalSecretName -Value $WhatsAppVerifyTokenSecret
+$GoogleWorkspaceOauthCredentialsJsonB64Secret = Get-NormalizedOptionalSecretName -Value $GoogleWorkspaceOauthCredentialsJsonB64Secret
+$GoogleWorkspaceTokenB64Secret = Get-NormalizedOptionalSecretName -Value $GoogleWorkspaceTokenB64Secret
+$GoogleWorkspaceMasterKeyB64Secret = Get-NormalizedOptionalSecretName -Value $GoogleWorkspaceMasterKeyB64Secret
 
 $workspaceRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $workspaceRoot

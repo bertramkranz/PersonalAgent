@@ -1,0 +1,67 @@
+name: Enforce Pinned Actions
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/*.yml"
+      - ".github/workflows/*.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enforce-pinned-actions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  enforce-pinned-actions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Enforce immutable action refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          workflow_files=(.github/workflows/*.yml .github/workflows/*.yaml)
+          violations=0
+
+          for file in "${workflow_files[@]}"; do
+            [ -f "$file" ] || continue
+
+            while IFS= read -r line; do
+              ref=$(echo "$line" | sed -E 's/.*uses:[[:space:]]*([^[:space:]]+).*/\1/')
+
+              case "$ref" in
+                ./*)
+                  # Local/composite actions are exempt from SHA pinning.
+                  continue
+                  ;;
+                docker://*)
+                  # Container references are outside GitHub Action ref pinning.
+                  continue
+                  ;;
+                *"@"*)
+                  action_ref="${ref##*@}"
+                  if [[ ! "$action_ref" =~ ^[0-9a-f]{40}$ ]]; then
+                    echo "::error file=$file::Unpinned action ref '$ref'. Use a full 40-char commit SHA."
+                    violations=1
+                  fi
+                  ;;
+              esac
+            done < <(grep -E '^[[:space:]]*uses:[[:space:]]+' "$file" || true)
+          done
+
+          if [[ $violations -ne 0 ]]; then
+            exit 1
+          fi

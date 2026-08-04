@@ -11,11 +11,13 @@ permissions:
 
 concurrency:
   group: auto-version-tag-${{ github.ref }}
+  # Preserve monotonic tag sequencing; do not interrupt a run that has already computed/pushed a version.
   cancel-in-progress: false
 
 jobs:
   tag-main:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout

@@ -333,6 +333,15 @@ JDBC or PostgreSQL settings:
 
 Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 
+### Scoped Persistence Key Compatibility
+
+When `withScope(...)` is used, runtime persists normalized scope keys for new writes and keeps backward-compatible reads for legacy data:
+
+- File-backed stores read both current normalized scope keys and legacy 200-character truncated aliases.
+- JDBC-backed stores read both current normalized scope keys and legacy 255-character truncated aliases.
+
+This compatibility behavior is shared across state, episodic memory, semantic memory, and profile stores to avoid migration breakage when upgrading existing environments.
+
 ## Checkpoint And Event Sourcing
 
 | Variable | Purpose | Notes |

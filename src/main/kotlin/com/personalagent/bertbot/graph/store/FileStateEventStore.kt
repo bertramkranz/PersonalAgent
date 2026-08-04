@@ -1,10 +1,10 @@
 package com.personalagent.bertbot.graph.store
 
 import com.google.gson.JsonSyntaxException
+import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.StateEvent
 import com.personalagent.bertbot.graph.runtime.StateEventStore
 import com.personalagent.bertbot.graph.runtime.StateEventType
-import com.personalagent.bertbot.graph.runtime.copyForPersistence
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
 import java.io.File
@@ -52,6 +52,7 @@ internal class FileStateEventStore(
         return try {
             codec.decode(content, PersistedStateEventEnvelope::class.java)?.events.orEmpty()
         } catch (_: JsonSyntaxException) {
+            println("Warning: failed to parse state event file '${file.path}'. Returning no events.")
             emptyList()
         }
     }
@@ -79,7 +80,7 @@ private data class PersistedStateEvent(
             traceId = traceId,
             nodeId = nodeId,
             eventType = eventType,
-            state = state.copyForPersistence(),
+            state = sanitizeStateForPersistence(state),
             metadata = metadata.toMap(),
             createdAtEpochMillis = createdAtEpochMillis,
         )
@@ -92,12 +93,15 @@ private data class PersistedStateEvent(
                 traceId = event.traceId,
                 nodeId = event.nodeId,
                 eventType = event.eventType,
-                state = event.state.copyForPersistence(),
+                state = sanitizeStateForPersistence(event.state),
                 metadata = event.metadata.toMap(),
                 createdAtEpochMillis = event.createdAtEpochMillis,
             )
     }
 }
+
+private fun sanitizeStateForPersistence(state: BertBotState): BertBotState =
+    PersistedBertBotStateSnapshot.fromState(state).toState()
 
 private fun writeTextAtomically(
     target: File,

@@ -2,9 +2,9 @@ package com.personalagent.bertbot.app
 
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.DiscordIntegrationConfig
-import com.personalagent.bertbot.ingestion.connectors.DaemonThreadExternalChatAsyncRunner
 import com.personalagent.bertbot.ingestion.connectors.DiscordMessagePayload
 import com.personalagent.bertbot.ingestion.connectors.DiscordReplyPayload
+import com.personalagent.bertbot.ingestion.connectors.ManagedExternalChatAsyncRunner
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
@@ -53,6 +53,7 @@ fun main() {
     Runtime.getRuntime().addShutdownHook(
         Thread {
             runCatching { jda.shutdown() }
+            runCatching { listener.close() }
             runCatching { runtime.close() }
         },
     )
@@ -65,8 +66,8 @@ fun main() {
 private class DiscordMessageListener(
     private val runtime: BertBotRuntime,
     private val config: BertBotAgentConfig,
-) : ListenerAdapter() {
-    private val asyncRunner = DaemonThreadExternalChatAsyncRunner
+) : ListenerAdapter(), AutoCloseable {
+    private val asyncRunner = ManagedExternalChatAsyncRunner()
 
     override fun onMessageReceived(event: MessageReceivedEvent) {
         if (event.author.isBot) {
@@ -105,6 +106,10 @@ private class DiscordMessageListener(
                 event.channel.sendMessage(reply.content).queue()
             }
         }
+    }
+
+    override fun close() {
+        asyncRunner.close()
     }
 }
 

@@ -2,8 +2,9 @@ package com.personalagent.bertbot.memory
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
+import com.personalagent.bertbot.graph.store.DriverManagerJdbcConnectionProvider
+import com.personalagent.bertbot.graph.store.JdbcConnectionProvider
 import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.SQLException
 
 internal interface UserProfilePersistence {
@@ -42,10 +43,12 @@ internal class JdbcUserProfileStore(
     private val password: String? = null,
     private val tableName: String,
     private val gson: Gson = Gson(),
+    private val connectionProvider: JdbcConnectionProvider = DriverManagerJdbcConnectionProvider(jdbcUrl, username, password),
 ) : UserProfilePersistence {
     private val lock = Any()
     private var cached = UserProfile()
-    private val currentScope = ThreadLocal.withInitial { DEFAULT_SCOPE_KEY }
+    private val currentScope = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
+    private val legacyScopeAlias = ThreadLocal.withInitial { PersistenceScopeKey.defaultScopeKey() }
     private var loadedScopeKey: String? = null
 
     init {
@@ -69,9 +72,19 @@ internal class JdbcUserProfileStore(
     }
 
     private fun loadScope(scopeKey: String): UserProfile {
+        val legacyScopeKey = legacyScopeAlias.get()
         val payload =
             try {
-                readScopedPayload(scopeKey)
+                val scopedPayload = readScopedPayload(scopeKey)
+                if (scopedPayload != null) {
+                    scopedPayload
+                } else {
+                    val legacyPayload = readScopedPayload(legacyScopeKey)
+                    if (legacyPayload != null && legacyScopeKey != scopeKey) {
+                        println("Warning: JDBC user profile store loaded legacy scoped row for scope_key='$legacyScopeKey' because normalized scope_key='$scopeKey' was not found.")
+                    }
+                    legacyPayload
+                }
             } catch (_: SQLException) {
                 readLegacyPayload()
             }
@@ -98,11 +111,14 @@ internal class JdbcUserProfileStore(
         action: () -> T,
     ): T {
         val previous = currentScope.get()
-        currentScope.set(normalizeScope(scopeKey))
+        val previousLegacyAlias = legacyScopeAlias.get()
+        currentScope.set(PersistenceScopeKey.normalizeForJdbc(scopeKey))
+        legacyScopeAlias.set(PersistenceScopeKey.legacyJdbcAlias(scopeKey))
         return try {
             action()
         } finally {
             currentScope.set(previous)
+            legacyScopeAlias.set(previousLegacyAlias)
         }
     }
 
@@ -362,16 +378,12 @@ internal class JdbcUserProfileStore(
     }
 
     private fun <T> withConnection(action: (Connection) -> T): T {
-        val connection = if (username != null) DriverManager.getConnection(jdbcUrl, username, password) else DriverManager.getConnection(jdbcUrl)
+        val connection = connectionProvider.open()
         connection.use { return action(it) }
     }
 
     private companion object {
-        private const val DEFAULT_SCOPE_KEY: String = "global"
         private const val LEGACY_SNAPSHOT_ID: Int = 1
         private val TABLE_NAME_REGEX = Regex("^[A-Za-z_][A-Za-z0-9_]*$")
-
-        private fun normalizeScope(scopeKey: String): String =
-            scopeKey.trim().ifBlank { DEFAULT_SCOPE_KEY }.take(255)
     }
 }

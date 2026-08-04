@@ -41,6 +41,8 @@ jobs:
                   'analyze',
                   'dependency-review',
                   'gitleaks',
+                  'lint-workflows',
+                  'enforce-pinned-actions',
                 ],
               },
               enforce_admins: false,

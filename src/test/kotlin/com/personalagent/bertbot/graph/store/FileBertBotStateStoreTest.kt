@@ -76,4 +76,22 @@ class FileBertBotStateStoreTest {
             reloaded.pendingTasks.single(),
         )
     }
+
+    @Test
+    fun `long scope key reads legacy truncated scoped file`() {
+        val file = File.createTempFile("bertbot-state", ".json")
+        file.delete()
+        file.deleteOnExit()
+
+        val longScope = "scope-" + "x".repeat(320)
+        val legacyScope = longScope.trim().ifBlank { "global" }.take(200)
+        val legacyScopedFile = File(file.parentFile, "${file.nameWithoutExtension}-$legacyScope.${file.extension}")
+        legacyScopedFile.writeText("{\"lastUserMessage\":\"legacy-scope\"}")
+        legacyScopedFile.deleteOnExit()
+
+        val store = FileBertBotStateStore(file)
+        val loaded = store.withScope(longScope) { store.load() }
+
+        assertEquals("legacy-scope", loaded.lastUserMessage)
+    }
 }

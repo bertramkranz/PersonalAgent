@@ -13,6 +13,7 @@ permissions:
 
 concurrency:
   group: deploy-cloud-run-main
+  # Keep in-flight deploy immutable once started to avoid partial roll-forward/race conditions.
   cancel-in-progress: false
 
 jobs:
@@ -20,6 +21,7 @@ jobs:
     name: Build And Deploy Webhook
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     env:
       GCP_PROJECT_ID: "${{ vars.GCP_PROJECT_ID }}"
@@ -32,7 +34,7 @@ jobs:
       AI_API_KEY_SECRET_NAME: "${{ vars.AI_API_KEY_SECRET_NAME || 'bertbot-ai-api-key' }}"
       DB_PASSWORD_SECRET_NAME: "${{ vars.DB_PASSWORD_SECRET_NAME || 'bertbot-db-password' }}"
       TELEGRAM_SECRET_TOKEN_SECRET_NAME: "${{ vars.TELEGRAM_SECRET_TOKEN_SECRET_NAME || 'bertbot-telegram-secret-token' }}"
-      TELEGRAM_BOT_TOKEN_SECRET_NAME: bertbot-telegram-bot-token
+      TELEGRAM_BOT_TOKEN_SECRET_NAME: "${{ vars[format('{0}', 'TELEGRAM_BOT_TOKEN_SECRET_NAME')] || '' }}"
       SLACK_SIGNING_SECRET_NAME: "${{ vars[format('{0}', 'SLACK_SIGNING_SECRET_NAME')] || '' }}"
       WHATSAPP_APP_SECRET_NAME: "${{ vars[format('{0}', 'WHATSAPP_APP_SECRET_NAME')] || '' }}"
       WHATSAPP_VERIFY_TOKEN_SECRET_NAME: "${{ vars[format('{0}', 'WHATSAPP_VERIFY_TOKEN_SECRET_NAME')] || '' }}"
@@ -62,13 +64,13 @@ jobs:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193 # v2.1.10
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOYER_SERVICE_ACCOUNT }}
 
       - name: Set up gcloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # v2.1.4
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
