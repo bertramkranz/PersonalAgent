@@ -1,3 +1,8 @@
+# Architecture Diagram (Markdown Preview)
+
+This page wraps the Mermaid source from docs/architecture.mmd for VS Code Markdown preview.
+
+```mermaid
 %% 2026-08-03: repo_improvement_researcher sub-agent enabled by default; routing skills expanded with repo improvement, ecosystem upgrade, dependency upgrade, and scout keywords.
 %% 2026-07-14: ShoppingBridge added: StoreProvider interface, StoreProviderRegistry (priority-based selection), AmazonStoreProvider scaffold, and PersonalShopperService (provider-agnostic orchestration with budget/seller-threshold safety invariants).
 %% Build quality tooling: JaCoCo test-coverage reporting and SonarQube static-analysis added in build.gradle.kts.
@@ -273,3 +278,6 @@ flowchart TD
 
     JaCoCo --> SonarQube
     DetektReport --> SonarQube
+
+```
+

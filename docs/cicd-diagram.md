@@ -1,3 +1,8 @@
+# CI/CD Diagram (Markdown Preview)
+
+This page wraps the Mermaid source from docs/cicd-diagram.mmd for VS Code Markdown preview.
+
+```mermaid
 flowchart TD
     %% 2026-07-14: Consolidated repeated workflow bootstrap steps into .github/actions/setup-java-gradle (JDK17 + Gradle cache + chmod gradlew) and reused in ci/cd/codeql/autofix; workflows still perform checkout and Gradle wrapper validation separately.
     %% 2026-07-14: Consolidated duplicate checks by keeping changed-file doc guardrails in dod-enforcement and removing redundant CI guardrail invocation; DoD now focuses on policy-only enforcement.
@@ -75,3 +80,5 @@ flowchart TD
     class AUTO_PR,AUTOFIX,CI_JOB,MAAT,DOD,CODEQL,DEPREVIEW,SECRET,ACTIONLINT,MERGE,DEPLOY_MAIN,AUTO_TAG,CD,ERRLOG workflow
     class DEV,DEP actor
     class MAIN,RELEASE external
+```
+

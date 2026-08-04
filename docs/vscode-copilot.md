@@ -14,7 +14,7 @@ The repository-local agent manifests live at:
 - [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md)
 - [../.github/agents/browser-automation.agent.md](../.github/agents/browser-automation.agent.md)
 
-Both agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
+These agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
 
 Use `@BertBot` for orchestration-heavy requests and cross-domain delegation.
 

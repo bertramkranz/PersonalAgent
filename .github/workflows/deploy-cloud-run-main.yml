@@ -254,7 +254,8 @@ jobs:
             --no-cpu-throttling
             --memory 1Gi
             --concurrency 1
-            --min-instances 1
+            --min-instances 0
+            --max-instances 1
             --set-env-vars "$(IFS=,; echo "${env_vars[*]}")"
             --set-secrets "$(IFS=,; echo "${secret_mappings[*]}")"
           )
