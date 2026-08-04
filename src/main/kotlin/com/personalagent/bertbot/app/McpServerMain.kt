@@ -257,44 +257,9 @@ internal class McpRequestDispatcher(
     private fun buildDispatcherCapabilityRegistry(): CapabilityRegistry {
         val capabilities = mutableListOf<CapabilityDefinition>()
 
-        if (macrofactorToolRouter != null) {
-            capabilities +=
-                CapabilityDefinition(
-                    id = "macrofactor",
-                    router =
-                        FunctionToolRouter(
-                            id = "macrofactor",
-                            definitionsProvider = macrofactorToolRouter::toolDefinitions,
-                            executor = { toolName, callParams -> macrofactorToolRouter.handle(toolName, callParams) },
-                        ),
-                )
-        }
-
-        if (googleWorkspaceToolRouter != null) {
-            capabilities +=
-                CapabilityDefinition(
-                    id = "google_workspace",
-                    router =
-                        FunctionToolRouter(
-                            id = "google_workspace",
-                            definitionsProvider = googleWorkspaceToolRouter::toolDefinitions,
-                            executor = { toolName, callParams -> googleWorkspaceToolRouter.handle(toolName, callParams) },
-                        ),
-                )
-        }
-
-        if (desktopAutomationToolRouter != null) {
-            capabilities +=
-                CapabilityDefinition(
-                    id = "desktop_automation",
-                    router =
-                        FunctionToolRouter(
-                            id = "desktop_automation",
-                            definitionsProvider = desktopAutomationToolRouter::toolDefinitions,
-                            executor = { toolName, callParams -> desktopAutomationToolRouter.handle(toolName, callParams) },
-                        ),
-                )
-        }
+        addOptionalCapability(capabilities, "macrofactor", macrofactorToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "google_workspace", googleWorkspaceToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "desktop_automation", desktopAutomationToolRouter as? ToolRouter)
 
         capabilities +=
             CapabilityDefinition(
@@ -313,33 +278,23 @@ internal class McpRequestDispatcher(
                     ),
             )
 
-        if (continuousResearchToolRouter != null) {
-            capabilities +=
-                CapabilityDefinition(
-                    id = "continuous_research",
-                    router =
-                        FunctionToolRouter(
-                            id = "continuous_research",
-                            definitionsProvider = continuousResearchToolRouter::toolDefinitions,
-                            executor = { toolName, callParams -> continuousResearchToolRouter.handle(toolName, callParams) },
-                        ),
-                )
-        }
-
-        if (shoppingToolRouter != null) {
-            capabilities +=
-                CapabilityDefinition(
-                    id = "shopping",
-                    router =
-                        FunctionToolRouter(
-                            id = "shopping",
-                            definitionsProvider = shoppingToolRouter::toolDefinitions,
-                            executor = { toolName, callParams -> shoppingToolRouter.handle(toolName, callParams) },
-                        ),
-                )
-        }
+        addOptionalCapability(capabilities, "continuous_research", continuousResearchToolRouter as? ToolRouter)
+        addOptionalCapability(capabilities, "shopping", shoppingToolRouter as? ToolRouter)
 
         return CapabilityRegistry(capabilities)
+    }
+
+    private fun addOptionalCapability(
+        capabilities: MutableList<CapabilityDefinition>,
+        id: String,
+        router: ToolRouter?,
+    ) {
+        val toolRouter = router ?: return
+        capabilities +=
+            CapabilityDefinition(
+                id = id,
+                router = toolRouter,
+            )
     }
 
     private fun executeCheckpointTool(

@@ -204,13 +204,17 @@ internal const val DEFAULT_SHOPPING_STORE_MODE = "browse"
 internal const val DEFAULT_SHOPPING_STORE_PRIORITY = 100
 internal const val MAX_SHOPPING_STORES = 9
 
-internal fun createAssistantResponseSkill(llmGateway: LlmGateway): SelfCorrectingSkill<AssistantResponseEnvelope> {
+internal fun createAssistantResponseSkill(
+    llmGateway: LlmGateway,
+    gatewayResolver: ((String) -> LlmGateway)? = null,
+): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
         name = "assistant_response_generator",
         llmGateway = llmGateway,
         outputFormatInstructions = "Return valid JSON object only: {\"response\": \"<assistant response>\"}",
         parser = ::parseAssistantResponseEnvelope,
         structuredOutputGateway = KoogStructuredOutputGateway(),
+        gatewayResolver = gatewayResolver,
     )
 }
 
@@ -930,6 +934,10 @@ internal fun buildCapabilityStatusResponse(
         config.enabledSubAgents().any { definition ->
             definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) }
         }
+    val desktopAutomationEnabled =
+        config.enabledSubAgents().any { definition ->
+            definition.skills.any { skill -> skill.contains("desktop automation", ignoreCase = true) }
+        }
     val workspaceReadEnabled = config.enabledTools().any { definition -> definition.name == "workspace.read_file" }
 
     val subAgentLines =
@@ -945,6 +953,7 @@ internal fun buildCapabilityStatusResponse(
         appendLine("- workspace.read_file (allowed file roots): ${if (workspaceReadEnabled) "enabled" else "disabled"}")
         appendLine("- Google Workspace MCP: ${summarizeGoogleWorkspaceCapability(runtimeCapabilities)}")
         appendLine("- Browser automation (web-only): ${if (playwrightEnabled) "enabled" else "disabled"}")
+        appendLine("- Desktop automation (MCP bridge): ${if (desktopAutomationEnabled) "enabled" else "disabled"}")
         appendLine("- Browser automation fallback: ${summarizePlaywrightFallback(runtimeCapabilities, playwrightEnabled)}")
         appendLine("- Persistence store: ${runtimeCapabilities.persistenceBackend}")
         appendLine()
@@ -961,7 +970,19 @@ private fun isCapabilityQuestion(userMessage: String): Boolean {
         return true
     }
 
-    val featureTokens = listOf("playwright", "google workspace", "documents", "store backend", "state store")
+    val featureTokens =
+        listOf(
+            "playwright",
+            "google workspace",
+            "documents",
+            "store backend",
+            "state store",
+            "desktop automation",
+            "desktop",
+            "gui automation",
+            "computer use",
+            "computer-use",
+        )
     val qualifierTokens = listOf("can you", "do you", "access", "enabled", "disabled", "configured", "using", "active")
     return featureTokens.any { normalized.contains(it) } && qualifierTokens.any { normalized.contains(it) }
 }
