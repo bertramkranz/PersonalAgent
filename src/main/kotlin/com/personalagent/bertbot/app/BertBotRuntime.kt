@@ -582,7 +582,6 @@ private fun buildToolCallingSkillOrNull(
                 toolExecutor = { name, args ->
                     val params = JsonObject()
                     params.add("arguments", args)
-
                     capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
                 },
                 gatewayResolver = gatewayResolver,
