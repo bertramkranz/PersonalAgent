@@ -16,8 +16,10 @@ This folder holds focused documentation that was moved out of the root README so
 
 ## Existing Diagrams
 
-- [architecture.mmd](architecture.mmd) contains the architecture diagram source.
-- [cicd-diagram.mmd](cicd-diagram.mmd) contains the CI/CD automation diagram source.
+- [architecture-diagram.md](architecture-diagram.md) provides a Markdown preview of the architecture diagram.
+- [architecture.mmd](architecture.mmd) contains the architecture Mermaid source.
+- [cicd-diagram.md](cicd-diagram.md) provides a Markdown preview of the CI/CD automation diagram.
+- [cicd-diagram.mmd](cicd-diagram.mmd) contains the CI/CD Mermaid source.
 
 ## Suggested Reading Paths
 

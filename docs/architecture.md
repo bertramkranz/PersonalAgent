@@ -102,5 +102,7 @@ BertBot mixes stable and beta Koog modules.  The beta module (`agents-features-l
 
 ## Diagrams
 
-- [architecture.mmd](architecture.mmd) is the diagram source for the main architecture view.
-- [cicd-diagram.mmd](cicd-diagram.mmd) documents the repository automation flow.
+- [architecture-diagram.md](architecture-diagram.md) is the Markdown preview page for the main architecture diagram.
+- [architecture.mmd](architecture.mmd) is the Mermaid source of truth for the architecture diagram.
+- [cicd-diagram.md](cicd-diagram.md) is the Markdown preview page for the repository automation diagram.
+- [cicd-diagram.mmd](cicd-diagram.mmd) is the Mermaid source of truth for the repository automation diagram.
