@@ -5,8 +5,10 @@ import com.google.gson.JsonObject
 internal class DesktopAutomationToolRouter(
     private val runtimeConfiguration: DesktopAutomationRuntimeConfiguration,
     private val transport: DesktopAutomationMcpTransport = StdioDesktopAutomationMcpTransport(runtimeConfiguration),
-) {
-    fun toolDefinitions(): List<JsonObject> {
+) : ToolRouter {
+    override val id: String = "desktop_automation"
+
+    override fun toolDefinitions(): List<JsonObject> {
         if (!runtimeConfiguration.enabled) {
             return emptyList()
         }
@@ -20,7 +22,7 @@ internal class DesktopAutomationToolRouter(
         }.orEmpty()
     }
 
-    fun handle(
+    override fun handle(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {

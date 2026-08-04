@@ -17,6 +17,7 @@ class SelfCorrectingSkill<O>(
     private val parser: (JsonElement) -> O,
     private val maxAttempts: Int = 3,
     private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+    private val gatewayResolver: ((String) -> LlmGateway)? = null,
 ) : Skill<SelfCorrectingSkillRequest, O> {
     init {
         require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
@@ -26,6 +27,14 @@ class SelfCorrectingSkill<O>(
         input: SelfCorrectingSkillRequest,
         tracingContext: TracingContext,
     ): O {
+        return invoke(input, tracingContext, selectedModelId = null)
+    }
+
+    fun invoke(
+        input: SelfCorrectingSkillRequest,
+        tracingContext: TracingContext,
+        selectedModelId: String? = null,
+    ): O {
         var attempt = 1
         var currentUserPrompt = input.userPrompt
         var lastError: Throwable? = null
@@ -34,8 +43,9 @@ class SelfCorrectingSkill<O>(
         while (attempt <= maxAttempts) {
             TraceLogger.skillInvoked(tracingContext, "skill=$name attempt=$attempt")
 
+            val activeGateway = resolveGateway(selectedModelId)
             rawOutput =
-                llmGateway.complete(
+                activeGateway.complete(
                     systemPrompt = buildSystemPrompt(input.systemPrompt),
                     userPrompt = currentUserPrompt,
                 )
@@ -67,6 +77,9 @@ class SelfCorrectingSkill<O>(
             cause = lastError,
         )
     }
+
+    private fun resolveGateway(selectedModelId: String?): LlmGateway =
+        gatewayResolver?.invoke(selectedModelId.orEmpty()) ?: llmGateway
 
     private fun parseStructuredOutput(rawOutput: String): JsonElement {
         return structuredOutputGateway.parse(rawOutput)

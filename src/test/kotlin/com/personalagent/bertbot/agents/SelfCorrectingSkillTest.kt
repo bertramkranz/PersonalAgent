@@ -75,6 +75,32 @@ class SelfCorrectingSkillTest {
 
         assertTrue(error.message?.contains("failed after 3 attempts") == true)
     }
+
+    @Test
+    fun `self correcting skill uses resolved gateway for selected model`() {
+        val defaultGateway = FakeLlmGateway(outputs = mutableListOf("42"))
+        val selectedGateway = FakeLlmGateway(outputs = mutableListOf("84"))
+        val skill =
+            SelfCorrectingSkill(
+                name = "integer_parser",
+                llmGateway = defaultGateway,
+                outputFormatInstructions = "Return only an integer as plain text.",
+                parser = { it.asString.trim().toInt() },
+                maxAttempts = 3,
+                gatewayResolver = { modelId -> if (modelId == "reasoning") selectedGateway else defaultGateway },
+            )
+
+        val result =
+            skill.invoke(
+                SelfCorrectingSkillRequest(systemPrompt = "System", userPrompt = "Give me an integer"),
+                TracingContext(traceId = "test-trace"),
+                selectedModelId = "reasoning",
+            )
+
+        assertEquals(84, result)
+        assertEquals(1, selectedGateway.calls.size)
+        assertEquals(0, defaultGateway.calls.size)
+    }
 }
 
 private class FakeLlmGateway(

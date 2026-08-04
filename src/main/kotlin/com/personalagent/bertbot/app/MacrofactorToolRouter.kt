@@ -16,10 +16,11 @@ import java.util.concurrent.TimeoutException
 internal class MacrofactorToolRouter(
     private val runtimeConfiguration: MacrofactorRuntimeConfiguration,
     private val transport: MacrofactorMcpTransport = StdioMacrofactorMcpTransport(runtimeConfiguration),
-) {
+) : ToolRouter {
+    override val id: String = "macrofactor"
     private var discoveredTools: List<MacrofactorDiscoveredTool>? = null
 
-    fun toolDefinitions(): List<JsonObject> {
+    override fun toolDefinitions(): List<JsonObject> {
         val tools = discoverTools() ?: return emptyList()
         return tools.map { tool ->
             val proxy = JsonObject()
@@ -31,7 +32,7 @@ internal class MacrofactorToolRouter(
         }
     }
 
-    fun handle(
+    override fun handle(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
