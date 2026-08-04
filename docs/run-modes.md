@@ -56,6 +56,14 @@ Core tools include:
 - `learning_review_list_pending`
 - `learning_review_approve`
 - `learning_review_reject`
+- `scheduled_job_list`
+- `scheduled_job_create`
+- `scheduled_job_update`
+- `scheduled_job_pause`
+- `scheduled_job_resume`
+- `scheduled_job_run`
+- `scheduled_job_remove`
+- `scheduled_job_history`
 
 Ingestion tools (enabled when ingestion control is configured):
 

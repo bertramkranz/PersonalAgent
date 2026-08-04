@@ -33,6 +33,8 @@ class McpStatusProviderFactoryTest {
                     continuousResearchToolRouter = null,
                     sessionHistoryToolRouter = sessionHistoryToolRouter,
                     learningReviewToolRouter = learningReviewToolRouter,
+                    proceduralSkillToolRouter = null,
+                    scheduledJobToolRouter = null,
                     learningReviewConfiguration =
                         LearningReviewRuntimeConfiguration(
                             enabled = true,
@@ -108,6 +110,8 @@ class McpStatusProviderFactoryTest {
                     continuousResearchToolRouter = null,
                     sessionHistoryToolRouter = sessionHistoryToolRouter,
                     learningReviewToolRouter = null,
+                    proceduralSkillToolRouter = null,
+                    scheduledJobToolRouter = null,
                     learningReviewConfiguration = LearningReviewRuntimeConfiguration(),
                     toolNames = McpConstants.toolNames,
                     checkpointRollbackPolicy = CheckpointRollbackPolicyConfiguration(),

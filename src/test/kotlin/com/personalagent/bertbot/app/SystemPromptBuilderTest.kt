@@ -78,4 +78,21 @@ class SystemPromptBuilderTest {
 
         assertFalse(prompt.contains("config.systemPrompt}"))
     }
+
+    @Test
+    fun `buildSystemPrompt includes session recall excerpts when provided`() {
+        val config = BertBotAgentConfig(systemPrompt = "System prompt")
+        val state = BertBotState()
+
+        val prompt =
+            buildSystemPrompt(
+                config = config,
+                state = state,
+                sessionRecallExcerpts = listOf("User prefers concise updates.", "Avoid broad refactors."),
+            )
+
+        assertTrue(prompt.contains("Relevant prior session excerpts (retrieval opt-in):"))
+        assertTrue(prompt.contains("1. User prefers concise updates."))
+        assertTrue(prompt.contains("2. Avoid broad refactors."))
+    }
 }

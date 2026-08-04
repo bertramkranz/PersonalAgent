@@ -30,15 +30,11 @@ This document tracks practical parity progress for advanced learning-loop abilit
 
 ### In Progress
 
-1. Session retrieval integration into prompt assembly as on-demand recall excerpts (search exists; prompt path still pending).
-2. Consolidated parity reporting and phase acceptance criteria (this document is the initial baseline).
+1. Consolidated parity reporting and phase acceptance criteria (this document is the implementation baseline).
 
 ### Not Started
 
-1. Bounded curated memory store distinct from episodic/semantic/profile layers.
-2. Procedural skill lifecycle store (create/patch/archive/supersede) with approval staging.
-3. Outcome-aware delegation/tool-routing hints from historical success/failure telemetry.
-4. First-class scheduled jobs subsystem (create/list/update/pause/resume/run/remove + execution history + chained context).
+1. No remaining phase-1 parity gaps in the scoped backlog tracked by #110/#111/#112/#113/#114/#115.
 
 ## Evidence Map
 
@@ -54,6 +50,31 @@ This document tracks practical parity progress for advanced learning-loop abilit
 - Runtime approval/reject outcomes and apply-failure recording: `src/main/kotlin/com/personalagent/bertbot/app/BertBotRuntime.kt`.
 - MCP surface and failure-metadata rendering: `src/main/kotlin/com/personalagent/bertbot/app/LearningReviewToolRouter.kt`.
 
+### Curated Memory
+
+- Store implementations and bounded eviction: `src/main/kotlin/com/personalagent/bertbot/app/CuratedMemoryStore.kt`.
+- Runtime wiring and persistence configuration: `src/main/kotlin/com/personalagent/bertbot/app/BertBotRuntime.kt`, `src/main/kotlin/com/personalagent/bertbot/app/BertBotSupport.kt`.
+
+### Procedural Skill Lifecycle
+
+- Skill artifact persistence (file/JDBC) and staged approval lifecycle: `src/main/kotlin/com/personalagent/bertbot/app/ProceduralSkillStore.kt`.
+- MCP control plane: `src/main/kotlin/com/personalagent/bertbot/app/ProceduralSkillToolRouter.kt`.
+
+### Routing Hints
+
+- Telemetry store and bounded hint computation: `src/main/kotlin/com/personalagent/bertbot/app/RoutingTelemetryStore.kt`.
+- Delegation integration with trace explainability: `src/main/kotlin/com/personalagent/bertbot/graph/nodes/DelegationNode.kt`.
+
+### Scheduled Jobs
+
+- Job + execution persistence and scheduler service: `src/main/kotlin/com/personalagent/bertbot/app/ScheduledJobs.kt`.
+- MCP control plane: `src/main/kotlin/com/personalagent/bertbot/app/ScheduledJobToolRouter.kt`.
+
+### Background Learning Proposal Loop
+
+- Signal persistence and bounded/cooldown proposal loop: `src/main/kotlin/com/personalagent/bertbot/app/LearningProposalLoop.kt`.
+- Runtime signal capture on conversation outcomes: `src/main/kotlin/com/personalagent/bertbot/app/BertBotRuntime.kt`.
+
 ### Focused Verification Tests
 
 - `src/test/kotlin/com/personalagent/bertbot/app/SessionHistoryStoreTest.kt`
@@ -63,6 +84,12 @@ This document tracks practical parity progress for advanced learning-loop abilit
 - `src/test/kotlin/com/personalagent/bertbot/app/LearningReviewToolRouterTest.kt`
 - `src/test/kotlin/com/personalagent/bertbot/app/McpRequestDispatcherLearningReviewTest.kt`
 - `src/test/kotlin/com/personalagent/bertbot/app/BertBotRuntimeHelpersTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/CuratedMemoryStoreTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/ProceduralSkillStoreTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/ProceduralSkillToolRouterTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/RoutingTelemetryStoreTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/ScheduledJobsTest.kt`
+- `src/test/kotlin/com/personalagent/bertbot/app/LearningProposalLoopTest.kt`
 
 ## Phase Gates
 
@@ -78,19 +105,18 @@ This document tracks practical parity progress for advanced learning-loop abilit
 - Approval queue persistence: complete.
 - MCP review controls: complete.
 - Apply-failure durability + operator visibility: complete.
-- Background learning-review proposal loop: pending.
+- Background learning-review proposal loop: complete.
 
 ### Phase 3 Gate (Procedural Skills)
 
-- Skill lifecycle persistence + approval: not started.
+- Skill lifecycle persistence + approval: complete.
 
 ### Phase 4 Gate (Scheduler)
 
-- First-class scheduled jobs subsystem: not started.
+- First-class scheduled jobs subsystem: complete.
 
 ## Next Acceptance Targets
 
-1. Add retrieved session-excerpt injection path that is disabled by default and explicitly enabled by request/tool context.
-2. Introduce curated memory store boundaries and limits with compatibility-safe migration behavior.
-3. Define procedural skill artifact format and approval lifecycle with tests.
-4. Stand up scheduled jobs data model and control-plane tools.
+1. Expand cross-scope scheduler discovery beyond default scope for multi-tenant deployments.
+2. Add optional richer schedule expressions after validating backward compatibility with fixed-interval jobs.
+3. Add additional heuristics for proposal signals while preserving current dedupe/cooldown protections.

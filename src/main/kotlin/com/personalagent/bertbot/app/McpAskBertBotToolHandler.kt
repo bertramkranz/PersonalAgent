@@ -5,7 +5,7 @@ import java.io.File
 
 internal class McpAskBertBotToolHandler(
     workspaceRoot: File,
-    private val respondToPrompt: (String, String?) -> String?,
+    private val respondToPrompt: (String, String?, String?) -> String?,
     private val statusProvider: () -> String,
     private val backendUnavailableMarkers: List<String>,
     private val evidenceHintKeywords: List<String>,
@@ -35,7 +35,10 @@ internal class McpAskBertBotToolHandler(
 
         return try {
             val promptWithContext = mcpAskBuildPromptWithWorkspaceEvidence(prompt)
-            val rawResponse = respondToPrompt(promptWithContext, requestCorrelationId)
+            val sessionRecallQuery =
+                arguments.stringValue("sessionRecallQuery")
+                    ?: arguments.stringValue("session_recall_query")
+            val rawResponse = respondToPrompt(promptWithContext, requestCorrelationId, sessionRecallQuery)
             val response = mcpAskRewriteFalseWorkspaceUnavailable(prompt, rawResponse)
             if (response.isNullOrBlank()) {
                 true to "BertBot did not return a response."

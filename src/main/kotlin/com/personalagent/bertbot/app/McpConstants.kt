@@ -29,6 +29,21 @@ internal object McpConstants {
     const val LEARNING_REVIEW_LIST_TOOL_NAME = "learning_review_list_pending"
     const val LEARNING_REVIEW_APPROVE_TOOL_NAME = "learning_review_approve"
     const val LEARNING_REVIEW_REJECT_TOOL_NAME = "learning_review_reject"
+    const val PROCEDURAL_SKILL_LIST_TOOL_NAME = "procedural_skill_list"
+    const val PROCEDURAL_SKILL_CREATE_TOOL_NAME = "procedural_skill_create"
+    const val PROCEDURAL_SKILL_PATCH_TOOL_NAME = "procedural_skill_patch"
+    const val PROCEDURAL_SKILL_SUPERSEDE_TOOL_NAME = "procedural_skill_supersede"
+    const val PROCEDURAL_SKILL_ARCHIVE_TOOL_NAME = "procedural_skill_archive"
+    const val PROCEDURAL_SKILL_APPROVE_TOOL_NAME = "procedural_skill_approve"
+    const val PROCEDURAL_SKILL_REJECT_TOOL_NAME = "procedural_skill_reject"
+    const val SCHEDULED_JOB_LIST_TOOL_NAME = "scheduled_job_list"
+    const val SCHEDULED_JOB_CREATE_TOOL_NAME = "scheduled_job_create"
+    const val SCHEDULED_JOB_UPDATE_TOOL_NAME = "scheduled_job_update"
+    const val SCHEDULED_JOB_PAUSE_TOOL_NAME = "scheduled_job_pause"
+    const val SCHEDULED_JOB_RESUME_TOOL_NAME = "scheduled_job_resume"
+    const val SCHEDULED_JOB_RUN_TOOL_NAME = "scheduled_job_run"
+    const val SCHEDULED_JOB_REMOVE_TOOL_NAME = "scheduled_job_remove"
+    const val SCHEDULED_JOB_HISTORY_TOOL_NAME = "scheduled_job_history"
 
     const val WORKSPACE_ROOT_ENV_VAR = "BERTBOT_WORKSPACE_ROOT"
 
@@ -58,6 +73,21 @@ internal object McpConstants {
             learningReviewListPending = LEARNING_REVIEW_LIST_TOOL_NAME,
             learningReviewApprove = LEARNING_REVIEW_APPROVE_TOOL_NAME,
             learningReviewReject = LEARNING_REVIEW_REJECT_TOOL_NAME,
+            proceduralSkillList = PROCEDURAL_SKILL_LIST_TOOL_NAME,
+            proceduralSkillCreate = PROCEDURAL_SKILL_CREATE_TOOL_NAME,
+            proceduralSkillPatch = PROCEDURAL_SKILL_PATCH_TOOL_NAME,
+            proceduralSkillSupersede = PROCEDURAL_SKILL_SUPERSEDE_TOOL_NAME,
+            proceduralSkillArchive = PROCEDURAL_SKILL_ARCHIVE_TOOL_NAME,
+            proceduralSkillApprove = PROCEDURAL_SKILL_APPROVE_TOOL_NAME,
+            proceduralSkillReject = PROCEDURAL_SKILL_REJECT_TOOL_NAME,
+            scheduledJobList = SCHEDULED_JOB_LIST_TOOL_NAME,
+            scheduledJobCreate = SCHEDULED_JOB_CREATE_TOOL_NAME,
+            scheduledJobUpdate = SCHEDULED_JOB_UPDATE_TOOL_NAME,
+            scheduledJobPause = SCHEDULED_JOB_PAUSE_TOOL_NAME,
+            scheduledJobResume = SCHEDULED_JOB_RESUME_TOOL_NAME,
+            scheduledJobRun = SCHEDULED_JOB_RUN_TOOL_NAME,
+            scheduledJobRemove = SCHEDULED_JOB_REMOVE_TOOL_NAME,
+            scheduledJobHistory = SCHEDULED_JOB_HISTORY_TOOL_NAME,
         )
 
     val startupTools =
@@ -82,6 +112,21 @@ internal object McpConstants {
             LEARNING_REVIEW_LIST_TOOL_NAME,
             LEARNING_REVIEW_APPROVE_TOOL_NAME,
             LEARNING_REVIEW_REJECT_TOOL_NAME,
+            PROCEDURAL_SKILL_LIST_TOOL_NAME,
+            PROCEDURAL_SKILL_CREATE_TOOL_NAME,
+            PROCEDURAL_SKILL_PATCH_TOOL_NAME,
+            PROCEDURAL_SKILL_SUPERSEDE_TOOL_NAME,
+            PROCEDURAL_SKILL_ARCHIVE_TOOL_NAME,
+            PROCEDURAL_SKILL_APPROVE_TOOL_NAME,
+            PROCEDURAL_SKILL_REJECT_TOOL_NAME,
+            SCHEDULED_JOB_LIST_TOOL_NAME,
+            SCHEDULED_JOB_CREATE_TOOL_NAME,
+            SCHEDULED_JOB_UPDATE_TOOL_NAME,
+            SCHEDULED_JOB_PAUSE_TOOL_NAME,
+            SCHEDULED_JOB_RESUME_TOOL_NAME,
+            SCHEDULED_JOB_RUN_TOOL_NAME,
+            SCHEDULED_JOB_REMOVE_TOOL_NAME,
+            SCHEDULED_JOB_HISTORY_TOOL_NAME,
         )
 
     val defaultStatusToolSurface =
@@ -106,5 +151,20 @@ internal object McpConstants {
             LEARNING_REVIEW_LIST_TOOL_NAME,
             LEARNING_REVIEW_APPROVE_TOOL_NAME,
             LEARNING_REVIEW_REJECT_TOOL_NAME,
+            PROCEDURAL_SKILL_LIST_TOOL_NAME,
+            PROCEDURAL_SKILL_CREATE_TOOL_NAME,
+            PROCEDURAL_SKILL_PATCH_TOOL_NAME,
+            PROCEDURAL_SKILL_SUPERSEDE_TOOL_NAME,
+            PROCEDURAL_SKILL_ARCHIVE_TOOL_NAME,
+            PROCEDURAL_SKILL_APPROVE_TOOL_NAME,
+            PROCEDURAL_SKILL_REJECT_TOOL_NAME,
+            SCHEDULED_JOB_LIST_TOOL_NAME,
+            SCHEDULED_JOB_CREATE_TOOL_NAME,
+            SCHEDULED_JOB_UPDATE_TOOL_NAME,
+            SCHEDULED_JOB_PAUSE_TOOL_NAME,
+            SCHEDULED_JOB_RESUME_TOOL_NAME,
+            SCHEDULED_JOB_RUN_TOOL_NAME,
+            SCHEDULED_JOB_REMOVE_TOOL_NAME,
+            SCHEDULED_JOB_HISTORY_TOOL_NAME,
         )
 }
