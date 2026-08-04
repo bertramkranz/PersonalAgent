@@ -13,6 +13,7 @@ The repository-local agent manifests live at:
 - [../.github/agents/test-orchestration.agent.md](../.github/agents/test-orchestration.agent.md)
 - [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md)
 - [../.github/agents/browser-automation.agent.md](../.github/agents/browser-automation.agent.md)
+- [../.github/agents/desktop-automation.agent.md](../.github/agents/desktop-automation.agent.md)
 
 These agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
 
@@ -26,6 +27,8 @@ Use `@Repo Ops` for repeatable maintenance tasks like dependency hygiene, workfl
 
 Use `@Browser Automation` for checkpointed web-browser workflows such as navigation, form completion, content extraction, and UI verification.
 
+Use `@Desktop Automation` for desktop and GUI automation workflows through the desktop automation bridge.
+
 ## Agent Selection Matrix
 
 | If your task is primarily... | Use this agent | Why |
@@ -35,6 +38,7 @@ Use `@Browser Automation` for checkpointed web-browser workflows such as navigat
 | Verification, focused checks, and failure triage | `@Test Orchestration` | Optimized for confidence-building validation and actionable test outcomes. |
 | Recurring maintenance and operational hygiene | `@Repo Ops` | Tailored for dependency, workflow, and repository-health upkeep. |
 | Browser-driven web workflows and web task execution | `@Browser Automation` | Specialized for Playwright-backed interaction flows with explicit checkpoints and web-only safety constraints. |
+| Desktop and GUI automation workflows | `@Desktop Automation` | Specialized for MCP-backed desktop interaction flows with explicit checkpoints and desktop-focused safety constraints. |
 
 When unsure, start with `@BertBot` and then switch to a specialized agent once the task shape is clear.
 
@@ -47,6 +51,8 @@ For focused build/test validation and check planning, use [../.github/skills/tes
 For recurring maintenance and operational hygiene automation, use [../.github/skills/repo-ops/SKILL.md](../.github/skills/repo-ops/SKILL.md).
 
 For browser-driven workflows with explicit safety and checkpointing, use [../.github/skills/browser-automation/SKILL.md](../.github/skills/browser-automation/SKILL.md).
+
+For desktop and GUI automation through the desktop automation bridge, use [../.github/skills/desktop-automation/SKILL.md](../.github/skills/desktop-automation/SKILL.md).
 
 The existing repo-specific review baseline is [../.github/skills/code-review/SKILL.md](../.github/skills/code-review/SKILL.md).
 

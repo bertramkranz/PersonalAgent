@@ -24,6 +24,7 @@ class SubAgentRegistryTest {
                 "philosopher",
                 "psychologist",
                 "google_workspace_operator",
+                "desktop_automation_operator",
                 "repo_improvement_researcher",
             ),
             ids,
@@ -79,6 +80,16 @@ class SubAgentRegistryTest {
 
         assertNotNull(match)
         assertEquals("coder", match.id)
+    }
+
+    @Test
+    fun `registry routes desktop automation requests to dedicated desktop automation agent`() {
+        val registry = SubAgentRegistry()
+
+        val match = registry.findBestMatch("Use desktop automation and computer-use workflows to click through a GUI application")
+
+        assertNotNull(match)
+        assertEquals("desktop_automation_operator", match.id)
     }
 
     @Test

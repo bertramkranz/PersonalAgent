@@ -601,6 +601,53 @@ class McpRequestDispatcherTest {
         assertTrue(text.contains("calories=2400"))
         assertEquals("get_nutrition", transport.lastToolName)
     }
+
+    @Test
+    fun `tools list includes desktop automation proxy tools when router is configured`() {
+        val transport = FakeDesktopAutomationTransport()
+        val router =
+            DesktopAutomationToolRouter(
+                runtimeConfiguration =
+                    DesktopAutomationRuntimeConfiguration(enabled = true),
+                transport = transport,
+            )
+        val dispatcher =
+            McpRequestDispatcher(
+                respondToPrompt = { _, _ -> "unused" },
+                desktopAutomationToolRouter = router,
+            )
+
+        val response =
+            dispatcher.handle(
+                """
+                {"jsonrpc":"2.0","id":16,"method":"tools/list","params":{}}
+                """.trimIndent(),
+            )
+
+        val json = JsonParser.parseString(response).asJsonObject
+        val names = json.getAsJsonObject("result").getAsJsonArray("tools").map { it.asJsonObject.get("name").asString }
+        assertTrue(names.contains("desktop_automation_click"))
+    }
+}
+
+private class FakeDesktopAutomationTransport : DesktopAutomationMcpTransport {
+    override fun listTools(): List<DesktopAutomationDiscoveredTool> {
+        val schema = JsonObject()
+        schema.addProperty("type", "object")
+        schema.add("properties", JsonObject())
+        return listOf(
+            DesktopAutomationDiscoveredTool(
+                name = "click",
+                description = "Click a GUI element.",
+                inputSchema = schema,
+            ),
+        )
+    }
+
+    override fun callTool(
+        toolName: String,
+        arguments: JsonObject,
+    ): Pair<Boolean, String> = false to "clicked"
 }
 
 private class FakeMacrofactorTransport : MacrofactorMcpTransport {

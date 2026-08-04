@@ -7,6 +7,7 @@ internal object McpServerBootstrap {
         val aiRuntimeConfiguration: AiRuntimeConfiguration,
         val macrofactorRuntimeConfiguration: MacrofactorRuntimeConfiguration,
         val googleWorkspaceRuntimeConfiguration: GoogleWorkspaceRuntimeConfiguration,
+        val desktopAutomationRuntimeConfiguration: DesktopAutomationRuntimeConfiguration = DesktopAutomationRuntimeConfiguration(),
         val shoppingRuntimeConfiguration: ShoppingRuntimeConfiguration = ShoppingRuntimeConfiguration(),
         val workspaceRoot: File,
         val toolNames: McpToolNames,
@@ -33,6 +34,12 @@ internal object McpServerBootstrap {
         val googleWorkspaceToolRouter =
             if (input.googleWorkspaceRuntimeConfiguration.enabled) {
                 GoogleWorkspaceToolRouter(input.googleWorkspaceRuntimeConfiguration)
+            } else {
+                null
+            }
+        val desktopAutomationToolRouter =
+            if (input.desktopAutomationRuntimeConfiguration.enabled) {
+                DesktopAutomationToolRouter(input.desktopAutomationRuntimeConfiguration)
             } else {
                 null
             }
@@ -63,6 +70,17 @@ internal object McpServerBootstrap {
                                 router =
                                     FunctionToolRouter(
                                         id = "google_workspace",
+                                        definitionsProvider = router::toolDefinitions,
+                                        executor = { toolName, params -> router.handle(toolName, params) },
+                                    ),
+                            )
+                        },
+                        desktopAutomationToolRouter?.let { router ->
+                            CapabilityDefinition(
+                                id = "desktop_automation",
+                                router =
+                                    FunctionToolRouter(
+                                        id = "desktop_automation",
                                         definitionsProvider = router::toolDefinitions,
                                         executor = { toolName, params -> router.handle(toolName, params) },
                                     ),
@@ -140,6 +158,7 @@ internal object McpServerBootstrap {
                 workspaceRoot = input.workspaceRoot,
                 macrofactorToolRouter = macrofactorToolRouter,
                 googleWorkspaceToolRouter = googleWorkspaceToolRouter,
+                desktopAutomationToolRouter = desktopAutomationToolRouter,
                 polymarketToolRouter = polymarketToolRouter,
                 continuousResearchToolRouter = continuousResearchToolRouter,
                 shoppingToolRouter = shoppingToolRouter,

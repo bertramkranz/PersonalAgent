@@ -30,6 +30,14 @@ class CapabilityStatusResponseTest {
     }
 
     @Test
+    fun `capability response includes desktop automation status`() {
+        val response = buildCapabilityStatusResponse(BertBotAgentConfig(), "Can you control my desktop GUI?")
+
+        assertNotNull(response)
+        assertTrue(response.contains("Desktop automation (MCP bridge): enabled"))
+    }
+
+    @Test
     fun `capability response marks google workspace configured but unavailable`() {
         val response =
             buildCapabilityStatusResponse(

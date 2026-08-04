@@ -50,7 +50,7 @@ Safety invariants apply to all shopping stages:
 - Budget and seller-threshold checks run before any cart or checkout preparation.
 - Final checkout is never performed autonomously.
 
-When a direct MCP shopping integration is unavailable, BertBot can advertise web-browser automation as a fallback capability through the coder sub-agent. This fallback is optional and must be explicitly enabled in sub-agent configuration. It is web-only and limited to browser actions such as navigation, form input, reading page state, and screenshots. The `RuntimeCapabilitySnapshot` reports both the Playwright sub-agent advertisement and the direct Playwright fallback availability so the system prompt stays accurate.
+When a direct MCP shopping integration is unavailable, BertBot can advertise web-browser automation as a fallback capability through the coder sub-agent. This fallback is optional and must be explicitly enabled in sub-agent configuration. It is web-only and limited to browser actions such as navigation, form input, reading page state, and screenshots. Desktop automation is tracked separately as its own MCP-backed capability and is not folded into the browser automation path. The `RuntimeCapabilitySnapshot` reports the Playwright sub-agent advertisement, the direct Playwright fallback availability, and the desktop automation capability state so the system prompt stays accurate.
 
 ## Persistence Model
 

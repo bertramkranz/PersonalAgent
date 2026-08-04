@@ -20,8 +20,10 @@ private val BLOCKED_PLACE_ORDER_OPERATIONS =
 internal class ShoppingToolRouter(
     private val config: ShoppingRuntimeConfiguration,
     private val shopperService: PersonalShopperService = defaultPersonalShopperService(config),
-) {
-    fun handle(
+) : ToolRouter {
+    override val id: String = "shopping"
+
+    override fun handle(
         toolName: String?,
         params: JsonObject,
     ): Pair<Boolean, String>? {
@@ -60,7 +62,7 @@ internal class ShoppingToolRouter(
         }
     }
 
-    fun toolDefinitions(): List<JsonObject> = listOf(buildShoppingToolDefinition())
+    override fun toolDefinitions(): List<JsonObject> = listOf(buildShoppingToolDefinition())
 
     private fun enforceConfirmationAndGuardrails(
         operation: String,

@@ -49,6 +49,7 @@ internal fun buildInitializeResultPayload(
 internal data class OptionalToolDefinitions(
     val macrofactorToolDefinitions: List<JsonObject> = emptyList(),
     val googleWorkspaceToolDefinitions: List<JsonObject> = emptyList(),
+    val desktopAutomationToolDefinitions: List<JsonObject> = emptyList(),
     val continuousResearchToolDefinitions: List<JsonObject> = emptyList(),
     val shoppingToolDefinitions: List<JsonObject> = emptyList(),
 )
@@ -67,6 +68,7 @@ internal fun buildToolsListResultPayload(
 
     optionalToolDefinitions.macrofactorToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.googleWorkspaceToolDefinitions.forEach { tool -> tools.add(tool) }
+    optionalToolDefinitions.desktopAutomationToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.continuousResearchToolDefinitions.forEach { tool -> tools.add(tool) }
     optionalToolDefinitions.shoppingToolDefinitions.forEach { tool -> tools.add(tool) }
 

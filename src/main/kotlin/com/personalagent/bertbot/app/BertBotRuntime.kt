@@ -7,6 +7,7 @@ import com.google.gson.JsonObject
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillRequest
 import com.personalagent.bertbot.agents.ToolCallingSkill
+import com.personalagent.bertbot.agents.ToolCallingSkillConfig
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.config.ExecutionProfileFallbackBehavior
 import com.personalagent.bertbot.graph.model.BertBotState
@@ -28,6 +29,7 @@ import com.personalagent.bertbot.ingestion.connectors.BertBotExternalConnectors
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatFollowupSender
 import com.personalagent.bertbot.ingestion.connectors.ExternalChatPayloadDispatcher
 import com.personalagent.bertbot.ingestion.connectors.NoopExternalChatFollowupSender
+import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.memory.DualMemoryContextAssembler
 import com.personalagent.bertbot.memory.EpisodicMemory
 import com.personalagent.bertbot.memory.MemorySummarizationWorker
@@ -314,6 +316,7 @@ internal class BertBotRuntime(
                             userPrompt = userMessage,
                         ),
                     tracingContext = tracingContext,
+                    selectedModelId = state.selectedModel ?: state.modelRoutingDecision?.selectedModelId,
                 ).response
         }
 
@@ -336,6 +339,7 @@ internal class BertBotRuntime(
                 } else {
                     { name, args -> executeProfileScopedTool(name, args, state.selectedSubAgent, allowedCapabilityIds) }
                 },
+            selectedModelId = state.selectedModel ?: state.modelRoutingDecision?.selectedModelId,
         )
     }
 
@@ -451,6 +455,9 @@ internal object BertBotRuntimeFactory {
                         "Unsupported AI provider '${aiRuntimeConfiguration.provider}'. Supported providers: openai, ollama.",
                     )
             }
+        val gatewayResolver: (String?) -> LlmGateway = { selectedModelId ->
+            resolveRuntimeGatewayForModel(aiRuntimeConfiguration, llmGateway, selectedModelId)
+        }
         val memoryRuntime = BertBotRuntimeDependenciesFactory.createMemoryRuntime(runtimeConfig, llmGateway, persistenceConfiguration)
         val ingestionRuntime =
             BertBotRuntimeDependenciesFactory.createIngestionRuntime(
@@ -484,6 +491,7 @@ internal object BertBotRuntimeFactory {
                 capabilityRegistry = capabilityRegistry,
                 llmGateway = llmGateway,
                 config = runtimeConfig,
+                gatewayResolver = gatewayResolver,
             )
         val runtimeCapabilitySnapshot =
             RuntimeCapabilitySnapshot(
@@ -510,7 +518,7 @@ internal object BertBotRuntimeFactory {
                 aiRuntimeConfiguration = aiRuntimeConfiguration,
                 stateStore = stateStore,
                 graph = graph,
-                assistantResponseSkill = createAssistantResponseSkill(llmGateway),
+                assistantResponseSkill = createAssistantResponseSkill(llmGateway, gatewayResolver),
                 memoryRuntime = memoryRuntime,
                 ingestionRuntime = ingestionRuntime,
                 researchRuntime = researchRuntime,
@@ -561,20 +569,50 @@ private fun buildToolCallingSkillOrNull(
     capabilityRegistry: CapabilityRegistry,
     llmGateway: com.personalagent.bertbot.llm.LlmGateway,
     config: BertBotAgentConfig,
+    gatewayResolver: ((String?) -> com.personalagent.bertbot.llm.LlmGateway)? = null,
 ): ToolCallingSkill? {
     validateToolBackedSubAgentCoverage(config, capabilityRegistry)
     if (capabilityRegistry.capabilityIds().isEmpty()) return null
 
     return ToolCallingSkill(
-        llmGateway = llmGateway,
-        toolDefinitionsProvider = capabilityRegistry::toolDefinitions,
-        toolExecutor = { name, args ->
-            val params = JsonObject()
-            params.add("arguments", args)
+        config =
+            ToolCallingSkillConfig(
+                llmGateway = llmGateway,
+                toolDefinitionsProvider = capabilityRegistry::toolDefinitions,
+                toolExecutor = { name, args ->
+                    val params = JsonObject()
+                    params.add("arguments", args)
 
-            capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
-        },
+                    capabilityRegistry.execute(name, params)?.second ?: "Tool '$name' not found"
+                },
+                gatewayResolver = gatewayResolver,
+            ),
     )
+}
+
+private fun resolveRuntimeGatewayForModel(
+    aiRuntimeConfiguration: AiRuntimeConfiguration,
+    fallbackGateway: com.personalagent.bertbot.llm.LlmGateway,
+    selectedModelId: String?,
+): com.personalagent.bertbot.llm.LlmGateway {
+    val requestedModel = selectedModelId?.takeIf { it.isNotBlank() }
+    if (requestedModel.isNullOrBlank() || requestedModel == aiRuntimeConfiguration.model) {
+        return fallbackGateway
+    }
+
+    return when (aiRuntimeConfiguration.provider.lowercase()) {
+        "openai" -> {
+            val apiKey = aiRuntimeConfiguration.apiKey ?: return fallbackGateway
+            createOpenAiLlmGateway(apiKey, requestedModel)
+        }
+        "ollama" ->
+            createOllamaLlmGateway(
+                baseUrl = aiRuntimeConfiguration.ollamaBaseUrl,
+                modelName = requestedModel,
+                timeoutSeconds = aiRuntimeConfiguration.ollamaTimeoutSeconds,
+            )
+        else -> fallbackGateway
+    }
 }
 
 internal fun buildCapabilityRegistry(
