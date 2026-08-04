@@ -127,6 +127,9 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_SESSION_HISTORY_ENABLED` | `true` | `true` | `true` | Master toggle for durable turn history |
 | `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE` | `2000` | `2000` | `2000` | Max retained history rows per persistence scope |
 | `BERTBOT_LEARNING_REVIEW_ENABLED` | `true` | `true` | `true` | Enables parity scaffolding for learning-review flows |
+| `BERTBOT_LEARNING_REVIEW_FILE_PATH` | `state/bertbot-learning-review.jsonl` | same | same | File backend path for the learning-review queue |
+| `BERTBOT_LEARNING_REVIEW_JDBC_TABLE` | `bertbot_learning_review_queue` | same | same | JDBC table for learning-review queue rows |
+| `BERTBOT_LEARNING_REVIEW_DECISION_JDBC_TABLE` | `bertbot_learning_review_decision_event` | same | same | JDBC table for approve/reject decision events |
 | `BERTBOT_SCHEDULED_JOBS_ENABLED` | `false` | `false` | `false` | Master toggle for scheduled job polling loop |
 | `BERTBOT_SCHEDULED_JOBS_POLL_INTERVAL_SECONDS` | `60` | `60` | `60` | Scheduler polling cadence in seconds |
 | `BERTBOT_SCHEDULED_JOBS_INITIAL_DELAY_SECONDS` | `10` | `10` | `10` | Startup delay before scheduler begins polling |
