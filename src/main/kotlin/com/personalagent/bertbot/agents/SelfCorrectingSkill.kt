@@ -10,17 +10,43 @@ data class SelfCorrectingSkillRequest(
     val userPrompt: String,
 )
 
+data class SelfCorrectingSkillConfig<O>(
+    val name: String,
+    val llmGateway: LlmGateway,
+    val outputFormatInstructions: String,
+    val parser: (JsonElement) -> O,
+    val maxAttempts: Int = 3,
+    val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+    val gatewayResolver: ((String) -> LlmGateway)? = null,
+)
+
 class SelfCorrectingSkill<O>(
-    private val name: String,
-    private val llmGateway: LlmGateway,
-    private val outputFormatInstructions: String,
-    private val parser: (JsonElement) -> O,
-    private val maxAttempts: Int = 3,
-    private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-    private val gatewayResolver: ((String) -> LlmGateway)? = null,
+    private val config: SelfCorrectingSkillConfig<O>,
 ) : Skill<SelfCorrectingSkillRequest, O> {
+    @Suppress("LongParameterList")
+    constructor(
+        name: String,
+        llmGateway: LlmGateway,
+        outputFormatInstructions: String,
+        parser: (JsonElement) -> O,
+        maxAttempts: Int = 3,
+        structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+        gatewayResolver: ((String) -> LlmGateway)? = null,
+    ) : this(
+        config =
+            SelfCorrectingSkillConfig(
+                name = name,
+                llmGateway = llmGateway,
+                outputFormatInstructions = outputFormatInstructions,
+                parser = parser,
+                maxAttempts = maxAttempts,
+                structuredOutputGateway = structuredOutputGateway,
+                gatewayResolver = gatewayResolver,
+            ),
+    )
+
     init {
-        require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
+        require(config.maxAttempts >= 1) { "maxAttempts must be at least 1" }
     }
 
     override fun invoke(
@@ -40,8 +66,8 @@ class SelfCorrectingSkill<O>(
         var lastError: Throwable? = null
         var rawOutput = ""
 
-        while (attempt <= maxAttempts) {
-            TraceLogger.skillInvoked(tracingContext, "skill=$name attempt=$attempt")
+        while (attempt <= config.maxAttempts) {
+            TraceLogger.skillInvoked(tracingContext, "skill=${config.name} attempt=$attempt")
 
             val activeGateway = resolveGateway(selectedModelId)
             rawOutput =
@@ -51,19 +77,19 @@ class SelfCorrectingSkill<O>(
                 )
 
             try {
-                val parsed = parser(parseStructuredOutput(rawOutput))
-                TraceLogger.skillCompleted(tracingContext, "skill=$name attempt=$attempt")
+                val parsed = config.parser(parseStructuredOutput(rawOutput))
+                TraceLogger.skillCompleted(tracingContext, "skill=${config.name} attempt=$attempt")
                 return parsed
             } catch (e: Exception) {
                 lastError = e
-                if (attempt == maxAttempts) {
+                if (attempt == config.maxAttempts) {
                     break
                 }
 
                 TraceLogger.warn(
                     tracingContext,
                     "skill_parse_failed",
-                    "skill=$name attempt=$attempt error=${e.message ?: "unknown"}",
+                    "skill=${config.name} attempt=$attempt error=${e.message ?: "unknown"}",
                 )
                 currentUserPrompt = buildCorrectionPrompt(input.userPrompt, rawOutput, e)
                 attempt += 1
@@ -71,18 +97,18 @@ class SelfCorrectingSkill<O>(
         }
 
         throw SelfCorrectionFailedException(
-            skillName = name,
-            attempts = maxAttempts,
+            skillName = config.name,
+            attempts = config.maxAttempts,
             lastOutput = rawOutput,
             cause = lastError,
         )
     }
 
     private fun resolveGateway(selectedModelId: String?): LlmGateway =
-        gatewayResolver?.invoke(selectedModelId.orEmpty()) ?: llmGateway
+        config.gatewayResolver?.invoke(selectedModelId.orEmpty()) ?: config.llmGateway
 
     private fun parseStructuredOutput(rawOutput: String): JsonElement {
-        return structuredOutputGateway.parse(rawOutput)
+        return config.structuredOutputGateway.parse(rawOutput)
     }
 
     private fun buildSystemPrompt(baseSystemPrompt: String): String =
@@ -90,7 +116,7 @@ class SelfCorrectingSkill<O>(
         $baseSystemPrompt
 
         Output contract:
-        $outputFormatInstructions
+        ${config.outputFormatInstructions}
         """.trimIndent()
 
     private fun buildCorrectionPrompt(

@@ -13,15 +13,42 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+data class ToolCallingSkillConfig(
+    val llmGateway: LlmGateway,
+    val toolDefinitionsProvider: () -> List<JsonObject>,
+    val toolExecutor: (name: String, args: JsonObject) -> String,
+    val maxIterations: Int = 5,
+    val codec: AgentJsonCodec = GsonAgentJsonCodec(),
+    val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+    val gatewayResolver: ((String?) -> LlmGateway)? = null,
+)
+
 internal class ToolCallingSkill(
-    private val llmGateway: LlmGateway,
-    private val toolDefinitionsProvider: () -> List<JsonObject>,
-    private val toolExecutor: (name: String, args: JsonObject) -> String,
-    private val maxIterations: Int = 5,
-    private val codec: AgentJsonCodec = GsonAgentJsonCodec(),
-    private val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-    private val gatewayResolver: ((String?) -> LlmGateway)? = null,
+    private val config: ToolCallingSkillConfig,
 ) {
+    @Suppress("LongParameterList")
+    constructor(
+        llmGateway: LlmGateway,
+        toolDefinitionsProvider: () -> List<JsonObject>,
+        toolExecutor: (name: String, args: JsonObject) -> String,
+        maxIterations: Int = 5,
+        codec: AgentJsonCodec = GsonAgentJsonCodec(),
+        structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
+        gatewayResolver: ((String?) -> LlmGateway)? = null,
+    ) : this(
+        config =
+            ToolCallingSkillConfig(
+                llmGateway = llmGateway,
+                toolDefinitionsProvider = toolDefinitionsProvider,
+                toolExecutor = toolExecutor,
+                maxIterations = maxIterations,
+                codec = codec,
+                structuredOutputGateway = structuredOutputGateway,
+                gatewayResolver = gatewayResolver,
+            ),
+    )
+
+    @Suppress("LongParameterList")
     constructor(
         llmGateway: LlmGateway,
         toolDefinitions: List<JsonObject>,
@@ -40,6 +67,7 @@ internal class ToolCallingSkill(
         gatewayResolver = gatewayResolver,
     )
 
+    @Suppress("LongParameterList")
     fun invoke(
         systemPrompt: String,
         userPrompt: String,
@@ -48,15 +76,15 @@ internal class ToolCallingSkill(
         dynamicToolExecutor: ((name: String, args: JsonObject) -> String)? = null,
         selectedModelId: String? = null,
     ): String {
-        val activeToolDefinitions = dynamicToolDefinitions ?: toolDefinitionsProvider()
-        val activeToolExecutor = dynamicToolExecutor ?: toolExecutor
+        val activeToolDefinitions = dynamicToolDefinitions ?: config.toolDefinitionsProvider()
+        val activeToolExecutor = dynamicToolExecutor ?: config.toolExecutor
         val augmentedSystemPrompt = buildAugmentedSystemPrompt(systemPrompt, activeToolDefinitions)
         val toolResults = mutableListOf<Pair<String, String>>()
         var iteration = 1
 
         val activeGateway = resolveGateway(selectedModelId)
 
-        while (iteration <= maxIterations) {
+        while (iteration <= config.maxIterations) {
             TraceLogger.skillInvoked(tracingContext, "skill=tool_calling iteration=$iteration")
             val raw =
                 activeGateway.complete(augmentedSystemPrompt, buildUserPrompt(userPrompt, toolResults))
@@ -87,13 +115,13 @@ internal class ToolCallingSkill(
             iteration++
         }
 
-        TraceLogger.warn(tracingContext, "tool_calling_max_iterations", "iterations=$maxIterations")
+        TraceLogger.warn(tracingContext, "tool_calling_max_iterations", "iterations=${config.maxIterations}")
         val finalResponse = activeGateway.complete(systemPrompt, buildUserPrompt(userPrompt, toolResults))
         return formatFinalResponse(finalResponse, toolResults)
     }
 
     private fun resolveGateway(selectedModelId: String?): LlmGateway {
-        return gatewayResolver?.invoke(selectedModelId) ?: llmGateway
+        return config.gatewayResolver?.invoke(selectedModelId) ?: config.llmGateway
     }
 
     private fun resolveAction(
@@ -420,7 +448,7 @@ internal class ToolCallingSkill(
         val normalized = extractJsonObjectCandidate(raw)
         val payload =
             runCatching {
-                codec.decode(structuredOutputGateway.parse(normalized).toString(), ToolActionEnvelope::class.java)
+                config.codec.decode(config.structuredOutputGateway.parse(normalized).toString(), ToolActionEnvelope::class.java)
             }.getOrNull() ?: return null
 
         return runCatching {
