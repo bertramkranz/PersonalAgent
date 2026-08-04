@@ -21,6 +21,7 @@
 %% 2026-08-04: Phase 1 graph stages now include ResearchPlannerNode, EvidenceJudgeNode, and SafetyGuardianNode before delegation/execution.
 %% 2026-08-04: Phase 2/3 graph stages now include ModelRouterNode, IncidentDetectorNode, and IncidentCommanderNode.
 %% 2026-08-04: Runtime now resolves ModelRouter-selected model IDs per turn for both direct responses and tool-calling loops, with traceable fallback reasons.
+%% 2026-08-04: Hermes parity slice adds scoped session-history search/list/clear tooling and durable learning-review approval queues with apply-failure metadata.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
@@ -103,7 +104,14 @@ flowchart TD
     subgraph McpHandlers
         CheckpointHandler[McpCheckpointToolHandler]
         IngestionHandler[McpIngestionToolHandler]
+        SessionHistoryRouter[SessionHistoryToolRouter\nsession_history_list/search/clear]
+        LearningReviewRouter[LearningReviewToolRouter\nlearning_review_list/approve/reject]
         StatusProvider[McpStatusProviderFactory]
+    end
+
+    subgraph LearningReviewAndSession
+        SessionHistoryStore[(Session History Store: File or JDBC)]
+        LearningReviewStore[(Learning Review Queue: File or JDBC)]
     end
 
     subgraph PolymarketBridge
@@ -255,9 +263,15 @@ flowchart TD
 
     MCP --> CheckpointHandler
     MCP --> IngestionHandler
+    MCP --> SessionHistoryRouter
+    MCP --> LearningReviewRouter
     MCP --> StatusProvider
     CheckpointHandler --> CompensatingRollback
     IngestionHandler --> Control
+    SessionHistoryRouter --> SessionHistoryStore
+    LearningReviewRouter --> LearningReviewStore
+    RuntimeCore --> SessionHistoryStore
+    RuntimeCore --> LearningReviewStore
 
     MCP --> PolymarketToolRouter
     PolymarketToolRouter --> PolymarketApiClient
