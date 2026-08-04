@@ -1,6 +1,7 @@
 package com.personalagent.bertbot.agents
 
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,7 +88,13 @@ class SelfCorrectingSkillTest {
                 outputFormatInstructions = "Return only an integer as plain text.",
                 parser = { it.asString.trim().toInt() },
                 maxAttempts = 3,
-                gatewayResolver = { modelId -> if (modelId == "reasoning") selectedGateway else defaultGateway },
+                gatewayResolver = { modelId ->
+                    if (modelId == "reasoning") {
+                        GatewayResolution(selectedGateway, modelId, "reasoning")
+                    } else {
+                        GatewayResolution(defaultGateway, modelId, "default")
+                    }
+                },
             )
 
         val result =

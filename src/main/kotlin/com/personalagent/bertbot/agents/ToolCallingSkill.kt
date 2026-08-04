@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.serialization.AgentJsonCodec
 import com.personalagent.bertbot.serialization.GsonAgentJsonCodec
@@ -20,7 +21,7 @@ data class ToolCallingSkillConfig(
     val maxIterations: Int = 5,
     val codec: AgentJsonCodec = GsonAgentJsonCodec(),
     val structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-    val gatewayResolver: ((String?) -> LlmGateway)? = null,
+    val gatewayResolver: ((String?) -> GatewayResolution)? = null,
 )
 
 internal class ToolCallingSkill(
@@ -34,7 +35,7 @@ internal class ToolCallingSkill(
         maxIterations: Int = 5,
         codec: AgentJsonCodec = GsonAgentJsonCodec(),
         structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-        gatewayResolver: ((String?) -> LlmGateway)? = null,
+        gatewayResolver: ((String?) -> GatewayResolution)? = null,
     ) : this(
         config =
             ToolCallingSkillConfig(
@@ -56,7 +57,7 @@ internal class ToolCallingSkill(
         maxIterations: Int = 5,
         codec: AgentJsonCodec = GsonAgentJsonCodec(),
         structuredOutputGateway: StructuredOutputGateway = JsonStructuredOutputGateway(),
-        gatewayResolver: ((String?) -> LlmGateway)? = null,
+        gatewayResolver: ((String?) -> GatewayResolution)? = null,
     ) : this(
         llmGateway = llmGateway,
         toolDefinitionsProvider = { toolDefinitions },
@@ -82,7 +83,13 @@ internal class ToolCallingSkill(
         val toolResults = mutableListOf<Pair<String, String>>()
         var iteration = 1
 
-        val activeGateway = resolveGateway(selectedModelId)
+        val resolution = resolveGateway(selectedModelId)
+        val activeGateway = resolution.gateway
+        TraceLogger.info(
+            tracingContext,
+            "llm_model_resolution",
+            "requested_model=${resolution.requestedModelId ?: "default"} effective_model=${resolution.effectiveModelId} fallback_reason=${resolution.fallbackReason ?: "none"}",
+        )
 
         while (iteration <= config.maxIterations) {
             TraceLogger.skillInvoked(tracingContext, "skill=tool_calling iteration=$iteration")
@@ -120,9 +127,13 @@ internal class ToolCallingSkill(
         return formatFinalResponse(finalResponse, toolResults)
     }
 
-    private fun resolveGateway(selectedModelId: String?): LlmGateway {
-        return config.gatewayResolver?.invoke(selectedModelId) ?: config.llmGateway
-    }
+    private fun resolveGateway(selectedModelId: String?): GatewayResolution =
+        config.gatewayResolver?.invoke(selectedModelId)
+            ?: GatewayResolution(
+                gateway = config.llmGateway,
+                requestedModelId = selectedModelId,
+                effectiveModelId = selectedModelId?.takeIf { it.isNotBlank() } ?: "default",
+            )
 
     private fun resolveAction(
         raw: String,

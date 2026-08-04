@@ -20,6 +20,7 @@
 %% 2026-08-04: Shopping router is now service-backed through PersonalShopperService and seeded AmazonStoreProvider catalog data rather than placeholder-only responses.
 %% 2026-08-04: Phase 1 graph stages now include ResearchPlannerNode, EvidenceJudgeNode, and SafetyGuardianNode before delegation/execution.
 %% 2026-08-04: Phase 2/3 graph stages now include ModelRouterNode, IncidentDetectorNode, and IncidentCommanderNode.
+%% 2026-08-04: Runtime now resolves ModelRouter-selected model IDs per turn for both direct responses and tool-calling loops, with traceable fallback reasons.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]

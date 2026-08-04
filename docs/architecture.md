@@ -34,6 +34,8 @@ At a high level, BertBot:
 
 That design makes the path through the system easy to inspect in traces and interaction diagrams.
 
+Model selection remains orchestrator-controlled: `ModelRouterNode` chooses the requested model ID (`primaryModel` or `reasoningModel`) and runtime resolves the effective gateway per turn for both direct responses and tool-calling loops. If provider-specific resolution fails, runtime falls back to the configured default model and logs the fallback reason in trace events.
+
 ## Shopping Workflow Stages
 
 BertBot supports a structured shopping assistance workflow. Each stage corresponds to a user intent that routes through the same graph pipeline:

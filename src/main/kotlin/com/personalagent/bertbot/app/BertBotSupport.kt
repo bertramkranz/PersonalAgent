@@ -11,6 +11,7 @@ import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillConfig
 import com.personalagent.bertbot.config.BertBotAgentConfig
 import com.personalagent.bertbot.graph.model.BertBotState
+import com.personalagent.bertbot.llm.GatewayResolution
 import com.personalagent.bertbot.llm.LlmGateway
 import com.personalagent.bertbot.llm.OllamaLlmGateway
 import com.personalagent.bertbot.llm.OpenAiLlmGateway
@@ -207,7 +208,7 @@ internal const val MAX_SHOPPING_STORES = 9
 
 internal fun createAssistantResponseSkill(
     llmGateway: LlmGateway,
-    gatewayResolver: ((String) -> LlmGateway)? = null,
+    gatewayResolver: ((String?) -> GatewayResolution)? = null,
 ): SelfCorrectingSkill<AssistantResponseEnvelope> {
     return SelfCorrectingSkill(
         config =
