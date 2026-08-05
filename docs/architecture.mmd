@@ -23,6 +23,7 @@
 %% 2026-08-04: Phase 2/3 graph stages now include ModelRouterNode, IncidentDetectorNode, and IncidentCommanderNode.
 %% 2026-08-05: DelegationNode now applies per-sub-agent preferredModelId override from SubAgentExecutionProfileDefinition, superseding the complexity-based model chosen by ModelRouterNode when a sub-agent is matched.
 %% 2026-08-04: Learning-parity slice adds scoped session-history search/list/clear tooling and durable learning-review approval queues with apply-failure metadata.
+%% 2026-08-05: Removed rollout toggles SESSION_HISTORY_ENABLED, CURATED_MEMORY_ENABLED, KOOG_CHAT_MEMORY_ENABLED, KOOG_LONG_TERM_MEMORY_ENABLED; session history, curated memory, and Koog chat/long-term memory are now always on.
 flowchart TD
     subgraph Interfaces
         CLI[Interactive CLI]
