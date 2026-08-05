@@ -64,7 +64,7 @@ This reduces mistakes and makes the agent easier to supervise.
 A very effective style is:
 
 - “Verify your answer against the relevant files or tool output.”
-- “Show the evidence you used before you finalise your conclusion.”
+- “Show the evidence you used before you finalize your conclusion.”
 
 ### Separate intent from execution
 
