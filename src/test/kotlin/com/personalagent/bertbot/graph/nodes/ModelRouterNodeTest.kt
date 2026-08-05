@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class ModelRouterNodeTest {
     @Test
     fun `model router selects reasoning model for complex requests`() {
-        val node = ModelRouterNode(strategy = ModelSelectionStrategy(primaryModel = "gpt-4o-mini", reasoningModel = "gpt-4o"))
+        val node = ModelRouterNode(strategy = ModelSelectionStrategy(primaryModel = "gpt-5.6-luna", reasoningModel = "gpt-5.6-sol"))
         val state =
             BertBotState(
                 lastUserMessage = "research and deeply analyze this architecture decision",
@@ -27,19 +27,19 @@ class ModelRouterNodeTest {
 
         val updated = node.execute(state, TracingContext(traceId = "test-trace"))
 
-        assertEquals("gpt-4o", updated.selectedModel)
+        assertEquals("gpt-5.6-sol", updated.selectedModel)
         assertNotNull(updated.modelRoutingDecision)
         assertTrue(updated.estimatedCostForCurrentTurn > 0.0)
     }
 
     @Test
     fun `model router selects primary model for routine requests`() {
-        val node = ModelRouterNode(strategy = ModelSelectionStrategy(primaryModel = "gpt-4o-mini", reasoningModel = "gpt-4o"))
+        val node = ModelRouterNode(strategy = ModelSelectionStrategy(primaryModel = "gpt-5.6-luna", reasoningModel = "gpt-5.6-sol"))
         val state = BertBotState(lastUserMessage = "hello")
 
         val updated = node.execute(state, TracingContext(traceId = "test-trace"))
 
-        assertEquals("gpt-4o-mini", updated.selectedModel)
+        assertEquals("gpt-5.6-luna", updated.selectedModel)
         assertNotNull(updated.tokenCountingMetadata)
     }
 }

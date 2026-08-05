@@ -8,6 +8,7 @@ import com.personalagent.bertbot.graph.model.BertBotState
 import com.personalagent.bertbot.graph.runtime.TracingContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DelegationNodeTest {
@@ -111,5 +112,143 @@ class DelegationNodeTest {
 
         assertEquals("polymarket_analyst", updated.selectedSubAgent)
         assertEquals("matched_sub_agent", updated.delegationDecision?.reason)
+    }
+
+    @Test
+    fun `delegation node applies profile model override when preferredModelId is set`() {
+        val registry =
+            SubAgentRegistry(
+                definitions =
+                    listOf(
+                        SubAgentDefinition(
+                            id = "coder",
+                            name = "Coder",
+                            description = "Implements code",
+                            skills = setOf("coding", "implementation"),
+                        ),
+                    ),
+            )
+        val node =
+            DelegationNode(
+                registry = registry,
+                profileModelLookup = { subAgentId, _ -> if (subAgentId == "coder") "gpt-5.4-mini" else null },
+            )
+        val state =
+            BertBotState(
+                lastUserMessage = "please write a coding implementation",
+                currentIntent = BertBotIntent(summary = "coding task", actionable = true, priority = BertBotPriority.ROUTINE),
+                selectedModel = "gpt-5.6-luna",
+            )
+
+        val updated = node.execute(state, TracingContext(traceId = "test-override"))
+
+        assertEquals("coder", updated.selectedSubAgent)
+        assertEquals("gpt-5.4-mini", updated.selectedModel)
+        assertEquals("sub_agent_profile_override", updated.modelRoutingDecision?.reasoning)
+    }
+
+    @Test
+    fun `delegation node leaves selected model unchanged when no profile model is configured`() {
+        val registry =
+            SubAgentRegistry(
+                definitions =
+                    listOf(
+                        SubAgentDefinition(
+                            id = "planner",
+                            name = "Planner",
+                            description = "Plans tasks",
+                            skills = setOf("planning", "scheduling"),
+                        ),
+                    ),
+            )
+        val node = DelegationNode(registry = registry, profileModelLookup = { _, _ -> null })
+        val state =
+            BertBotState(
+                lastUserMessage = "create a planning schedule",
+                currentIntent = BertBotIntent(summary = "planning task", actionable = true, priority = BertBotPriority.ROUTINE),
+                selectedModel = "gpt-5.6-luna",
+            )
+
+        val updated = node.execute(state, TracingContext(traceId = "test-no-override"))
+
+        assertEquals("planner", updated.selectedSubAgent)
+        assertEquals("gpt-5.6-luna", updated.selectedModel)
+        assertNull(updated.modelRoutingDecision)
+    }
+
+    @Test
+    fun `delegation node sets sub_agent_profile_override reasoning on modelRoutingDecision`() {
+        val registry =
+            SubAgentRegistry(
+                definitions =
+                    listOf(
+                        SubAgentDefinition(
+                            id = "architect",
+                            name = "Architect",
+                            description = "Designs systems",
+                            skills = setOf("architecture", "design"),
+                        ),
+                    ),
+            )
+        val node =
+            DelegationNode(
+                registry = registry,
+                profileModelLookup = { subAgentId, _ -> if (subAgentId == "architect") "gpt-5.6-terra" else null },
+            )
+        val state =
+            BertBotState(
+                lastUserMessage = "review the architecture and design",
+                currentIntent = BertBotIntent(summary = "architecture review", actionable = true, priority = BertBotPriority.ROUTINE),
+            )
+
+        val updated = node.execute(state, TracingContext(traceId = "test-architect"))
+
+        assertEquals("gpt-5.6-terra", updated.selectedModel)
+        assertEquals("sub_agent_profile_override", updated.modelRoutingDecision?.reasoning)
+        assertEquals("gpt-5.6-terra", updated.modelRoutingDecision?.selectedModelId)
+    }
+
+    @Test
+    fun `delegation node uses highComplexityModelId when complexity_routed signal is set`() {
+        val registry =
+            SubAgentRegistry(
+                definitions =
+                    listOf(
+                        SubAgentDefinition(
+                            id = "architect",
+                            name = "Architect",
+                            description = "Designs systems",
+                            skills = setOf("architecture", "design"),
+                        ),
+                    ),
+            )
+        val node =
+            DelegationNode(
+                registry = registry,
+                profileModelLookup = { subAgentId, isComplexTask ->
+                    if (subAgentId == "architect") {
+                        if (isComplexTask) "gpt-5.6-sol" else "gpt-5.6-terra"
+                    } else {
+                        null
+                    }
+                },
+            )
+        val complexState =
+            BertBotState(
+                lastUserMessage = "deeply analyze the architecture and design tradeoffs",
+                currentIntent =
+                    BertBotIntent(summary = "complex architecture review", actionable = true, priority = BertBotPriority.URGENT),
+                modelRoutingDecision =
+                    com.personalagent.bertbot.graph.model.ModelRoutingDecision(
+                        selectedModelId = "gpt-5.6-sol",
+                        reasoning = "complexity_routed",
+                    ),
+            )
+
+        val updated = node.execute(complexState, TracingContext(traceId = "test-complex-architect"))
+
+        assertEquals("architect", updated.selectedSubAgent)
+        assertEquals("gpt-5.6-sol", updated.selectedModel)
+        assertEquals("sub_agent_profile_override", updated.modelRoutingDecision?.reasoning)
     }
 }

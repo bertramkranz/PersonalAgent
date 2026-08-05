@@ -61,6 +61,7 @@ internal class BertBotRuntime(
     private val routingTelemetryStore: RoutingTelemetryStore? = null,
     private val scheduledJobService: ScheduledJobService? = null,
     private val learningProposalLoopService: LearningProposalLoopService? = null,
+    private val promptOptimizer: PromptOptimizer = PromptOptimizer(PromptOptimizerConfig()),
     private val koogMemoryFeatureAdapter: KoogMemoryFeatureAdapter = KoogMemoryFeatureAdapter(),
     private val toolCapabilityRegistry: CapabilityRegistry? = null,
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
@@ -160,20 +161,43 @@ internal class BertBotRuntime(
                 recordLearningSignals(userMessage, persistenceScopeKey, state)
 
                 val koogPromptContext = koogMemoryFeatureAdapter.buildPromptContext(persistenceScopeKey, userMessage)
-                val systemPrompt =
+                val baseSystemPrompt =
                     buildSystemPrompt(
                         config = config,
                         state = state,
                         runtimeCapabilities = effectiveRuntimeCapabilitySnapshot,
                         sessionRecallExcerpts = requestContext.sessionRecallExcerpts,
-                    ).let { base ->
-                        if (koogPromptContext.isBlank()) {
-                            base
-                        } else {
-                            "$base\n\nKoog memory context:\n$koogPromptContext"
-                        }
+                    )
+                val promptWithMemory =
+                    if (koogPromptContext.isBlank()) {
+                        baseSystemPrompt
+                    } else {
+                        "$baseSystemPrompt\n\nKoog memory context:\n$koogPromptContext"
                     }
                 val tracingContext = TracingContext(traceId = state.traceId ?: requestContext.requestTraceId)
+                val proposal =
+                    promptOptimizer.proposePromptEnhancement(
+                        basePrompt = promptWithMemory,
+                        context =
+                            PromptOptimizerContext(
+                                userMessage = userMessage,
+                                state = state,
+                                feedbackSignals = state.executionSummary,
+                            ),
+                    )
+                val systemPrompt =
+                    if (proposal.shouldApply) {
+                        proposal.enhancedPrompt
+                    } else {
+                        promptOptimizer.rollbackPromptEnhancement(promptWithMemory, proposal)
+                    }
+                if (proposal.shouldApply || proposal.reason != "optimizer disabled") {
+                    TraceLogger.info(
+                        tracingContext,
+                        "prompt_optimizer_decision",
+                        "applied=${proposal.shouldApply} confidence=${proposal.confidence} reason=${proposal.reason}",
+                    )
+                }
                 if (requestContext.sessionRecallExcerpts.isNotEmpty()) {
                     TraceLogger.info(
                         tracingContext,
@@ -844,6 +868,7 @@ internal object BertBotRuntimeFactory {
         val routingHintsConfiguration = resolveRoutingHintsRuntimeConfiguration()
         val scheduledJobsConfiguration = resolveScheduledJobsRuntimeConfiguration()
         val learningProposalConfiguration = resolveLearningProposalRuntimeConfiguration()
+        val promptOptimizerConfiguration = resolvePromptOptimizerRuntimeConfiguration()
         val stateStore = BertBotRuntimeDependenciesFactory.createStateStore(persistenceConfiguration)
         val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
         val stateEventStore = BertBotRuntimeDependenciesFactory.createStateEventStore(persistenceConfiguration)
@@ -1010,6 +1035,17 @@ internal object BertBotRuntimeFactory {
                 learningReviewStore = learningReviewStore,
                 configuration = learningProposalConfiguration,
             )
+        val promptOptimizer =
+            PromptOptimizer(
+                PromptOptimizerConfig(
+                    enabled = promptOptimizerConfiguration.enabled,
+                    maxInstructionLines = promptOptimizerConfiguration.maxInstructionLines,
+                ),
+                proposalHistoryStore =
+                    LearningProposalSignalStorePromptOptimizerHistoryStore(
+                        LearningProposalSignalStoreFactory.create(persistenceConfiguration),
+                    ),
+            )
 
         val runtime =
             BertBotRuntime(
@@ -1034,6 +1070,7 @@ internal object BertBotRuntimeFactory {
                 routingTelemetryStore = routingTelemetryStore,
                 scheduledJobService = scheduledJobService,
                 learningProposalLoopService = learningProposalLoopService,
+                promptOptimizer = promptOptimizer,
                 koogMemoryFeatureAdapter = koogMemoryFeatureAdapter,
                 toolCapabilityRegistry = capabilityRegistry,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,

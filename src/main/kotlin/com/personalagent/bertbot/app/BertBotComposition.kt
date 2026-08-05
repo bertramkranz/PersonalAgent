@@ -119,6 +119,15 @@ internal object BertBotGraphFactory {
                             ),
                         hintProvider = routingHintContext.provider,
                         scopeKeyProvider = routingHintContext.scopeKeyProvider,
+                        profileModelLookup = { subAgentId, isComplexTask ->
+                            config.executionProfileFor(subAgentId)?.let { profile ->
+                                if (isComplexTask) {
+                                    profile.highComplexityModelId ?: profile.preferredModelId
+                                } else {
+                                    profile.preferredModelId
+                                }
+                            }
+                        },
                     ),
                     ExecutorNode(),
                     IncidentDetectorNode(),

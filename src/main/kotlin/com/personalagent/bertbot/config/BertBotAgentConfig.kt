@@ -31,6 +31,8 @@ data class SubAgentExecutionProfileDefinition(
     val requiredCapabilities: Set<String> = emptySet(),
     val optionalCapabilities: Set<String> = emptySet(),
     val fallbackBehavior: ExecutionProfileFallbackBehavior = ExecutionProfileFallbackBehavior.ALLOW_ALL,
+    val preferredModelId: String? = null,
+    val highComplexityModelId: String? = null,
 )
 
 data class ConnectorConfig(
@@ -91,8 +93,8 @@ data class ContinuousImprovementResearchConfig(
 )
 
 data class ModelSelectionStrategy(
-    val primaryModel: String = "gpt-4o-mini",
-    val reasoningModel: String = "gpt-4o",
+    val primaryModel: String = "gpt-5.6-luna",
+    val reasoningModel: String = "gpt-5.6-sol",
     val costBudgetPerRequestUsd: Double = 0.50,
 )
 
@@ -442,26 +444,54 @@ data class BertBotAgentConfig(
 
 private fun defaultSubAgentExecutionProfiles(): List<SubAgentExecutionProfileDefinition> =
     listOf(
+        agentProfile("coder", "gpt-5.4-mini", "gpt-5.6-terra"),
+        agentProfile("planner", "gpt-5.6-luna", "gpt-5.6-terra"),
+        agentProfile("architect", "gpt-5.6-terra", "gpt-5.6-sol"),
+        agentProfile("analyst", "gpt-5.6-luna", "gpt-5.6-terra"),
+        agentProfile("copywriter", "gpt-5.6-luna", "gpt-5.6-luna"),
+        agentProfile("red_teamer", "gpt-5.6-terra", "gpt-5.6-sol"),
+        agentProfile("philosopher", "gpt-5.6-terra", "gpt-5.6-sol"),
+        agentProfile("psychologist", "gpt-5.6-luna", "gpt-5.6-terra"),
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "google_workspace_operator",
+            optionalCapabilities = setOf("google_workspace"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
+            preferredModelId = "gpt-5.6-luna",
+            highComplexityModelId = "gpt-5.6-luna",
+        ),
+        agentProfile("desktop_automation_operator", "gpt-5.4-mini", "gpt-5.4-mini"),
+        SubAgentExecutionProfileDefinition(
+            subAgentId = "repo_improvement_researcher",
+            optionalCapabilities = setOf("continuous_research"),
+            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
+            preferredModelId = "gpt-5.6-terra",
+            highComplexityModelId = "gpt-5.6-sol",
+        ),
         SubAgentExecutionProfileDefinition(
             subAgentId = "polymarket_analyst",
             requiredCapabilities = setOf("polymarket"),
             fallbackBehavior = ExecutionProfileFallbackBehavior.DENY_OUTSIDE_PROFILE,
+            preferredModelId = "gpt-5.6-terra",
+            highComplexityModelId = "gpt-5.6-sol",
         ),
         SubAgentExecutionProfileDefinition(
             subAgentId = "personal_shopper",
             requiredCapabilities = setOf("shopping"),
             fallbackBehavior = ExecutionProfileFallbackBehavior.DENY_OUTSIDE_PROFILE,
+            preferredModelId = "gpt-5.6-luna",
+            highComplexityModelId = "gpt-5.6-luna",
         ),
-        SubAgentExecutionProfileDefinition(
-            subAgentId = "google_workspace_operator",
-            optionalCapabilities = setOf("google_workspace"),
-            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
-        ),
-        SubAgentExecutionProfileDefinition(
-            subAgentId = "repo_improvement_researcher",
-            optionalCapabilities = setOf("continuous_research"),
-            fallbackBehavior = ExecutionProfileFallbackBehavior.WARN_ONLY,
-        ),
+    )
+
+private fun agentProfile(
+    subAgentId: String,
+    preferredModelId: String,
+    highComplexityModelId: String,
+): SubAgentExecutionProfileDefinition =
+    SubAgentExecutionProfileDefinition(
+        subAgentId = subAgentId,
+        preferredModelId = preferredModelId,
+        highComplexityModelId = highComplexityModelId,
     )
 
 private fun requireConnectorScope(

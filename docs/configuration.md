@@ -51,7 +51,7 @@ The table below lists every recognized env key, its code default, and the value 
 | Key | Code default | `.env.example` | `.env.compose.example` | Notes |
 | --- | --- | --- | --- | --- |
 | `BERTBOT_AI_PROVIDER` | `openai` | `openai` | `openai` | `openai` or `ollama` |
-| `BERTBOT_AI_MODEL` | `gpt-4o-mini` | `gpt-4o-mini` | `gpt-4o-mini` | |
+| `BERTBOT_AI_MODEL` | `gpt-5.6-luna` | `gpt-5.6-luna` | `gpt-5.6-luna` | |
 | `BERTBOT_AI_API_KEY` | — | `[required]` | `[required]` | Required for OpenAI |
 | `BERTBOT_OLLAMA_BASE_URL` | `http://localhost:11434` | `http://localhost:11434` | `http://ollama:11434` | [compose override] Docker service hostname |
 | `BERTBOT_OLLAMA_TIMEOUT_SECONDS` | `120` | `120` | `120` | |
@@ -204,7 +204,7 @@ OpenAI example:
 
 ```bash
 BERTBOT_AI_PROVIDER=openai
-BERTBOT_AI_MODEL=gpt-4o-mini
+BERTBOT_AI_MODEL=gpt-5.6-luna
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
@@ -232,8 +232,9 @@ BERTBOT_OLLAMA_BASE_URL=http://localhost:11434
 
 Phase 2 and Phase 3 routing are deterministic graph stages and currently use in-repo config defaults through `BertBotAgentConfig`.
 
-- `modelSelection.primaryModel` (default `gpt-4o-mini`) routes lower-complexity tasks to lower-cost inference.
-- `modelSelection.reasoningModel` (default `gpt-4o`) routes higher-complexity tasks when research, urgency, or evidence density signals are high.
+- `modelSelection.primaryModel` (default `gpt-5.6-luna`) routes lower-complexity tasks and unmatched requests to the cost-optimized frontier model.
+- `modelSelection.reasoningModel` (default `gpt-5.6-sol`) routes higher-complexity tasks when research, urgency, or evidence density signals are high and no sub-agent profile overrides the selection.
+- Each sub-agent execution profile also declares a `preferredModelId` and `highComplexityModelId`, which override the global selection after sub-agent matching — so task identity takes precedence over the complexity score alone.
 - `modelSelection.costBudgetPerRequestUsd` (default `0.50`) emits cost budget warnings in traces when estimated request cost exceeds the threshold.
 
 Runtime applies the selected model per turn at invocation time for both direct response generation and tool-calling loops. If the requested model cannot be resolved for the active provider, BertBot falls back to `BERTBOT_AI_MODEL` and emits a trace event with the requested model, effective model, and fallback reason.

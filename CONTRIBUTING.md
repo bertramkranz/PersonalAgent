@@ -17,7 +17,7 @@ This guide explains how to set up a local environment, run the quality checks, a
 
 ```bash
 BERTBOT_AI_PROVIDER=openai
-BERTBOT_AI_MODEL=gpt-4o-mini
+BERTBOT_AI_MODEL=gpt-5.6-luna
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 

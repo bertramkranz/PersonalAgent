@@ -5,6 +5,7 @@ import com.personalagent.bertbot.app.RoutingHint
 import com.personalagent.bertbot.app.RoutingHintRuntimeConfiguration
 import com.personalagent.bertbot.graph.model.BertBotDelegationDecision
 import com.personalagent.bertbot.graph.model.BertBotState
+import com.personalagent.bertbot.graph.model.ModelRoutingDecision
 import com.personalagent.bertbot.graph.runtime.BertBotGraphNode
 import com.personalagent.bertbot.graph.runtime.TraceLogger
 import com.personalagent.bertbot.graph.runtime.TracingContext
@@ -14,6 +15,7 @@ internal class DelegationNode(
     private val hintConfiguration: RoutingHintRuntimeConfiguration = RoutingHintRuntimeConfiguration(),
     private val hintProvider: ((scopeKey: String, routeKey: String) -> RoutingHint?)? = null,
     private val scopeKeyProvider: ((BertBotState) -> String)? = null,
+    private val profileModelLookup: ((subAgentId: String, isComplexTask: Boolean) -> String?)? = null,
 ) : BertBotGraphNode {
     override val id: String = NodeIds.DELEGATION
 
@@ -48,6 +50,23 @@ internal class DelegationNode(
                 state.delegationPlan.add("Delegate to ${match.name} (id=${match.id}; ${match.description})")
                 state.executionSummary.add("Prepared delegation to ${match.id}")
                 TraceLogger.subAgentSelected(tracingContext, "sub_agent=${match.id}")
+                val isComplexTask = state.modelRoutingDecision?.reasoning == "complexity_routed"
+                val profileModel = profileModelLookup?.invoke(selectedSubAgent, isComplexTask)
+                if (profileModel != null) {
+                    state.selectedModel = profileModel
+                    state.modelRoutingDecision =
+                        ModelRoutingDecision(
+                            selectedModelId = profileModel,
+                            reasoning = "sub_agent_profile_override",
+                            fallbackModelIds = listOfNotNull(state.modelRoutingDecision?.selectedModelId).filterNot { it == profileModel },
+                            estimatedCostUsd = state.modelRoutingDecision?.estimatedCostUsd ?: 0.0,
+                        )
+                    TraceLogger.info(
+                        tracingContext,
+                        "model_override",
+                        "sub_agent=$selectedSubAgent model=$profileModel",
+                    )
+                }
             } else {
                 state.selectedSubAgent = null
                 state.delegationDecision =

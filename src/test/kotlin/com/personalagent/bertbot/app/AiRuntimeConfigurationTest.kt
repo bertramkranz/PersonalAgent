@@ -115,6 +115,38 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `prompt optimizer configuration defaults are applied`() {
+        val configuration =
+            resolvePromptOptimizerRuntimeConfiguration(
+                environment = emptyMap(),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(DEFAULT_PROMPT_OPTIMIZER_ENABLED, configuration.enabled)
+        assertEquals(DEFAULT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES, configuration.maxInstructionLines)
+    }
+
+    @Test
+    fun `prompt optimizer configuration prefers environment over dotenv`() {
+        val configuration =
+            resolvePromptOptimizerRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_PROMPT_OPTIMIZER_ENABLED" to "true",
+                        "BERTBOT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES" to "7",
+                    ),
+                dotEnvValues =
+                    mapOf(
+                        "BERTBOT_PROMPT_OPTIMIZER_ENABLED" to "false",
+                        "BERTBOT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES" to "3",
+                    ),
+            )
+
+        assertEquals(true, configuration.enabled)
+        assertEquals(7, configuration.maxInstructionLines)
+    }
+
+    @Test
     fun `routing hints configuration defaults are applied`() {
         val configuration =
             resolveRoutingHintsRuntimeConfiguration(

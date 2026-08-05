@@ -82,7 +82,7 @@ class IncidentCommanderNode : BertBotGraphNode {
         when (strategy.action) {
             RecoveryAction.RETRY -> {
                 if (state.selectedModel.isNullOrBlank()) {
-                    state.selectedModel = "gpt-4o-mini"
+                    state.selectedModel = "gpt-5.6-luna"
                 }
             }
 
