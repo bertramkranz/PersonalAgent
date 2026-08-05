@@ -5,6 +5,7 @@ This folder holds focused documentation that was moved out of the root README so
 ## Start Here
 
 - Use [../README.md](../README.md) for the high-level project overview and quick start.
+- Use [user-guide.md](user-guide.md) for a practical guide to getting the most value from BertBot, including self-learning and MCP workflows.
 - Use [configuration.md](configuration.md) when you need environment variables, provider settings, or persistence configuration.
 - Use [run-modes.md](run-modes.md) when you need to choose or operate a runtime mode.
 - Use [deployment.md](deployment.md) when you want Docker Compose or container deployment guidance.
