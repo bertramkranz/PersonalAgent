@@ -124,7 +124,6 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_SCHEDULED_JOB_JDBC_TABLE` | `bertbot_scheduled_job_snapshot` | same | same | |
 | `BERTBOT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE` | `bertbot_scheduled_job_execution_event` | same | same | |
 | `BERTBOT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE` | `bertbot_learning_proposal_signal_snapshot` | same | same | |
-| `BERTBOT_SESSION_HISTORY_ENABLED` | `true` | `true` | `true` | Master toggle for durable turn history |
 | `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE` | `2000` | `2000` | `2000` | Max retained history rows per persistence scope |
 | `BERTBOT_LEARNING_REVIEW_ENABLED` | `true` | `true` | `true` | Enables parity scaffolding for learning-review flows |
 | `BERTBOT_LEARNING_REVIEW_FILE_PATH` | `state/bertbot-learning-review.jsonl` | same | same | File backend path for the learning-review queue |
@@ -144,9 +143,7 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_CHECKPOINT_ROLLBACK_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM` | `true` | `true` | `true` | |
 | `BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED` | `false` | `false` | `false` | Set `true` to allow rollback in prod/staging |
-| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | `50` | `50` | `50` | |
-| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | `5` | `5` | `5` | |
 | `BERTBOT_KOOG_OTEL_SERVICE_NAME` | `personalagent-bertbot` | same | same | |
 | `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | `0.1.0` | same | same | |
@@ -361,11 +358,12 @@ JDBC or PostgreSQL settings:
 
 Session history and learning review controls:
 
-- `BERTBOT_SESSION_HISTORY_ENABLED`
 - `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE`
 - `BERTBOT_LEARNING_REVIEW_ENABLED`
 - `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED`
 - `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED`
+
+Session history capture is always enabled.
 
 Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 
@@ -404,14 +402,14 @@ When `BERTBOT_RUNTIME_ENV` is `prod`, `production`, `staging`, or `preprod`, rol
 
 | Variable | Purpose | Notes |
 | --- | --- | --- |
-| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | Enable in-context chat memory window | Default `true` |
 | `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | Number of past turns to include | Default `50` |
-| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | Enable long-term memory retrieval | Default `true` |
 | `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | Number of memories to retrieve per turn | Default `5` |
 | `BERTBOT_KOOG_OTEL_SERVICE_NAME` | OTel service name for traces | Default `personalagent-bertbot` |
 | `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | OTel service version | Default `0.1.0` |
 | `BERTBOT_KOOG_OTEL_VERBOSE` | Enable verbose OTel output | Default `false` |
 | `BERTBOT_KOOG_OTEL_OTLP_ENDPOINT` | OTLP exporter endpoint URL | Leave blank to disable OTel export |
+
+Koog chat memory and long-term retrieval are always enabled.
 
 ## Research Overrides
 

@@ -70,7 +70,6 @@ internal data class PersistenceRuntimeConfiguration(
 )
 
 internal data class SessionHistoryRuntimeConfiguration(
-    val enabled: Boolean = DEFAULT_SESSION_HISTORY_ENABLED,
     val maxEntriesPerScope: Int = DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE,
 )
 
@@ -87,7 +86,6 @@ internal data class LearningReviewRuntimeConfiguration(
 )
 
 internal data class CuratedMemoryRuntimeConfiguration(
-    val enabled: Boolean = DEFAULT_CURATED_MEMORY_ENABLED,
     val maxEntriesPerScope: Int = DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE,
 )
 
@@ -176,9 +174,7 @@ internal data class PlaywrightStoreRuntimeConfiguration(
 }
 
 internal data class KoogFeatureRuntimeConfiguration(
-    val chatMemoryEnabled: Boolean = DEFAULT_KOOG_CHAT_MEMORY_ENABLED,
     val chatMemoryWindowSize: Int = DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE,
-    val longTermMemoryEnabled: Boolean = DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED,
     val longTermMemoryTopK: Int = DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K,
     val openTelemetryServiceName: String = DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME,
     val openTelemetryServiceVersion: String = DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION,
@@ -251,13 +247,11 @@ internal const val DEFAULT_ROUTING_TELEMETRY_JDBC_TABLE = "bertbot_routing_telem
 internal const val DEFAULT_SCHEDULED_JOB_JDBC_TABLE = "bertbot_scheduled_job_snapshot"
 internal const val DEFAULT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE = "bertbot_scheduled_job_execution_event"
 internal const val DEFAULT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE = "bertbot_learning_proposal_signal_snapshot"
-internal const val DEFAULT_SESSION_HISTORY_ENABLED = true
 internal const val DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE = 2000
 internal const val DEFAULT_SESSION_RECALL_ENABLED = false
 internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPTS = 3
 internal const val DEFAULT_SESSION_RECALL_MAX_EXCERPT_CHARS = 280
 internal const val DEFAULT_LEARNING_REVIEW_ENABLED = true
-internal const val DEFAULT_CURATED_MEMORY_ENABLED = true
 internal const val DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE = 200
 internal const val DEFAULT_ROUTING_HINTS_ENABLED = false
 internal const val DEFAULT_ROUTING_HINTS_MIN_SAMPLES = 5
@@ -294,9 +288,7 @@ internal const val DEFAULT_DESKTOP_AUTOMATION_COMMAND = "npx"
 internal val DEFAULT_DESKTOP_AUTOMATION_ARGS = emptyList<String>()
 internal const val DEFAULT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS: Long = 60
 internal const val DEFAULT_DESKTOP_AUTOMATION_TOOL_NAME_PREFIX = "desktop_automation_"
-internal const val DEFAULT_KOOG_CHAT_MEMORY_ENABLED = true
 internal const val DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE = 50
-internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED = true
 internal const val DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K = 5
 internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME = "personalagent-bertbot"
 internal const val DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION = "0.1.0"
@@ -1014,17 +1006,11 @@ internal fun resolveKoogFeatureRuntimeConfiguration(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
 ): KoogFeatureRuntimeConfiguration {
-    val chatMemoryEnabled =
-        resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_ENABLED", environment, dotEnvValues)
-            .toBooleanEnv(DEFAULT_KOOG_CHAT_MEMORY_ENABLED)
     val chatMemoryWindowSize =
         resolveRuntimeSetting("BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE", environment, dotEnvValues)
             ?.toIntOrNull()
             ?.coerceAtLeast(1)
             ?: DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE
-    val longTermMemoryEnabled =
-        resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED", environment, dotEnvValues)
-            .toBooleanEnv(DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED)
     val longTermMemoryTopK =
         resolveRuntimeSetting("BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K", environment, dotEnvValues)
             ?.toIntOrNull()
@@ -1046,9 +1032,7 @@ internal fun resolveKoogFeatureRuntimeConfiguration(
             ?.takeIf { it.isNotBlank() }
 
     return KoogFeatureRuntimeConfiguration(
-        chatMemoryEnabled = chatMemoryEnabled,
         chatMemoryWindowSize = chatMemoryWindowSize,
-        longTermMemoryEnabled = longTermMemoryEnabled,
         longTermMemoryTopK = longTermMemoryTopK,
         openTelemetryServiceName = openTelemetryServiceName,
         openTelemetryServiceVersion = openTelemetryServiceVersion,
@@ -1100,9 +1084,6 @@ internal fun resolveSessionHistoryRuntimeConfiguration(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
 ): SessionHistoryRuntimeConfiguration {
-    val enabled =
-        resolveRuntimeSetting("BERTBOT_SESSION_HISTORY_ENABLED", environment, dotEnvValues)
-            .toBooleanEnv(DEFAULT_SESSION_HISTORY_ENABLED)
     val maxEntriesPerScope =
         resolveRuntimeSetting("BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE", environment, dotEnvValues)
             ?.toIntOrNull()
@@ -1110,7 +1091,6 @@ internal fun resolveSessionHistoryRuntimeConfiguration(
             ?: DEFAULT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE
 
     return SessionHistoryRuntimeConfiguration(
-        enabled = enabled,
         maxEntriesPerScope = maxEntriesPerScope,
     )
 }
@@ -1152,9 +1132,6 @@ internal fun resolveCuratedMemoryRuntimeConfiguration(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
 ): CuratedMemoryRuntimeConfiguration {
-    val enabled =
-        resolveRuntimeSetting("BERTBOT_CURATED_MEMORY_ENABLED", environment, dotEnvValues)
-            .toBooleanEnv(DEFAULT_CURATED_MEMORY_ENABLED)
     val maxEntriesPerScope =
         resolveRuntimeSetting("BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE", environment, dotEnvValues)
             ?.toIntOrNull()
@@ -1162,7 +1139,6 @@ internal fun resolveCuratedMemoryRuntimeConfiguration(
             ?: DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE
 
     return CuratedMemoryRuntimeConfiguration(
-        enabled = enabled,
         maxEntriesPerScope = maxEntriesPerScope,
     )
 }
@@ -1583,10 +1559,7 @@ internal fun buildCapabilityStatusResponse(
         config.enabledSubAgents().any { definition ->
             definition.skills.any { skill -> skill.contains("playwright", ignoreCase = true) }
         }
-    val desktopAutomationEnabled =
-        config.enabledSubAgents().any { definition ->
-            definition.skills.any { skill -> skill.contains("desktop automation", ignoreCase = true) }
-        }
+    val desktopAutomationEnabled = runtimeCapabilities.desktopAutomationEnabled
     val workspaceReadEnabled = config.enabledTools().any { definition -> definition.name == "workspace.read_file" }
 
     val subAgentLines =
@@ -1687,6 +1660,7 @@ internal data class RuntimeCapabilitySnapshot(
     val persistenceBackend: String = resolvePersistenceRuntimeConfiguration().backend,
     val playwrightFallbackAvailable: Boolean = false,
     val shoppingProviderAvailable: Boolean = resolveShoppingRuntimeConfiguration().hasEnabledStore,
+    val desktopAutomationEnabled: Boolean = resolveDesktopAutomationRuntimeConfiguration().enabled,
 )
 
 internal fun summarizeMacrofactorAvailability(

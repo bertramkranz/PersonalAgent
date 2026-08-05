@@ -873,14 +873,10 @@ internal object BertBotRuntimeFactory {
         val checkpointStore = BertBotRuntimeDependenciesFactory.createCheckpointStore(persistenceConfiguration)
         val stateEventStore = BertBotRuntimeDependenciesFactory.createStateEventStore(persistenceConfiguration)
         val sessionHistoryStore =
-            if (sessionHistoryConfiguration.enabled) {
-                BertBotRuntimeDependenciesFactory.createSessionHistoryStore(
-                    persistenceConfiguration = persistenceConfiguration,
-                    sessionHistoryConfiguration = sessionHistoryConfiguration,
-                )
-            } else {
-                null
-            }
+            BertBotRuntimeDependenciesFactory.createSessionHistoryStore(
+                persistenceConfiguration = persistenceConfiguration,
+                sessionHistoryConfiguration = sessionHistoryConfiguration,
+            )
         val learningReviewStore = BertBotRuntimeDependenciesFactory.createLearningReviewStore(persistenceConfiguration)
         val routingTelemetryStore =
             if (routingHintsConfiguration.enabled) {
@@ -975,19 +971,17 @@ internal object BertBotRuntimeFactory {
         val polymarketToolRouter = createPolymarketToolRouterOrNull(runtimeConfig)
         val shoppingToolRouter = createShoppingToolRouterOrNull(shoppingRuntimeConfiguration)
         val sessionHistoryToolRouter =
-            sessionHistoryStore?.let { store ->
-                SessionHistoryToolRouter(
-                    listEntries = { limit, scopeKey ->
-                        runtimeScopedSessionHistoryList(store, scopeKey, limit)
-                    },
-                    searchEntries = { query, limit, scopeKey ->
-                        runtimeScopedSessionHistorySearch(store, scopeKey, query, limit)
-                    },
-                    clearEntries = { scopeKey ->
-                        runtimeScopedSessionHistoryClear(store, scopeKey)
-                    },
-                )
-            }
+            SessionHistoryToolRouter(
+                listEntries = { limit, scopeKey ->
+                    runtimeScopedSessionHistoryList(sessionHistoryStore, scopeKey, limit)
+                },
+                searchEntries = { query, limit, scopeKey ->
+                    runtimeScopedSessionHistorySearch(sessionHistoryStore, scopeKey, query, limit)
+                },
+                clearEntries = { scopeKey ->
+                    runtimeScopedSessionHistoryClear(sessionHistoryStore, scopeKey)
+                },
+            )
         val capabilityRegistry =
             buildCapabilityRegistry(
                 googleWorkspaceRouter = googleWorkspaceRouter,
