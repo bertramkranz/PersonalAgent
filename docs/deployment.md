@@ -7,6 +7,9 @@ This repository supports two deployment styles:
 
 See [configuration.md](configuration.md) for environment-variable details and [run-modes.md](run-modes.md) for runtime-mode behavior.
 
+Gradle local runs select mode by task name (for example `runMcpServer` or `runWebhookServer`).
+Containerized runs (Docker Compose, Cloud Run images) select mode via `BERTBOT_RUN_MODE` in [../docker/entrypoint.sh](../docker/entrypoint.sh).
+
 ## Recommended Production Shape
 
 - Cloud Run for `BERTBOT_RUN_MODE=webhook`
@@ -97,7 +100,7 @@ Optional GitHub repository variables:
 - `WHATSAPP_VERIFY_TOKEN_SECRET_NAME` (default empty; set only when WhatsApp integration is enabled)
 - `CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT` (default empty; when set, deploy uses this identity)
 - Cloud Run container port is fixed to `8080` in the workflow default path.
-- `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `true`)
+- `BERTBOT_GOOGLE_WORKSPACE_ENABLED` (default `false`)
 - `GOOGLE_WORKSPACE_OAUTH_CREDENTIALS_JSON_B64_SECRET_NAME` (default empty, recommended single-secret bootstrap for Cloud Run)
 - `GOOGLE_WORKSPACE_TOKEN_B64_SECRET_NAME` (default empty, recommended for calendar/drive auth on Cloud Run)
 - `GOOGLE_WORKSPACE_MASTER_KEY_B64_SECRET_NAME` (default empty, must be paired with token secret)

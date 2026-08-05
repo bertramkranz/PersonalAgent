@@ -79,6 +79,18 @@ The `dod-enforcement.yml` workflow also checks that path-coupled test expectatio
 
 CI runs `./gradlew --no-daemon check` as the final gate on all pull requests.
 
+## Workflow Hygiene
+
+When editing files under `.github/workflows/` or `.github/actions/`, pin every `uses:` action to a full commit SHA and keep the human-readable version comment.
+
+Example:
+
+```yaml
+uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+```
+
+Do not introduce tag-only references such as `@v4` without a SHA pin.
+
 ## PR Process
 
 1. Branch off `main` with a descriptive name.

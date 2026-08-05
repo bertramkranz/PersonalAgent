@@ -8,12 +8,12 @@ Related docs: [configuration.md](configuration.md) for provider settings, [run-m
 
 The repository-local agent manifests live at:
 
-- [../.github/agents/bertbot.agent.md](../.github/agents/bertbot.agent.md)
-- [../.github/agents/repo-automation.agent.md](../.github/agents/repo-automation.agent.md)
-- [../.github/agents/test-orchestration.agent.md](../.github/agents/test-orchestration.agent.md)
-- [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md)
-- [../.github/agents/browser-automation.agent.md](../.github/agents/browser-automation.agent.md)
-- [../.github/agents/desktop-automation.agent.md](../.github/agents/desktop-automation.agent.md)
+- [../.github/agents/bertbot.agent.md](../.github/agents/bertbot.agent.md) -> `@BertBot`
+- [../.github/agents/repo-automation.agent.md](../.github/agents/repo-automation.agent.md) -> `@Repo Automation`
+- [../.github/agents/test-orchestration.agent.md](../.github/agents/test-orchestration.agent.md) -> `@Test Orchestration`
+- [../.github/agents/repo-ops.agent.md](../.github/agents/repo-ops.agent.md) -> `@Repo Ops`
+- [../.github/agents/browser-automation.agent.md](../.github/agents/browser-automation.agent.md) -> `@Browser Automation`
+- [../.github/agents/desktop-automation.agent.md](../.github/agents/desktop-automation.agent.md) -> `@Desktop Automation`
 
 These agents are intended to operate against a `bertbot-backend` MCP server and related tool surfaces.
 

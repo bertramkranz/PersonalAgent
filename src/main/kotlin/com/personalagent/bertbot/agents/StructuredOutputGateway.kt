@@ -19,6 +19,16 @@ class JsonStructuredOutputGateway : StructuredOutputGateway {
     }
 }
 
+class DelegatingStructuredOutputGateway(
+    private val delegate: StructuredOutputGateway = JsonStructuredOutputGateway(),
+) : StructuredOutputGateway {
+    override fun parse(rawOutput: String): JsonElement = delegate.parse(rawOutput)
+}
+
+@Deprecated(
+    message = "Use DelegatingStructuredOutputGateway for framework-agnostic naming.",
+    replaceWith = ReplaceWith("DelegatingStructuredOutputGateway(delegate)"),
+)
 class KoogStructuredOutputGateway(
     private val delegate: StructuredOutputGateway = JsonStructuredOutputGateway(),
 ) : StructuredOutputGateway {

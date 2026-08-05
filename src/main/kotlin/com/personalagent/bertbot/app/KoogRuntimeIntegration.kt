@@ -37,7 +37,7 @@ import kotlin.math.max
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-internal data class KoogMemoryIntegration(
+internal data class KoogMemoryFeatureAdapter(
     val chatHistoryProvider: ChatHistoryProvider? = null,
     val longTermStorage: KoogScopedLongTermStorage? = null,
 ) {
@@ -168,7 +168,7 @@ internal object KoogRuntimeIntegrationFactory {
     fun createMemory(
         configuration: KoogFeatureRuntimeConfiguration,
         memoryRuntime: BertBotMemoryRuntime,
-    ): KoogMemoryIntegration {
+    ): KoogMemoryFeatureAdapter {
         val chatProvider =
             if (configuration.chatMemoryEnabled) {
                 KoogScopedChatHistoryProvider(
@@ -188,7 +188,7 @@ internal object KoogRuntimeIntegrationFactory {
                 null
             }
 
-        return KoogMemoryIntegration(
+        return KoogMemoryFeatureAdapter(
             chatHistoryProvider = chatProvider,
             longTermStorage = longTermStorage,
         )
