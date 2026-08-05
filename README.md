@@ -25,7 +25,7 @@ For local Gradle runs (CLI, headless, MCP, webhook, Discord):
 
 ```bash
 BERTBOT_AI_PROVIDER=openai
-BERTBOT_AI_MODEL=gpt-4o-mini
+BERTBOT_AI_MODEL=gpt-5.6-luna
 BERTBOT_AI_API_KEY=your-api-key-here
 ```
 
@@ -85,8 +85,9 @@ Start with [docs/index.md](docs/index.md) for the full docs index.
 
 ## Model Routing
 
-- The orchestrator selects the turn model via graph routing (`primaryModel` vs `reasoningModel`) based on complexity signals.
-- Runtime LLM invocation now resolves that selected model per turn; both direct response generation and tool-calling loops use the resolved model.
+- `ModelRouterNode` selects the turn model (`primaryModel` = `gpt-4.1-mini`, `reasoningModel` = `o3`) based on task complexity signals.
+- `DelegationNode` overrides that selection with the matched sub-agent's `preferredModelId` from its execution profile — so task identity takes precedence over the global complexity score.
+- Runtime resolves the effective gateway per turn; both direct response generation and tool-calling loops use the resolved model.
 - If a requested model cannot be resolved for the active provider, runtime falls back to `BERTBOT_AI_MODEL` and records the fallback reason in trace events.
 
 ## Project Structure

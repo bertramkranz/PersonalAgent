@@ -21,7 +21,7 @@
 %% 2026-08-04: Shopping router is now service-backed through PersonalShopperService and seeded AmazonStoreProvider catalog data rather than placeholder-only responses.
 %% 2026-08-04: Phase 1 graph stages now include ResearchPlannerNode, EvidenceJudgeNode, and SafetyGuardianNode before delegation/execution.
 %% 2026-08-04: Phase 2/3 graph stages now include ModelRouterNode, IncidentDetectorNode, and IncidentCommanderNode.
-%% 2026-08-04: Runtime now resolves ModelRouter-selected model IDs per turn for both direct responses and tool-calling loops, with traceable fallback reasons.
+%% 2026-08-05: DelegationNode now applies per-sub-agent preferredModelId override from SubAgentExecutionProfileDefinition, superseding the complexity-based model chosen by ModelRouterNode when a sub-agent is matched.
 %% 2026-08-04: Learning-parity slice adds scoped session-history search/list/clear tooling and durable learning-review approval queues with apply-failure metadata.
 flowchart TD
     subgraph Interfaces

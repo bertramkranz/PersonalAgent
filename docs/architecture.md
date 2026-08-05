@@ -34,7 +34,7 @@ At a high level, BertBot:
 
 That design makes the path through the system easy to inspect in traces and interaction diagrams.
 
-Model selection remains orchestrator-controlled: `ModelRouterNode` chooses the requested model ID (`primaryModel` or `reasoningModel`) and runtime resolves the effective gateway per turn for both direct responses and tool-calling loops. If provider-specific resolution fails, runtime falls back to the configured default model and logs the fallback reason in trace events.
+Model selection uses two complementary signals. `ModelRouterNode` runs first and picks the global turn model (`primaryModel` or `reasoningModel`) based on task complexity signals — urgency, research plan presence, evidence density, and message length. `DelegationNode` then selects a sub-agent and, if that sub-agent has a `preferredModelId` in its execution profile, overrides `state.selectedModel` with the profile model and updates `modelRoutingDecision.reasoning` to `sub_agent_profile_override`. This means task identity takes precedence over the complexity score when a matching sub-agent is found. Runtime resolves the effective gateway per turn for both direct responses and tool-calling loops. If the requested model cannot be resolved for the active provider, runtime falls back to `BERTBOT_AI_MODEL` and logs the fallback reason in trace events.
 
 ## Shopping Workflow Stages
 

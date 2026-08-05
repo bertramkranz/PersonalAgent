@@ -112,6 +112,11 @@ internal data class LearningProposalRuntimeConfiguration(
     val cooldownMinutes: Long = DEFAULT_LEARNING_PROPOSAL_COOLDOWN_MINUTES,
 )
 
+internal data class PromptOptimizerRuntimeConfiguration(
+    val enabled: Boolean = DEFAULT_PROMPT_OPTIMIZER_ENABLED,
+    val maxInstructionLines: Int = DEFAULT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES,
+)
+
 internal data class ShoppingRuntimeConfiguration(
     val enabled: Boolean = DEFAULT_SHOPPING_ENABLED,
     val budgetLimitCents: Long = DEFAULT_SHOPPING_BUDGET_LIMIT_CENTS,
@@ -201,7 +206,7 @@ internal data class ShoppingStoreRuntimeConfiguration(
 )
 
 internal const val DEFAULT_AI_PROVIDER = "openai"
-internal const val DEFAULT_AI_MODEL = "gpt-4o-mini"
+internal const val DEFAULT_AI_MODEL = "gpt-5.6-luna"
 internal const val DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 internal const val DEFAULT_OLLAMA_TIMEOUT_SECONDS: Long = 120
 internal const val DEFAULT_PERSISTENCE_BACKEND = "file"
@@ -266,6 +271,8 @@ internal const val DEFAULT_LEARNING_PROPOSAL_POLL_INTERVAL_SECONDS: Long = 180
 internal const val DEFAULT_LEARNING_PROPOSAL_INITIAL_DELAY_SECONDS: Long = 30
 internal const val DEFAULT_LEARNING_PROPOSAL_MAX_BATCH_SIZE = 3
 internal const val DEFAULT_LEARNING_PROPOSAL_COOLDOWN_MINUTES: Long = 240
+internal const val DEFAULT_PROMPT_OPTIMIZER_ENABLED = false
+internal const val DEFAULT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES = 4
 internal const val DEFAULT_MEMORY_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SKILL_WRITE_APPROVAL_REQUIRED = false
 internal const val DEFAULT_SHOPPING_ENABLED = false
@@ -1201,6 +1208,12 @@ internal fun resolveLearningProposalRuntimeConfiguration(): LearningProposalRunt
         dotEnvValues = loadDotEnvValues(),
     )
 
+internal fun resolvePromptOptimizerRuntimeConfiguration(): PromptOptimizerRuntimeConfiguration =
+    resolvePromptOptimizerRuntimeConfiguration(
+        environment = System.getenv(),
+        dotEnvValues = loadDotEnvValues(),
+    )
+
 internal fun resolveLearningProposalRuntimeConfiguration(
     environment: Map<String, String>,
     dotEnvValues: Map<String, String>,
@@ -1235,6 +1248,25 @@ internal fun resolveLearningProposalRuntimeConfiguration(
         initialDelaySeconds = initialDelaySeconds,
         maxBatchSize = maxBatchSize,
         cooldownMinutes = cooldownMinutes,
+    )
+}
+
+internal fun resolvePromptOptimizerRuntimeConfiguration(
+    environment: Map<String, String>,
+    dotEnvValues: Map<String, String>,
+): PromptOptimizerRuntimeConfiguration {
+    val enabled =
+        resolveRuntimeSetting("BERTBOT_PROMPT_OPTIMIZER_ENABLED", environment, dotEnvValues)
+            .toBooleanEnv(DEFAULT_PROMPT_OPTIMIZER_ENABLED)
+    val maxInstructionLines =
+        resolveRuntimeSetting("BERTBOT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES", environment, dotEnvValues)
+            ?.toIntOrNull()
+            ?.coerceIn(1, 20)
+            ?: DEFAULT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES
+
+    return PromptOptimizerRuntimeConfiguration(
+        enabled = enabled,
+        maxInstructionLines = maxInstructionLines,
     )
 }
 

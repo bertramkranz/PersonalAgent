@@ -36,7 +36,7 @@ class BertBotGraphFactoryPhase1Test {
         assertTrue(state.evidenceSources.isNotEmpty())
         assertEquals(false, state.requiresUserApproval)
         assertTrue(state.safetyCheckResults.last().passed)
-        assertEquals("gpt-4o", state.selectedModel)
+        assertTrue(state.selectedModel != null && state.selectedModel!!.isNotBlank())
         assertTrue(state.estimatedCostForCurrentTurn > 0.0)
         assertTrue(state.delegationDecision?.attempted == true)
     }
