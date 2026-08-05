@@ -19,6 +19,8 @@ internal data class WebhookServerConfig(
 
 internal data class WebhookSecurityConfig(
     val requireSignatures: Boolean = false,
+    val allowInsecureNoSignatures: Boolean = false,
+    val insecureNoSignaturesRequestIgnored: Boolean = false,
     val trustProxyHeaders: Boolean = false,
     val allowedIpCidrs: Set<String> = emptySet(),
     val telegramSecretToken: String? = null,
@@ -124,6 +126,12 @@ fun main() {
     println("WhatsApp endpoint: ${webhookConfig.whatsAppPath}")
     println("Health endpoint: ${webhookConfig.healthPath}")
     println("Signature verification required: ${securityConfig.requireSignatures}")
+    if (securityConfig.allowInsecureNoSignatures && !securityConfig.requireSignatures) {
+        println("WARNING: webhook signature verification is disabled via BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES=true. This is unsafe outside local development.")
+    }
+    if (securityConfig.insecureNoSignaturesRequestIgnored) {
+        println("WARNING: BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=false was ignored because BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES is not true.")
+    }
     println("Proxy header trust enabled: ${securityConfig.trustProxyHeaders}")
     println("IP allowlist entries: ${securityConfig.allowedIpCidrs.size}")
     println("Rate limit: ${securityConfig.rateLimitMaxRequests} requests/${securityConfig.rateLimitWindowSeconds}s")

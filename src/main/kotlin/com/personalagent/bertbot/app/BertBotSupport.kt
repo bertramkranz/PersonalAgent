@@ -286,6 +286,7 @@ internal const val DEFAULT_MACROFACTOR_TOOL_NAME_PREFIX = "macrofactor_"
 internal const val DEFAULT_GOOGLE_WORKSPACE_ENABLED = false
 internal const val DEFAULT_GOOGLE_WORKSPACE_COMMAND = "npx"
 internal val DEFAULT_GOOGLE_WORKSPACE_ARGS = listOf("-y", "-p", "github:gemini-cli-extensions/workspace#v0.0.8", "gemini-workspace-server")
+internal const val DEFAULT_GOOGLE_WORKSPACE_SERVER_COMMAND = "gemini-workspace-server"
 internal const val DEFAULT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS: Long = 60
 internal const val DEFAULT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX = "google_workspace_"
 internal const val DEFAULT_DESKTOP_AUTOMATION_ENABLED = false
@@ -875,6 +876,7 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
         resolveRuntimeSettingAllowBlank("BERTBOT_GOOGLE_WORKSPACE_ARGS", environment, dotEnvValues)
             ?.let { parseCommandArgs(it) }
             ?: DEFAULT_GOOGLE_WORKSPACE_ARGS
+    val normalizedArgs = normalizeGoogleWorkspaceCommandArgs(command, args)
 
     val timeoutSeconds =
         resolveRuntimeSetting("BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS", environment, dotEnvValues)
@@ -890,7 +892,7 @@ internal fun resolveGoogleWorkspaceRuntimeConfiguration(
     return GoogleWorkspaceRuntimeConfiguration(
         enabled = enabled,
         command = command,
-        args = args,
+        args = normalizedArgs,
         timeoutSeconds = timeoutSeconds,
         toolNamePrefix = toolNamePrefix,
     )
@@ -1337,6 +1339,41 @@ private fun parseCommandArgs(value: String): List<String> {
         .split(',')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
+}
+
+private fun normalizeGoogleWorkspaceCommandArgs(
+    command: String,
+    args: List<String>,
+): List<String> {
+    if (!command.equals("npx", ignoreCase = true)) {
+        return args
+    }
+    if (args.isEmpty()) {
+        return args
+    }
+    if (!args.contains("-p") && !args.contains("--package")) {
+        return args
+    }
+    if (containsNpxExecutableToken(args)) {
+        return args
+    }
+    return args + DEFAULT_GOOGLE_WORKSPACE_SERVER_COMMAND
+}
+
+private fun containsNpxExecutableToken(args: List<String>): Boolean {
+    var index = 0
+    while (index < args.size) {
+        val token = args[index]
+        when {
+            token == "--" -> return index < args.lastIndex
+            token == "-p" || token == "--package" || token == "-c" || token == "--call" -> {
+                index += 2
+            }
+            token.startsWith("-") -> index += 1
+            else -> return true
+        }
+    }
+    return false
 }
 
 internal fun resolvePlaywrightStoreRuntimeConfiguration(): PlaywrightStoreRuntimeConfiguration =

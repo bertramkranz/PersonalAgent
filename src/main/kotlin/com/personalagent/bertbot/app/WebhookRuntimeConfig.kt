@@ -32,8 +32,22 @@ internal fun resolveWebhookSecurityConfig(
     dotEnvValues: Map<String, String> = loadDotEnvValues(),
 ): WebhookSecurityConfig {
     fun env(key: String) = resolveRuntimeSetting(key, environment, dotEnvValues)
+    val allowInsecureNoSignatures = env("BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES").toBooleanEnv(defaultValue = false)
+    val requestedRequireSignaturesRaw = env("BERTBOT_WEBHOOK_REQUIRE_SIGNATURES")
+    val requestedRequireSignatures = requestedRequireSignaturesRaw?.toBooleanEnv(defaultValue = true)
+    val insecureNoSignaturesRequested = requestedRequireSignaturesRaw != null && requestedRequireSignatures == false
+    val insecureNoSignaturesRequestIgnored = insecureNoSignaturesRequested && !allowInsecureNoSignatures
+    val requireSignatures =
+        when {
+            insecureNoSignaturesRequestIgnored -> true
+            requestedRequireSignatures != null -> requestedRequireSignatures
+            else -> !allowInsecureNoSignatures
+        }
+
     return WebhookSecurityConfig(
-        requireSignatures = env("BERTBOT_WEBHOOK_REQUIRE_SIGNATURES").toBooleanEnv(defaultValue = false),
+        requireSignatures = requireSignatures,
+        allowInsecureNoSignatures = allowInsecureNoSignatures,
+        insecureNoSignaturesRequestIgnored = insecureNoSignaturesRequestIgnored,
         trustProxyHeaders = env("BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS").toBooleanEnv(defaultValue = false),
         allowedIpCidrs = parseCsvSet(env("BERTBOT_WEBHOOK_ALLOWED_IPS")),
         telegramSecretToken = env("BERTBOT_TELEGRAM_SECRET_TOKEN")?.takeIf { it.isNotBlank() },
