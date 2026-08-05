@@ -64,6 +64,7 @@ If `JAVA_HOME` is invalid, point it at a JDK 17 installation and open a new term
 ## Which Doc Do I Need?
 
 - Setup or env vars: [docs/configuration.md](docs/configuration.md)
+- Practical usage guide, including self-learning and MCP workflows: [docs/user-guide.md](docs/user-guide.md)
 - How to run BertBot locally or via MCP/webhooks: [docs/run-modes.md](docs/run-modes.md)
 - Docker Compose or Cloud Run deployment: [docs/deployment.md](docs/deployment.md)
 - VS Code and custom Copilot agent setup: [docs/vscode-copilot.md](docs/vscode-copilot.md)
