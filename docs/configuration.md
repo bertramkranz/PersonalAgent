@@ -171,7 +171,8 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_WEBHOOK_WHATSAPP_PATH` | `/webhook/whatsapp` | same | same | |
 | `BERTBOT_WEBHOOK_HEALTH_PATH` | `/health` | same | same | |
 | `BERTBOT_WEBHOOK_DRY_RUN` | `false` | `false` | `false` | |
-| `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES` | `false` | `false` | `false` | Set `true` in production |
+| `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES` | `true` | `true` | `true` | Set `false` only with explicit insecure override |
+| `BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES` | `false` | `false` | `false` | Must be `true` to honor `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=false` |
 | `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS` | `false` | `false` | `false` | |
 | `BERTBOT_WEBHOOK_ALLOWED_IPS` | — | `` | `` | |
 | `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` | `60` | `60` | `60` | |
@@ -482,6 +483,7 @@ Production-style guidance:
 | `BERTBOT_WEBHOOK_HEALTH_PATH` | Health endpoint path |
 | `BERTBOT_WEBHOOK_DRY_RUN` | Process without persistence writes |
 | `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES` | Enforce provider request verification |
+| `BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES` | Explicitly allow unsigned webhook requests (unsafe) |
 | `BERTBOT_WEBHOOK_TRUST_PROXY_HEADERS` | Trust forwarded IP headers |
 | `BERTBOT_WEBHOOK_ALLOWED_IPS` | Allowlist of client IPs and CIDRs |
 | `BERTBOT_WEBHOOK_RATE_LIMIT_WINDOW_SECONDS` | Rate-limit window size |
@@ -507,7 +509,14 @@ If `BERTBOT_WEBHOOK_PORT` is unset, the runtime falls back to the platform `PORT
 
 ## Provider Verification
 
-Used when `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true`:
+By default, webhook signature verification is enabled. To disable signatures you must set both:
+
+- `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=false`
+- `BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES=true`
+
+If `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=false` is set without the explicit override, runtime ignores that insecure request and keeps verification enabled.
+
+Used when signature verification is enabled:
 
 | Variable | Purpose |
 | --- | --- |
@@ -582,7 +591,7 @@ Local CLI or MCP development:
 Webhook deployment (local):
 
 - Use `.env` from the repository root.
-- Set `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true` and configure connector-specific verification secrets.
+- Keep `BERTBOT_WEBHOOK_REQUIRE_SIGNATURES=true` and configure connector-specific verification secrets.
 - Use PostgreSQL-backed persistence.
 - Set `BERTBOT_RUNTIME_ENV=production` to enable checkpoint rollback protection.
 

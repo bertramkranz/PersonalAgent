@@ -546,6 +546,24 @@ class AiRuntimeConfigurationTest {
     }
 
     @Test
+    fun `google workspace configuration appends default server command for npx package-only args`() {
+        val configuration =
+            resolveGoogleWorkspaceRuntimeConfiguration(
+                environment =
+                    mapOf(
+                        "BERTBOT_GOOGLE_WORKSPACE_COMMAND" to "npx",
+                        "BERTBOT_GOOGLE_WORKSPACE_ARGS" to "-y,-p,github:gemini-cli-extensions/workspace#v0.0.8",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertEquals(
+            listOf("-y", "-p", "github:gemini-cli-extensions/workspace#v0.0.8", DEFAULT_GOOGLE_WORKSPACE_SERVER_COMMAND),
+            configuration.args,
+        )
+    }
+
+    @Test
     fun `research runtime overrides prefer environment values`() {
         val config =
             applyResearchRuntimeOverrides(

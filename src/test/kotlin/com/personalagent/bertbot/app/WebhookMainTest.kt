@@ -91,6 +91,8 @@ class WebhookMainTest {
             )
 
         assertTrue(config.requireSignatures)
+        assertFalse(config.allowInsecureNoSignatures)
+        assertFalse(config.insecureNoSignaturesRequestIgnored)
         assertTrue(config.trustProxyHeaders)
         assertEquals(setOf("127.0.0.1", "10.0.0.0/8"), config.allowedIpCidrs)
         assertEquals("tg-secret", config.telegramSecretToken)
@@ -100,6 +102,42 @@ class WebhookMainTest {
         assertEquals(250, config.rateLimitMaxRequests)
         assertEquals("wa-secret", config.whatsAppAppSecret)
         assertEquals("wa-verify", config.whatsAppVerifyToken)
+    }
+
+    @Test
+    fun `resolve webhook security config is fail-closed by default`() {
+        val config = resolveWebhookSecurityConfig(environment = emptyMap(), dotEnvValues = emptyMap())
+
+        assertTrue(config.requireSignatures)
+        assertFalse(config.allowInsecureNoSignatures)
+        assertFalse(config.insecureNoSignaturesRequestIgnored)
+    }
+
+    @Test
+    fun `resolve webhook security config requires explicit insecure override`() {
+        val ignoredInsecureRequest =
+            resolveWebhookSecurityConfig(
+                environment = mapOf("BERTBOT_WEBHOOK_REQUIRE_SIGNATURES" to "false"),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertTrue(ignoredInsecureRequest.requireSignatures)
+        assertFalse(ignoredInsecureRequest.allowInsecureNoSignatures)
+        assertTrue(ignoredInsecureRequest.insecureNoSignaturesRequestIgnored)
+
+        val explicitOverride =
+            resolveWebhookSecurityConfig(
+                environment =
+                    mapOf(
+                        "BERTBOT_WEBHOOK_REQUIRE_SIGNATURES" to "false",
+                        "BERTBOT_WEBHOOK_ALLOW_INSECURE_NO_SIGNATURES" to "true",
+                    ),
+                dotEnvValues = emptyMap(),
+            )
+
+        assertFalse(explicitOverride.requireSignatures)
+        assertTrue(explicitOverride.allowInsecureNoSignatures)
+        assertFalse(explicitOverride.insecureNoSignaturesRequestIgnored)
     }
 
     @Test
