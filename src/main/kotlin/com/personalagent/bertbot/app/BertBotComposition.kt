@@ -348,14 +348,10 @@ private object BertBotMemoryRuntimeFactory {
         val userProfileStore = createUserProfileStore(normalizedBackend, persistenceConfiguration)
         val curatedMemoryConfiguration = resolveCuratedMemoryRuntimeConfiguration()
         val curatedMemoryStore =
-            if (curatedMemoryConfiguration.enabled) {
-                CuratedMemoryStoreFactory.create(
-                    persistenceConfiguration = persistenceConfiguration,
-                    maxEntriesPerScope = curatedMemoryConfiguration.maxEntriesPerScope,
-                )
-            } else {
-                null
-            }
+            CuratedMemoryStoreFactory.create(
+                persistenceConfiguration = persistenceConfiguration,
+                maxEntriesPerScope = curatedMemoryConfiguration.maxEntriesPerScope,
+            )
         val memoryWorker =
             MemorySummarizationWorker(
                 episodicMemory,

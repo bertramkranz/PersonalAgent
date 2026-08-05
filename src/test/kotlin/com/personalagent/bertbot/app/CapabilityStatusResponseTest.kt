@@ -31,7 +31,12 @@ class CapabilityStatusResponseTest {
 
     @Test
     fun `capability response includes desktop automation status`() {
-        val response = buildCapabilityStatusResponse(BertBotAgentConfig(), "Can you control my desktop GUI?")
+        val response =
+            buildCapabilityStatusResponse(
+                BertBotAgentConfig(),
+                "Can you control my desktop GUI?",
+                RuntimeCapabilitySnapshot(desktopAutomationEnabled = true),
+            )
 
         assertNotNull(response)
         assertTrue(response.contains("Desktop automation (MCP bridge): enabled"))

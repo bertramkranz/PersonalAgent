@@ -170,23 +170,15 @@ internal object KoogRuntimeIntegrationFactory {
         memoryRuntime: BertBotMemoryRuntime,
     ): KoogMemoryFeatureAdapter {
         val chatProvider =
-            if (configuration.chatMemoryEnabled) {
-                KoogScopedChatHistoryProvider(
-                    episodicMemory = memoryRuntime.episodicMemory,
-                    windowSize = configuration.chatMemoryWindowSize,
-                )
-            } else {
-                null
-            }
+            KoogScopedChatHistoryProvider(
+                episodicMemory = memoryRuntime.episodicMemory,
+                windowSize = configuration.chatMemoryWindowSize,
+            )
         val longTermStorage =
-            if (configuration.longTermMemoryEnabled) {
-                KoogScopedLongTermStorage(
-                    semanticMemory = memoryRuntime.semanticMemory,
-                    defaultTopK = configuration.longTermMemoryTopK,
-                )
-            } else {
-                null
-            }
+            KoogScopedLongTermStorage(
+                semanticMemory = memoryRuntime.semanticMemory,
+                defaultTopK = configuration.longTermMemoryTopK,
+            )
 
         return KoogMemoryFeatureAdapter(
             chatHistoryProvider = chatProvider,

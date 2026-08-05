@@ -90,7 +90,6 @@ class AiRuntimeConfigurationTest {
                 dotEnvValues = emptyMap(),
             )
 
-        assertEquals(DEFAULT_CURATED_MEMORY_ENABLED, configuration.enabled)
         assertEquals(DEFAULT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE, configuration.maxEntriesPerScope)
     }
 
@@ -100,17 +99,14 @@ class AiRuntimeConfigurationTest {
             resolveCuratedMemoryRuntimeConfiguration(
                 environment =
                     mapOf(
-                        "BERTBOT_CURATED_MEMORY_ENABLED" to "true",
                         "BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE" to "333",
                     ),
                 dotEnvValues =
                     mapOf(
-                        "BERTBOT_CURATED_MEMORY_ENABLED" to "false",
                         "BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE" to "111",
                     ),
             )
 
-        assertEquals(true, configuration.enabled)
         assertEquals(333, configuration.maxEntriesPerScope)
     }
 
@@ -743,9 +739,7 @@ class AiRuntimeConfigurationTest {
                 dotEnvValues = emptyMap(),
             )
 
-        assertEquals(DEFAULT_KOOG_CHAT_MEMORY_ENABLED, configuration.chatMemoryEnabled)
         assertEquals(DEFAULT_KOOG_CHAT_MEMORY_WINDOW_SIZE, configuration.chatMemoryWindowSize)
-        assertEquals(DEFAULT_KOOG_LONG_TERM_MEMORY_ENABLED, configuration.longTermMemoryEnabled)
         assertEquals(DEFAULT_KOOG_LONG_TERM_MEMORY_TOP_K, configuration.longTermMemoryTopK)
         assertEquals(DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_NAME, configuration.openTelemetryServiceName)
         assertEquals(DEFAULT_KOOG_OPEN_TELEMETRY_SERVICE_VERSION, configuration.openTelemetryServiceVersion)
@@ -759,9 +753,7 @@ class AiRuntimeConfigurationTest {
             resolveKoogFeatureRuntimeConfiguration(
                 environment =
                     mapOf(
-                        "BERTBOT_KOOG_CHAT_MEMORY_ENABLED" to "false",
                         "BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE" to "120",
-                        "BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED" to "false",
                         "BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K" to "9",
                         "BERTBOT_KOOG_OTEL_SERVICE_NAME" to "bertbot-koog",
                         "BERTBOT_KOOG_OTEL_SERVICE_VERSION" to "1.2.3",
@@ -774,9 +766,7 @@ class AiRuntimeConfigurationTest {
                     ),
             )
 
-        assertEquals(false, configuration.chatMemoryEnabled)
         assertEquals(120, configuration.chatMemoryWindowSize)
-        assertEquals(false, configuration.longTermMemoryEnabled)
         assertEquals(9, configuration.longTermMemoryTopK)
         assertEquals("bertbot-koog", configuration.openTelemetryServiceName)
         assertEquals("1.2.3", configuration.openTelemetryServiceVersion)

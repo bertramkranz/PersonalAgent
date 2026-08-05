@@ -258,15 +258,11 @@ class BertBotEnvironmentSettingsTest {
             resolveKoogFeatureRuntimeConfiguration(
                 environment =
                     mapOf(
-                        "BERTBOT_KOOG_CHAT_MEMORY_ENABLED" to "0",
-                        "BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED" to "1",
                         "BERTBOT_KOOG_OTEL_VERBOSE" to "yes",
                     ),
                 dotEnvValues = emptyMap(),
             )
 
-        assertEquals(false, configuration.chatMemoryEnabled)
-        assertEquals(true, configuration.longTermMemoryEnabled)
         assertEquals(true, configuration.openTelemetryVerbose)
     }
 

@@ -73,7 +73,7 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_GOOGLE_WORKSPACE_ARGS` | `…workspace#v0.0.8…` | same | same | |
 | `BERTBOT_GOOGLE_WORKSPACE_TIMEOUT_SECONDS` | `60` | `60` | `60` | |
 | `BERTBOT_GOOGLE_WORKSPACE_TOOL_NAME_PREFIX` | `google_workspace_` | `google_workspace_` | `google_workspace_` | |
-| `BERTBOT_DESKTOP_AUTOMATION_ENABLED` | `false` | `false` | `false` | Enable the desktop-automation MCP bridge |
+| `BERTBOT_DESKTOP_AUTOMATION_ENABLED` | `false` | `true` | `true` | Enable the desktop-automation MCP bridge |
 | `BERTBOT_DESKTOP_AUTOMATION_COMMAND` | `npx` | `npx` | `npx` | |
 | `BERTBOT_DESKTOP_AUTOMATION_ARGS` | — | `` | `` | Comma-separated launch args |
 | `BERTBOT_DESKTOP_AUTOMATION_TIMEOUT_SECONDS` | `60` | `60` | `60` | |
@@ -100,6 +100,9 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH` | `state/bertbot-ingestion-source-state.json` | same | same | |
 | `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH` | `state/bertbot-research-recommendations.json` | same | same | |
 | `BERTBOT_SESSION_HISTORY_FILE_PATH` | `state/bertbot-session-history.jsonl` | same | same | |
+| `BERTBOT_CURATED_MEMORY_FILE_PATH` | `state/bertbot-curated-memory.json` | same | same | |
+| `BERTBOT_PROCEDURAL_SKILL_FILE_PATH` | `state/bertbot-procedural-skills.json` | same | same | |
+| `BERTBOT_ROUTING_TELEMETRY_FILE_PATH` | `state/bertbot-routing-telemetry.json` | same | same | |
 | `BERTBOT_SCHEDULED_JOB_FILE_PATH` | `state/bertbot-scheduled-jobs.json` | same | same | |
 | `BERTBOT_SCHEDULED_JOB_EXECUTION_FILE_PATH` | `state/bertbot-scheduled-job-executions.jsonl` | same | same | |
 | `BERTBOT_LEARNING_PROPOSAL_SIGNAL_FILE_PATH` | `state/bertbot-learning-proposal-signals.json` | same | same | |
@@ -121,10 +124,12 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_INGESTION_CONSENT_JDBC_TABLE` | `bertbot_ingestion_consent_snapshot` | same | same | |
 | `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE` | `bertbot_ingestion_source_state_snapshot` | same | same | |
 | `BERTBOT_SESSION_HISTORY_JDBC_TABLE` | `bertbot_session_history_event` | same | same | |
+| `BERTBOT_CURATED_MEMORY_JDBC_TABLE` | `bertbot_curated_memory_snapshot` | same | same | |
+| `BERTBOT_PROCEDURAL_SKILL_JDBC_TABLE` | `bertbot_procedural_skill_snapshot` | same | same | |
+| `BERTBOT_ROUTING_TELEMETRY_JDBC_TABLE` | `bertbot_routing_telemetry_snapshot` | same | same | |
 | `BERTBOT_SCHEDULED_JOB_JDBC_TABLE` | `bertbot_scheduled_job_snapshot` | same | same | |
 | `BERTBOT_SCHEDULED_JOB_EXECUTION_JDBC_TABLE` | `bertbot_scheduled_job_execution_event` | same | same | |
 | `BERTBOT_LEARNING_PROPOSAL_SIGNAL_JDBC_TABLE` | `bertbot_learning_proposal_signal_snapshot` | same | same | |
-| `BERTBOT_SESSION_HISTORY_ENABLED` | `true` | `true` | `true` | Master toggle for durable turn history |
 | `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE` | `2000` | `2000` | `2000` | Max retained history rows per persistence scope |
 | `BERTBOT_LEARNING_REVIEW_ENABLED` | `true` | `true` | `true` | Enables parity scaffolding for learning-review flows |
 | `BERTBOT_LEARNING_REVIEW_FILE_PATH` | `state/bertbot-learning-review.jsonl` | same | same | File backend path for the learning-review queue |
@@ -140,13 +145,21 @@ The table below lists every recognized env key, its code default, and the value 
 | `BERTBOT_LEARNING_PROPOSAL_COOLDOWN_MINUTES` | `240` | `240` | `240` | Cooldown window before re-proposing same dedupe key |
 | `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before memory writes in review flows |
 | `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED` | `false` | `false` | `false` | Require approval before skill/prompt writes in review flows |
+| `BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE` | `200` | `200` | `200` | Max retained curated memory entries per scope |
+| `BERTBOT_SESSION_RECALL_ENABLED` | `false` | `false` | `false` | Inject relevant past session excerpts into each turn |
+| `BERTBOT_SESSION_RECALL_MAX_EXCERPTS` | `3` | `3` | `3` | Max excerpts injected per turn |
+| `BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS` | `280` | `280` | `280` | Max character length per injected excerpt |
+| `BERTBOT_ROUTING_HINTS_ENABLED` | `false` | `false` | `false` | Reinforce routing with telemetry from past successful routes |
+| `BERTBOT_ROUTING_HINTS_MIN_SAMPLES` | `5` | `5` | `5` | Min samples before a routing hint is applied |
+| `BERTBOT_ROUTING_HINTS_MAX_INFLUENCE` | `0.25` | `0.25` | `0.25` | Max fractional influence from routing hints (0.0–1.0) |
+| `BERTBOT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS` | `72` | `72` | `72` | Half-life for routing hint recency decay in hours |
+| `BERTBOT_PROMPT_OPTIMIZER_ENABLED` | `false` | `false` | `false` | Periodically refine system prompt instructions |
+| `BERTBOT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES` | `4` | `4` | `4` | Max lines added per optimizer cycle |
 | `BERTBOT_RUNTIME_ENV` | `dev` | `dev` | `production` | [compose override] |
 | `BERTBOT_CHECKPOINT_ROLLBACK_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_CHECKPOINT_ROLLBACK_REQUIRE_CONFIRM` | `true` | `true` | `true` | |
 | `BERTBOT_CHECKPOINT_ROLLBACK_ALLOW_PROTECTED` | `false` | `false` | `false` | Set `true` to allow rollback in prod/staging |
-| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | `50` | `50` | `50` | |
-| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | `true` | `true` | `true` | |
 | `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | `5` | `5` | `5` | |
 | `BERTBOT_KOOG_OTEL_SERVICE_NAME` | `personalagent-bertbot` | same | same | |
 | `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | `0.1.0` | same | same | |
@@ -340,6 +353,9 @@ File-backed paths:
 - `BERTBOT_INGESTION_SOURCE_STATE_FILE_PATH`
 - `BERTBOT_RESEARCH_RECOMMENDATIONS_FILE_PATH`
 - `BERTBOT_SESSION_HISTORY_FILE_PATH`
+- `BERTBOT_CURATED_MEMORY_FILE_PATH`
+- `BERTBOT_PROCEDURAL_SKILL_FILE_PATH`
+- `BERTBOT_ROUTING_TELEMETRY_FILE_PATH`
 - `BERTBOT_TRACE_FILE_PATH`
 - `BERTBOT_INTERACTIONS_FILE_PATH`
 - `BERTBOT_STATE_EVENT_FILE_PATH` – event-sourcing log (used when `BERTBOT_EVENT_SOURCING_ENABLED=true`)
@@ -358,14 +374,19 @@ JDBC or PostgreSQL settings:
 - `BERTBOT_INGESTION_CONSENT_JDBC_TABLE`
 - `BERTBOT_INGESTION_SOURCE_STATE_JDBC_TABLE`
 - `BERTBOT_SESSION_HISTORY_JDBC_TABLE`
+- `BERTBOT_CURATED_MEMORY_JDBC_TABLE` – defaults to `bertbot_curated_memory_snapshot`
+- `BERTBOT_PROCEDURAL_SKILL_JDBC_TABLE` – defaults to `bertbot_procedural_skill_snapshot`
+- `BERTBOT_ROUTING_TELEMETRY_JDBC_TABLE` – defaults to `bertbot_routing_telemetry_snapshot`
 
 Session history and learning review controls:
 
-- `BERTBOT_SESSION_HISTORY_ENABLED`
 - `BERTBOT_SESSION_HISTORY_MAX_ENTRIES_PER_SCOPE`
+- `BERTBOT_CURATED_MEMORY_MAX_ENTRIES_PER_SCOPE`
 - `BERTBOT_LEARNING_REVIEW_ENABLED`
 - `BERTBOT_MEMORY_WRITE_APPROVAL_REQUIRED`
 - `BERTBOT_SKILL_WRITE_APPROVAL_REQUIRED`
+
+Session history capture is always enabled.
 
 Local Gradle runs can stay on the default file backend. Containerised runs should prefer PostgreSQL-backed persistence. See [deployment.md](deployment.md).
 
@@ -404,14 +425,44 @@ When `BERTBOT_RUNTIME_ENV` is `prod`, `production`, `staging`, or `preprod`, rol
 
 | Variable | Purpose | Notes |
 | --- | --- | --- |
-| `BERTBOT_KOOG_CHAT_MEMORY_ENABLED` | Enable in-context chat memory window | Default `true` |
 | `BERTBOT_KOOG_CHAT_MEMORY_WINDOW_SIZE` | Number of past turns to include | Default `50` |
-| `BERTBOT_KOOG_LONG_TERM_MEMORY_ENABLED` | Enable long-term memory retrieval | Default `true` |
 | `BERTBOT_KOOG_LONG_TERM_MEMORY_TOP_K` | Number of memories to retrieve per turn | Default `5` |
 | `BERTBOT_KOOG_OTEL_SERVICE_NAME` | OTel service name for traces | Default `personalagent-bertbot` |
 | `BERTBOT_KOOG_OTEL_SERVICE_VERSION` | OTel service version | Default `0.1.0` |
 | `BERTBOT_KOOG_OTEL_VERBOSE` | Enable verbose OTel output | Default `false` |
 | `BERTBOT_KOOG_OTEL_OTLP_ENDPOINT` | OTLP exporter endpoint URL | Leave blank to disable OTel export |
+
+Koog chat memory and long-term retrieval are always enabled.
+
+## Session Recall
+
+When `BERTBOT_SESSION_RECALL_ENABLED=true`, BertBot injects relevant past session excerpts into the current turn's context window to improve continuity across turns.
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_SESSION_RECALL_ENABLED` | Enable session excerpt injection | Default `false` |
+| `BERTBOT_SESSION_RECALL_MAX_EXCERPTS` | Max excerpts injected per turn | Default `3` |
+| `BERTBOT_SESSION_RECALL_MAX_EXCERPT_CHARS` | Max character length per injected excerpt | Default `280` |
+
+## Routing Hints
+
+When `BERTBOT_ROUTING_HINTS_ENABLED=true`, BertBot reinforces sub-agent routing decisions using telemetry from past successful routes. Influence decays over time based on a configurable half-life.
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_ROUTING_HINTS_ENABLED` | Enable routing telemetry reinforcement | Default `false` |
+| `BERTBOT_ROUTING_HINTS_MIN_SAMPLES` | Min samples before a hint is applied | Default `5` |
+| `BERTBOT_ROUTING_HINTS_MAX_INFLUENCE` | Max fractional influence (0.0–1.0) | Default `0.25` |
+| `BERTBOT_ROUTING_HINTS_RECENCY_HALF_LIFE_HOURS` | Recency decay half-life in hours | Default `72` |
+
+## Prompt Optimizer
+
+When `BERTBOT_PROMPT_OPTIMIZER_ENABLED=true`, BertBot runs a background loop that periodically proposes and applies refinements to system prompt instructions based on observed outcomes.
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `BERTBOT_PROMPT_OPTIMIZER_ENABLED` | Enable background prompt refinement | Default `false` |
+| `BERTBOT_PROMPT_OPTIMIZER_MAX_INSTRUCTION_LINES` | Max lines added per optimizer cycle | Default `4` |
 
 ## Research Overrides
 
