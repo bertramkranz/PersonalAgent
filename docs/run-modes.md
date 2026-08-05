@@ -12,6 +12,11 @@ Related docs: [configuration.md](configuration.md) for required variables, [depl
 - `runWebhookServer`: HTTP ingress for Telegram, Slack, and WhatsApp.
 - `runDiscordBot`: Discord gateway-based two-way messaging.
 
+Mode selection differs by runtime surface:
+
+- Local Gradle runs choose mode by the task you execute (`run`, `runMcpServer`, `runWebhookServer`, and so on).
+- Containerized runs choose mode via `BERTBOT_RUN_MODE`, which is interpreted by [../docker/entrypoint.sh](../docker/entrypoint.sh).
+
 ## Interactive CLI
 
 Use when you want the original terminal-driven chat workflow.

@@ -17,8 +17,8 @@ FROM eclipse-temurin:17-jre
 WORKDIR /opt/bertbot
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nodejs npm git \
- && npm install -g npm@11 \
+ && apt-get install -y --no-install-recommends nodejs npm git curl \
+ && npm install -g npm@10 \
  && git clone --depth 1 --branch v0.0.8 https://github.com/gemini-cli-extensions/workspace.git /opt/google-workspace-extension \
  && cd /opt/google-workspace-extension \
  && npm install --no-audit --no-fund \
@@ -36,6 +36,5 @@ EXPOSE 8088
 
 ENV BERTBOT_RUN_MODE=webhook
 ENV BERTBOT_WEBHOOK_HOST=0.0.0.0
-ENV BERTBOT_WEBHOOK_PORT=8088
 
 ENTRYPOINT ["/entrypoint.sh"]

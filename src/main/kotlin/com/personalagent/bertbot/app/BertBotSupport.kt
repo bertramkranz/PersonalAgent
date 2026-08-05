@@ -6,7 +6,7 @@ import com.google.gson.JsonElement
 import com.openai.client.OpenAIClient
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import com.openai.models.ChatModel
-import com.personalagent.bertbot.agents.KoogStructuredOutputGateway
+import com.personalagent.bertbot.agents.DelegatingStructuredOutputGateway
 import com.personalagent.bertbot.agents.SelfCorrectingSkill
 import com.personalagent.bertbot.agents.SelfCorrectingSkillConfig
 import com.personalagent.bertbot.config.BertBotAgentConfig
@@ -316,7 +316,7 @@ internal fun createAssistantResponseSkill(
                 llmGateway = llmGateway,
                 outputFormatInstructions = "Return valid JSON object only: {\"response\": \"<assistant response>\"}",
                 parser = ::parseAssistantResponseEnvelope,
-                structuredOutputGateway = KoogStructuredOutputGateway(),
+                structuredOutputGateway = DelegatingStructuredOutputGateway(),
                 gatewayResolver = gatewayResolver,
             ),
     )

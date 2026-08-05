@@ -61,7 +61,7 @@ internal class BertBotRuntime(
     private val routingTelemetryStore: RoutingTelemetryStore? = null,
     private val scheduledJobService: ScheduledJobService? = null,
     private val learningProposalLoopService: LearningProposalLoopService? = null,
-    private val koogMemory: KoogMemoryIntegration = KoogMemoryIntegration(),
+    private val koogMemoryFeatureAdapter: KoogMemoryFeatureAdapter = KoogMemoryFeatureAdapter(),
     private val toolCapabilityRegistry: CapabilityRegistry? = null,
     private val runtimeCapabilitySnapshot: RuntimeCapabilitySnapshot = RuntimeCapabilitySnapshot(),
     private val runtimeCapabilitySnapshotProvider: (() -> RuntimeCapabilitySnapshot)? = null,
@@ -159,7 +159,7 @@ internal class BertBotRuntime(
                 recordDelegationRoutingOutcome(state, persistenceScopeKey)
                 recordLearningSignals(userMessage, persistenceScopeKey, state)
 
-                val koogPromptContext = koogMemory.buildPromptContext(persistenceScopeKey, userMessage)
+                val koogPromptContext = koogMemoryFeatureAdapter.buildPromptContext(persistenceScopeKey, userMessage)
                 val systemPrompt =
                     buildSystemPrompt(
                         config = config,
@@ -233,7 +233,7 @@ internal class BertBotRuntime(
                 )
                 if (!shouldGateMemoryWrites()) {
                     runCatching {
-                        koogMemory.recordTurn(
+                        koogMemoryFeatureAdapter.recordTurn(
                             scopeKey = persistenceScopeKey,
                             userMessage = userMessage,
                             assistantResponse = response,
@@ -606,7 +606,7 @@ internal class BertBotRuntime(
                         )
                 memoryRuntime.episodicMemory.append("ASSISTANT: ${payload.assistantResponse}")
                 runCatching {
-                    koogMemory.recordTurn(
+                    koogMemoryFeatureAdapter.recordTurn(
                         scopeKey = request.scopeKey,
                         userMessage = payload.userMessage,
                         assistantResponse = payload.assistantResponse,
@@ -995,7 +995,7 @@ internal object BertBotRuntimeFactory {
                 }
             }
         val koogConfiguration = resolveKoogFeatureRuntimeConfiguration()
-        val koogMemory = KoogRuntimeIntegrationFactory.createMemory(koogConfiguration, memoryRuntime)
+        val koogMemoryFeatureAdapter = KoogRuntimeIntegrationFactory.createMemory(koogConfiguration, memoryRuntime)
         val telemetry = KoogRuntimeIntegrationFactory.createTelemetry(koogConfiguration)
         val scheduledJobService =
             ScheduledJobService(
@@ -1034,7 +1034,7 @@ internal object BertBotRuntimeFactory {
                 routingTelemetryStore = routingTelemetryStore,
                 scheduledJobService = scheduledJobService,
                 learningProposalLoopService = learningProposalLoopService,
-                koogMemory = koogMemory,
+                koogMemoryFeatureAdapter = koogMemoryFeatureAdapter,
                 toolCapabilityRegistry = capabilityRegistry,
                 runtimeCapabilitySnapshot = runtimeCapabilitySnapshot,
                 runtimeCapabilitySnapshotProvider = runtimeCapabilitySnapshotProvider,

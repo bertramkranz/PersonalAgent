@@ -167,7 +167,7 @@ internal object BertBotRuntimeDependenciesFactory {
         persistenceConfiguration: PersistenceRuntimeConfiguration = resolvePersistenceRuntimeConfiguration(),
     ): AgentJsonCodec {
         return when (persistenceConfiguration.jsonCodec.lowercase()) {
-            "kotlinx", "kotlinx-serialization", "koog" -> KotlinxAgentJsonCodec()
+            "kotlinx", "kotlinx-serialization" -> KotlinxAgentJsonCodec()
             else -> GsonAgentJsonCodec()
         }
     }

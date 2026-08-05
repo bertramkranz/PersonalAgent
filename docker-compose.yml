@@ -13,14 +13,18 @@ services:
       BERTBOT_STATE_JDBC_URL: jdbc:postgresql://postgres:5432/bertbot
       BERTBOT_STATE_JDBC_USER: bertbot
       BERTBOT_STATE_JDBC_PASSWORD: bertbot
-      BERTBOT_WEBHOOK_HOST: 0.0.0.0
-      BERTBOT_WEBHOOK_PORT: 8088
       # Optional Discord mode overrides:
       # BERTBOT_RUN_MODE: discord
       # BERTBOT_DISCORD_ENABLED: "true"
       # BERTBOT_DISCORD_BOT_TOKEN: <token>
     ports:
       - "8088:8088"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
