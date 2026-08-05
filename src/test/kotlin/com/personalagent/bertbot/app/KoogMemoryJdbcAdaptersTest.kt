@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 class KoogMemoryJdbcAdaptersTest {
     @Test
-    fun `koog memory integration records turns into jdbc-backed memory runtime`() =
+    fun `koog memory feature adapter records turns into jdbc-backed memory runtime`() =
         runBlocking {
             val jdbcUrl =
                 "jdbc:h2:mem:koog_memory_jdbc_${UUID.randomUUID()};MODE=PostgreSQL;DB_CLOSE_DELAY=-1"
